@@ -97,7 +97,9 @@ fun Project.configureMavenArtifactUpload(
             validateTaskIsRegistered(Release.PROJECT_ARCHIVE_ZIP_TASK_NAME)
         }
         if (buildInfoTaskShouldBeRegistered(androidXExtension)) {
-            validateTaskIsRegistered(CreateLibraryBuildInfoFileTask.TASK_NAME)
+            if (!androidXExtension.isIsolatedProjectsEnabled()) {
+                validateTaskIsRegistered(CreateLibraryBuildInfoFileTask.TASK_NAME)
+            }
         }
     }
 }
@@ -163,7 +165,10 @@ private fun Project.configureComponentPublishing(
     }
 
     configure<PublishingExtension> {
-        repositories { it.maven { repo -> repo.setUrl(getRepositoryDirectory()) } }
+        repositories {
+            it.maven { repo -> repo.setUrl(getRepositoryDirectory()) }
+            it.maven { repo -> repo.setUrl(getPerProjectRepositoryDirectory()) }
+        }
         publications {
             if (appliesJavaGradlePluginPlugin()) {
                 // The 'java-gradle-plugin' will also add to the 'pluginMaven' publication

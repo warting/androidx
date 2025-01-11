@@ -25,7 +25,7 @@ import androidx.appsearch.flags.FlaggedApi;
 import androidx.appsearch.flags.Flags;
 import androidx.appsearch.safeparcel.AbstractSafeParcelable;
 import androidx.appsearch.safeparcel.SafeParcelable;
-import androidx.appsearch.safeparcel.stub.StubCreators;
+import androidx.appsearch.safeparcel.stub.StubCreators.RemoveBlobResponseCreator;
 import androidx.core.util.Preconditions;
 
 /**
@@ -36,14 +36,14 @@ import androidx.core.util.Preconditions;
  * blob handles.
  */
 @FlaggedApi(Flags.FLAG_ENABLE_BLOB_STORE)
-@SuppressWarnings("HiddenSuperclass")
+// TODO(b/384721898): Switch to JSpecify annotations
+@SuppressWarnings({"HiddenSuperclass", "JSpecifyNullness"})
 @SafeParcelable.Class(creator = "RemoveBlobResponseCreator")
 @ExperimentalAppSearchApi
 public final class RemoveBlobResponse extends AbstractSafeParcelable {
 
-    @NonNull
-    public static final Parcelable.Creator<RemoveBlobResponse> CREATOR =
-            new StubCreators.RemoveBlobResponseCreator();
+    public static final @NonNull Parcelable.Creator<RemoveBlobResponse> CREATOR =
+            new RemoveBlobResponseCreator();
 
     @Field(id = 1, getter = "getResponseParcel")
     private final AppSearchBatchResultParcelV2<AppSearchBlobHandle, Void> mResultParcel;
@@ -72,8 +72,7 @@ public final class RemoveBlobResponse extends AbstractSafeParcelable {
      * operation was successful, the result for that handle is {@code null}; if there was an error,
      * the result contains an {@link AppSearchResult} with details of the failure.
      */
-    @NonNull
-    public AppSearchBatchResult<AppSearchBlobHandle, Void> getResult() {
+    public @NonNull AppSearchBatchResult<AppSearchBlobHandle, Void> getResult() {
         return mResultParcel.getResult();
     }
 
@@ -82,13 +81,12 @@ public final class RemoveBlobResponse extends AbstractSafeParcelable {
      * @exportToFramework:hide
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-    @NonNull
-    public AppSearchBatchResultParcelV2<AppSearchBlobHandle, Void> getResponseParcel() {
+    public @NonNull AppSearchBatchResultParcelV2<AppSearchBlobHandle, Void> getResponseParcel() {
         return mResultParcel;
     }
 
     @Override
     public void writeToParcel(@NonNull Parcel dest, int flags) {
-        StubCreators.RemoveBlobResponseCreator.writeToParcel(this, dest, flags);
+        RemoveBlobResponseCreator.writeToParcel(this, dest, flags);
     }
 }

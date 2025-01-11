@@ -50,6 +50,9 @@ import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.attributes.BuildTypeAttr
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.CommonExtension
+import com.android.build.api.dsl.KotlinMultiplatformAndroidDeviceTestCompilation
+import com.android.build.api.dsl.KotlinMultiplatformAndroidHostTestCompilation
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.dsl.PrivacySandboxSdkExtension
 import com.android.build.api.dsl.TestBuildType
@@ -209,6 +212,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             androidXKmpExtension,
             componentFactory
         ) {
+            if (buildFeatures.isIsolatedProjectsEnabled()) return@configureMavenArtifactUpload
             project.addCreateLibraryBuildInfoFileTasks(androidXExtension, androidXKmpExtension)
         }
         project.publishInspectionArtifacts()
@@ -230,6 +234,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             if (androidXExtension.shouldPublish()) {
                 project.validatePublishedMultiplatformHasDefault()
                 project.addLicensesToPublishedArtifacts(androidXExtension.license)
+                project.registerValidateRelocatedDependenciesTask()
             }
             project.registerValidateMultiplatformSourceSetNamingTask()
             project.validateLintVersionTestExists(androidXExtension)
@@ -241,6 +246,8 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         project.configureSamplesProject()
         project.configureMaxDepVersions(androidXExtension)
         project.configureUnzipChromeBuildService()
+
+        project.plugins.apply("com.autonomousapps.dependency-analysis")
     }
 
     private fun initializeAndroidXExtension(project: Project): AndroidXExtension {
@@ -680,10 +687,9 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         project.configureJavaCompilationWarnings(androidXExtension)
     }
 
-    @Suppress("TYPEALIAS_EXPANSION_DEPRECATION")
     private fun configureWithKotlinMultiplatformAndroidPlugin(
         project: Project,
-        kotlinMultiplatformAndroidTarget: DeprecatedKotlinMultiplatformAndroidTarget,
+        kotlinMultiplatformAndroidTarget: KotlinMultiplatformAndroidLibraryTarget,
         androidXExtension: AndroidXExtension
     ) {
         val kotlinMultiplatformAndroidComponentsExtension =
@@ -722,6 +728,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         project.afterEvaluate {
             project.addToBuildOnServer("assembleAndroidMain")
             project.addToBuildOnServer("lint")
+            // Created to be consumed by docs-tip-of-tree
             project.configurations.create("androidIntermediates") {
                 it.isVisible = false
                 it.isCanBeResolved = false
@@ -908,6 +915,13 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                 it.buildTypes.configureEach { buildType ->
                     if (buildType.name == buildTypeForTests && !project.hasBenchmarkPlugin())
                         (buildType as TestBuildType).isDebuggable = true
+                    val blankProguardRules =
+                        project
+                            .getSupportRootFolder()
+                            .resolve("buildSrc/blank-proguard-rules/proguard-rules.pro")
+                    if (buildType.consumerProguardFiles.isEmpty()) {
+                        buildType.consumerProguardFiles.add(blankProguardRules)
+                    }
                 }
             }
             beforeVariants(selector().withBuildType("debug")) { variant -> variant.enable = false }
@@ -984,6 +998,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             it.enableStricterValidation.set(true)
             it.failOnWarning.set(true)
         }
+        project.addToBuildOnServer("validatePlugins")
         SdkResourceGenerator.generateForHostTest(project)
     }
 
@@ -1056,8 +1071,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             val isProbablyPublished =
                 androidXExtension.type == LibraryType.PUBLISHED_LIBRARY ||
                     androidXExtension.type ==
-                        LibraryType.PUBLISHED_LIBRARY_ONLY_USED_BY_KOTLIN_CONSUMERS ||
-                    androidXExtension.type == LibraryType.UNSET
+                        LibraryType.PUBLISHED_LIBRARY_ONLY_USED_BY_KOTLIN_CONSUMERS
             if (mavenGroup != null && isProbablyPublished && androidXExtension.shouldPublish()) {
                 validateProjectMavenGroup(mavenGroup.group)
                 validateProjectMavenName(androidXExtension.name.get(), mavenGroup.group)
@@ -1091,8 +1105,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         buildToolsVersion = project.defaultAndroidConfig.buildToolsVersion
 
-        // b/366238650
-        defaultConfig.ndk.abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+        defaultConfig.ndk.abiFilters.addAll(SUPPORTED_BUILD_ABIS)
         defaultConfig.minSdk = defaultMinSdk
         defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -1153,8 +1166,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         )
     }
 
-    @Suppress("TYPEALIAS_EXPANSION_DEPRECATION")
-    private fun DeprecatedKotlinMultiplatformAndroidTarget.configureAndroidBaseOptions(
+    private fun KotlinMultiplatformAndroidLibraryTarget.configureAndroidBaseOptions(
         project: Project,
         componentsExtension: KotlinMultiplatformAndroidComponentsExtension
     ) {
@@ -1168,13 +1180,13 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         lint.targetSdk = project.defaultAndroidConfig.targetSdk
         compilations
-            .withType(DeprecatedKotlinMultiplatformAndroidTestOnDeviceCompilation::class.java)
+            .withType(KotlinMultiplatformAndroidDeviceTestCompilation::class.java)
             .configureEach {
                 it.instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                 it.animationsDisabled = true
             }
         compilations
-            .withType(DeprecatedKotlinMultiplatformAndroidTestOnJvmCompilation::class.java)
+            .withType(KotlinMultiplatformAndroidHostTestCompilation::class.java)
             .configureEach {
                 it.isReturnDefaultValues = true
                 // Include resources in Robolectric tests as a workaround for b/184641296
@@ -1304,8 +1316,9 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         androidXExtension: AndroidXExtension,
         taskConfigurator: (TaskProvider<VerifyDependencyVersionsTask>) -> Unit
     ) {
+        if (buildFeatures.isIsolatedProjectsEnabled()) return
         afterEvaluate {
-            if (androidXExtension.type !in listOf(LibraryType.UNSET, LibraryType.SAMPLES)) {
+            if (androidXExtension.type.requiresDependencyVerification()) {
                 val verifyDependencyVersionsTask = project.createVerifyDependencyVersionsTask()
                 if (verifyDependencyVersionsTask != null) {
                     taskConfigurator(verifyDependencyVersionsTask)
@@ -1317,7 +1330,9 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     // If this project wants other project in the same group to have the same version,
     // this function configures those constraints.
     private fun Project.configureConstraintsWithinGroup(androidXExtension: AndroidXExtension) {
-        if (!project.shouldAddGroupConstraints().get()) {
+        if (
+            !project.shouldAddGroupConstraints().get() || buildFeatures.isIsolatedProjectsEnabled()
+        ) {
             return
         }
         project.afterEvaluate {
@@ -1367,7 +1382,8 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                     continue
                 }
                 // We only emit constraints referring to projects that will release
-                val otherFilepath = File(otherProject.filePath, "build.gradle")
+                val otherFilepath =
+                    getSupportRootFolder().resolve(File(otherProject.filePath, "build.gradle"))
                 val parsed = parseBuildFile(otherFilepath)
                 if (!parsed.shouldRelease()) {
                     continue
@@ -1445,6 +1461,9 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         const val EXTENSION_NAME = "androidx"
 
+        // b/366238650
+        val SUPPORTED_BUILD_ABIS = listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+
         /** Fail the build if a non-Studio task runs longer than expected */
         const val TASK_TIMEOUT_MINUTES = 60L
     }
@@ -1483,6 +1502,10 @@ private fun Project.validateLintVersionTestExists(androidXExtension: AndroidXExt
 /** Returns whether the configuration is used for testing. */
 private fun Configuration.isTest(): Boolean = name.lowercase().contains("test")
 
+/** Returns whether the configuration is part of publication. */
+internal fun Configuration.isPublished(): Boolean =
+    !isTest() && !name.lowercase().contains("metadata") && !name.endsWith("CInterop")
+
 /**
  * Hides a project's Javadoc tasks from the output of `./gradlew tasks` by setting their group to
  * `null`.
@@ -1518,11 +1541,20 @@ val Project.androidXExtension: AndroidXExtension
  * [TASK_TIMEOUT_MINUTES].
  */
 internal fun Project.configureTaskTimeouts() {
+    // A set of tasks that sometimes take >60 minutes. b/383874664
+    val slowTasks =
+        setOf(
+            ":compose:ui:ui:compileReleaseAndroidTestKotlinAndroid",
+            ":compose:foundation:foundation:compileReleaseAndroidTestKotlinAndroid",
+            ":compose:foundation:foundation:integration-tests:lazy-tests:compileReleaseAndroidTestKotlin"
+        )
     tasks.configureEach { t ->
         // skip adding a timeout for some tasks that both take a long time and
         // that we can count on the user to monitor
         if (t !is StudioTask) {
-            t.timeout.set(Duration.ofMinutes(TASK_TIMEOUT_MINUTES))
+            t.timeout.set(
+                Duration.ofMinutes(if (t.path in slowTasks) 80L else TASK_TIMEOUT_MINUTES)
+            )
         }
     }
 }
@@ -1617,10 +1649,6 @@ fun Project.validateProjectParser(androidXExtension: AndroidXExtension) {
         check(androidXExtension.type == parsed.libraryType) {
             "$errorPrefix Incorrectly computed libraryType = ${parsed.libraryType} " +
                 "instead of ${androidXExtension.type}"
-        }
-        check(androidXExtension.publish == parsed.publish) {
-            "$errorPrefix Incorrectly computed publish = ${parsed.publish} " +
-                "instead of ${androidXExtension.publish}"
         }
         check(androidXExtension.shouldPublish() == parsed.shouldPublish()) {
             "$errorPrefix Incorrectly computed shouldPublish() = ${parsed.shouldPublish()} " +

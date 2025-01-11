@@ -16,9 +16,10 @@
 
 package androidx.appsearch.localstorage.converter;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
+import androidx.appsearch.app.FeatureConstants;
 import androidx.appsearch.app.SearchSuggestionSpec;
+import androidx.appsearch.localstorage.NamespaceCache;
 import androidx.appsearch.localstorage.SchemaCache;
 import androidx.core.util.Preconditions;
 
@@ -28,6 +29,9 @@ import com.google.android.icing.proto.SuggestionSpecProto;
 import com.google.android.icing.proto.TermMatchType;
 import com.google.android.icing.proto.TypePropertyMask;
 
+import org.jspecify.annotations.NonNull;
+
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,23 +68,21 @@ public final class SearchSuggestionSpecToProtoConverter {
      * @param suggestionQueryExpression The non-empty query expression used to be completed.
      * @param searchSuggestionSpec      The spec we need to convert from.
      * @param prefixes                  Set of database prefix which the caller want to access.
-     * @param namespaceMap              The cached Map of {@code <Prefix, Set<PrefixedNamespace>>}
-     *                                  stores all prefixed namespace filters which are stored in
-     *                                  AppSearch.
+     * @param namespaceCache            The NamespaceCache instance held in AppSearch.
      */
     public SearchSuggestionSpecToProtoConverter(
             @NonNull String suggestionQueryExpression,
             @NonNull SearchSuggestionSpec searchSuggestionSpec,
             @NonNull Set<String> prefixes,
-            @NonNull Map<String, Set<String>> namespaceMap,
+            @NonNull NamespaceCache namespaceCache,
             @NonNull SchemaCache schemaCache) {
         mSuggestionQueryExpression = Preconditions.checkNotNull(suggestionQueryExpression);
         mSearchSuggestionSpec = Preconditions.checkNotNull(searchSuggestionSpec);
         mPrefixes = Preconditions.checkNotNull(prefixes);
-        Preconditions.checkNotNull(namespaceMap);
+        Preconditions.checkNotNull(namespaceCache);
         mTargetPrefixedNamespaceFilters =
                 SearchSpecToProtoConverterUtil.generateTargetNamespaceFilters(
-                        prefixes, namespaceMap, searchSuggestionSpec.getFilterNamespaces());
+                        prefixes, namespaceCache, searchSuggestionSpec.getFilterNamespaces());
         mTargetPrefixedSchemaFilters =
                 SearchSpecToProtoConverterUtil.generateTargetSchemaFilters(
                         prefixes, schemaCache, searchSuggestionSpec.getFilterSchemas());
@@ -98,8 +100,7 @@ public final class SearchSuggestionSpecToProtoConverter {
      * Extracts {@link SuggestionSpecProto} information from a {@link SearchSuggestionSpec}.
      *
      */
-    @NonNull
-    public SuggestionSpecProto toSearchSuggestionSpecProto() {
+    public @NonNull SuggestionSpecProto toSearchSuggestionSpecProto() {
         // Set query suggestion prefix to the SearchSuggestionProto and override schema and
         // namespace filter by targetPrefixedFilters which contains all existing and also
         // accessible to the caller filters.
@@ -109,6 +110,8 @@ public final class SearchSuggestionSpecToProtoConverter {
                 .addAllSchemaTypeFilters(mTargetPrefixedSchemaFilters)
                 .setNumToReturn(mSearchSuggestionSpec.getMaximumResultCount())
                 .addAllQueryParameterStrings(mSearchSuggestionSpec.getSearchStringParameters());
+
+        setMinimumQueryFeaturesEnabled(protoBuilder);
 
         // Convert type property filter map into type property mask proto.
         for (Map.Entry<String, List<String>> entry :
@@ -160,5 +163,21 @@ public final class SearchSuggestionSpecToProtoConverter {
                 throw new IllegalArgumentException("Invalid suggestion ranking strategy: "
                         + rankingStrategyCode);
         }
+    }
+
+    // When the SearchSuggestions api first launched, it did not include the various "set feature
+    // enabled" apis that {@link SearchSpec} has. This means that any suggestion query sent to
+    // platform-storage that invokes a query feature not present in Android T, will throw an error.
+    //
+    // To mitigate this, we enable all query features that were present at the time that the
+    // SearchSuggestions api launched. This will NOT resolve the issue for any features added
+    // *after* that time. Resolution of those cases will have to wait for the addition of the proper
+    // "set feature enabled" apis.
+    private static void setMinimumQueryFeaturesEnabled(SuggestionSpecProto.Builder protoBuilder) {
+        protoBuilder.addAllEnabledFeatures(
+                Arrays.asList(
+                        FeatureConstants.LIST_FILTER_QUERY_LANGUAGE,
+                        FeatureConstants.NUMERIC_SEARCH,
+                        FeatureConstants.VERBATIM_SEARCH));
     }
 }

@@ -39,7 +39,6 @@ import androidx.privacysandbox.ui.core.IRemoteSessionController
 import androidx.privacysandbox.ui.core.ISandboxedUiAdapter
 import androidx.privacysandbox.ui.core.ProtocolConstants
 import androidx.privacysandbox.ui.core.SandboxedUiAdapter
-import androidx.privacysandbox.ui.core.SessionObserverFactory
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -109,7 +108,7 @@ object SandboxedUiAdapterFactory {
 
         private val targetSessionClientClass =
             Class.forName(
-                SandboxedUiAdapter.SessionClient::class.java.name,
+                "androidx.privacysandbox.ui.core.SandboxedUiAdapter\$SessionClient",
                 /* initialize = */ false,
                 uiProviderBinder.javaClass.classLoader
             )
@@ -119,7 +118,7 @@ object SandboxedUiAdapterFactory {
         // need reflection to get hold of it.
         private val openSessionMethod: Method =
             Class.forName(
-                    SandboxedUiAdapter::class.java.name,
+                    "androidx.privacysandbox.ui.core.SandboxedUiAdapter",
                     /*initialize=*/ false,
                     uiProviderBinder.javaClass.classLoader
                 )
@@ -167,10 +166,6 @@ object SandboxedUiAdapterFactory {
             }
         }
 
-        override fun addObserverFactory(sessionObserverFactory: SessionObserverFactory) {}
-
-        override fun removeObserverFactory(sessionObserverFactory: SessionObserverFactory) {}
-
         private class SessionClientProxyHandler(
             private val origClient: SandboxedUiAdapter.SessionClient,
         ) : InvocationHandler {
@@ -214,7 +209,7 @@ object SandboxedUiAdapterFactory {
 
             private val targetClass =
                 Class.forName(
-                        SandboxedUiAdapter.Session::class.java.name,
+                        "androidx.privacysandbox.ui.core.SandboxedUiAdapter\$Session",
                         /* initialize = */ false,
                         origSession.javaClass.classLoader
                     )
@@ -297,10 +292,6 @@ object SandboxedUiAdapterFactory {
                 )
             }
         }
-
-        override fun addObserverFactory(sessionObserverFactory: SessionObserverFactory) {}
-
-        override fun removeObserverFactory(sessionObserverFactory: SessionObserverFactory) {}
 
         class RemoteSessionClient(
             val context: Context,
@@ -391,7 +382,6 @@ object SandboxedUiAdapterFactory {
                 }
             }
 
-            @SuppressLint("ClassVerificationFailure")
             override fun notifyResized(width: Int, height: Int) {
 
                 val parentView = surfaceView.parent as View

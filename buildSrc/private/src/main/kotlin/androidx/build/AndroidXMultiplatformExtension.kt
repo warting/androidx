@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-@file:Suppress(
-    "UnstableApiUsage",
-    "TYPEALIAS_EXPANSION_DEPRECATION"
-) // // KotlinMultiplatformAndroidTarget / DeprecatedKotlinMultiplatformAndroidTarget
+@file:Suppress("UnstableApiUsage")
 
 package androidx.build
 
@@ -25,6 +22,7 @@ import androidx.build.clang.AndroidXClang
 import androidx.build.clang.MultiTargetNativeCompilation
 import androidx.build.clang.NativeLibraryBundler
 import androidx.build.clang.configureCinterop
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.gradle.api.KotlinMultiplatformAndroidPlugin
 import groovy.lang.Closure
 import java.io.File
@@ -50,7 +48,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTargetWithHostTests
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWasmTargetDsl
 import org.jetbrains.kotlin.gradle.targets.js.ir.DefaultIncrementalSyncTask
-import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension
+import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
 import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnLockMismatchReport
 import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension
@@ -78,10 +76,10 @@ open class AndroidXMultiplatformExtension(val project: Project) {
         // make sure to initialize the kotlin extension by accessing the property
         val extension = (kotlinExtension as ExtensionAware)
         project.plugins.apply(KotlinMultiplatformAndroidPlugin::class.java)
-        extension.extensions.getByType(DeprecatedKotlinMultiplatformAndroidTarget::class.java)
+        extension.extensions.getByType(KotlinMultiplatformAndroidLibraryTarget::class.java)
     }
 
-    val agpKmpExtension: DeprecatedKotlinMultiplatformAndroidTarget by agpKmpExtensionDelegate
+    val agpKmpExtension: KotlinMultiplatformAndroidLibraryTarget by agpKmpExtensionDelegate
 
     /**
      * The list of platforms that have been declared as supported in the build configuration.
@@ -420,8 +418,8 @@ open class AndroidXMultiplatformExtension(val project: Project) {
 
     @JvmOverloads
     fun androidLibrary(
-        block: Action<DeprecatedKotlinMultiplatformAndroidTarget>? = null
-    ): DeprecatedKotlinMultiplatformAndroidTarget? {
+        block: Action<KotlinMultiplatformAndroidLibraryTarget>? = null
+    ): KotlinMultiplatformAndroidLibraryTarget? {
         supportedPlatforms.add(PlatformIdentifier.ANDROID)
         return if (project.enableJvm()) {
             agpKmpExtension.also { block?.execute(it) }
@@ -748,16 +746,18 @@ private fun Project.configureWasm() {
 }
 
 private fun Project.configureNode() {
-    rootProject.extensions.findByType<NodeJsRootExtension>()?.let { nodeJs ->
-        nodeJs.version = getVersionByName("node")
+    extensions.findByType<NodeJsEnvSpec>()?.let { nodeJs ->
+        nodeJs.version.set(getVersionByName("node"))
         if (!ProjectLayoutType.isPlayground(this)) {
-            nodeJs.downloadBaseUrl =
+            nodeJs.downloadBaseUrl.set(
                 File(project.getPrebuiltsRoot(), "androidx/external/org/nodejs/node")
                     .toURI()
                     .toString()
+            )
         }
     }
 
+    // https://youtrack.jetbrains.com/issue/KT-73913/K-Wasm-yarn-version-per-project
     rootProject.extensions.findByType(YarnRootExtension::class.java)?.let { yarn ->
         yarn.version = getVersionByName("yarn")
         yarn.yarnLockMismatchReport = YarnLockMismatchReport.FAIL
@@ -783,6 +783,9 @@ private fun Project.configureKotlinJsTests() =
                 )
             }
         }
+        task.testLogging.showStandardStreams = true
+        // From: https://nodejs.org/api/cli.html
+        task.nodeJsArgs.addAll(listOf("--trace-warnings", "--trace-uncaught", "--trace-sigint"))
     }
 
 fun Project.validatePublishedMultiplatformHasDefault() {

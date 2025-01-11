@@ -21,8 +21,9 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.params.SessionConfiguration;
 
 import androidx.annotation.IntDef;
-import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
+
+import org.jspecify.annotations.NonNull;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -53,8 +54,8 @@ public interface CameraDeviceSetupCompat {
      * @see CameraDevice.CameraDeviceSetup#isSessionConfigurationSupported
      */
     @NonNull
-    SupportQueryResult isSessionConfigurationSupported(@NonNull SessionConfiguration sessionConfig)
-            throws CameraAccessException;
+    SupportQueryResult isSessionConfigurationSupported(
+            @NonNull SessionConfiguration sessionConfig) throws CameraAccessException;
 
     /**
      * Result of a {@link CameraDeviceSetupCompat#isSessionConfigurationSupported} query.
@@ -128,7 +129,8 @@ public interface CameraDeviceSetupCompat {
          * @param source          The source of the result.
          * @param timestampMillis The epoch timestamp of when the result was updated.
          */
-        public SupportQueryResult(int supported, int source, long timestampMillis) {
+        public SupportQueryResult(@Supported int supported, @Sources int source,
+                long timestampMillis) {
             mSupported = supported;
             mSource = source;
             mTimestampMillis = timestampMillis;

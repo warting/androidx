@@ -50,6 +50,7 @@ androidXMultiplatform {
                 implementation(project(":compose:ui:ui-text"))
                 implementation(project(":compose:ui:ui-util"))
                 implementation(project(":compose:foundation:foundation-layout"))
+                implementation(project(":performance:performance-annotation"))
             }
         }
 
@@ -80,12 +81,16 @@ androidXMultiplatform {
             dependsOn(commonMain)
         }
 
-        jvmStubsMain {
+        nonAndroidStubsMain {
             dependsOn(commonStubsMain)
         }
 
+        jvmStubsMain {
+            dependsOn(nonAndroidStubsMain)
+        }
+
         linuxx64StubsMain {
-            dependsOn(commonStubsMain)
+            dependsOn(nonAndroidStubsMain)
         }
 
         androidInstrumentedTest {
@@ -125,6 +130,7 @@ androidXMultiplatform {
                 implementation(libs.kotlinReflect)
                 implementation(libs.mockitoCore4)
                 implementation(libs.mockitoKotlin4)
+                implementation(libs.dexmakerMockitoInlineExtended)
                 implementation(libs.byteBuddy)
                 implementation(project(":constraintlayout:constraintlayout-compose"))
             }
@@ -137,12 +143,9 @@ dependencies {
     lintPublish(project(":compose:foundation:foundation-lint"))
 }
 
-// Screenshot tests related setup
 android {
-    compileSdk 35
-    sourceSets.androidTest.assets.srcDirs +=
-            project.rootDir.absolutePath + "/../../golden/compose/foundation/foundation"
-    namespace "androidx.compose.foundation"
+    compileSdk = 35
+    namespace = "androidx.compose.foundation"
     buildTypes.configureEach {
         consumerProguardFiles("proguard-rules.pro")
     }
@@ -159,4 +162,5 @@ androidx {
     metalavaK2UastEnabled = false
     samples(project(":compose:foundation:foundation:foundation-samples"))
     kotlinTarget = KotlinTarget.KOTLIN_1_9
+    addGoldenImageAssets()
 }

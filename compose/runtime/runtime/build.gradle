@@ -44,8 +44,9 @@ androidXMultiplatform {
         commonMain {
             dependencies {
                 implementation(libs.kotlinStdlibCommon)
-                implementation(libs.kotlinCoroutinesCore)
+                api(libs.kotlinCoroutinesCore)
                 implementation(project(":collection:collection"))
+                implementation(project(":performance:performance-annotation"))
             }
         }
 
@@ -78,7 +79,6 @@ androidXMultiplatform {
             dependsOn(nonEmulatorJvmMain)
             dependencies {
                 implementation(libs.kotlinStdlib)
-                api(libs.kotlinCoroutinesCore)
             }
         }
 
@@ -138,7 +138,7 @@ android {
     defaultConfig {
         consumerProguardFiles 'proguard-rules.pro'
     }
-    namespace "androidx.compose.runtime"
+    namespace = "androidx.compose.runtime"
 }
 
 androidx {

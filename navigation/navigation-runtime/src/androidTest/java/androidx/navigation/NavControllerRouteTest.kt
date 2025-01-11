@@ -2335,6 +2335,25 @@ class NavControllerRouteTest {
 
     @UiThreadTest
     @Test
+    fun testGetBackStackEntryWithKClassNonReified() {
+        val navController = createNavController()
+        navController.graph =
+            navController.createGraph(startDestination = "start") {
+                test("start")
+                test<TestClass>()
+            }
+
+        navController.navigate(TEST_CLASS_ROUTE)
+
+        val navigator = navController.navigatorProvider.getNavigator(TestNavigator::class.java)
+        assertThat(navigator.backStack.size).isEqualTo(2)
+
+        val entry = navController.getBackStackEntry(TestClass::class)
+        assertThat(entry.destination.route).isEqualTo(TEST_CLASS_ROUTE)
+    }
+
+    @UiThreadTest
+    @Test
     fun testGetBackStackEntryWithKClassArg() {
         val navController = createNavController()
         navController.graph =
@@ -2830,6 +2849,25 @@ class NavControllerRouteTest {
         assertThat(navigator.backStack.size).isEqualTo(2)
 
         val popped = navController.popBackStack<TestClass>(true)
+        assertThat(popped).isTrue()
+        assertThat(navigator.backStack.size).isEqualTo(1)
+    }
+
+    @UiThreadTest
+    @Test
+    fun testPopBackStackWithKClassNonReified() {
+        val navController = createNavController()
+        navController.graph =
+            navController.createGraph(startDestination = "start") {
+                test("start")
+                test<TestClass>()
+            }
+        navController.navigate(TestClass())
+
+        val navigator = navController.navigatorProvider.getNavigator(TestNavigator::class.java)
+        assertThat(navigator.backStack.size).isEqualTo(2)
+
+        val popped = navController.popBackStack(TestClass::class, true)
         assertThat(popped).isTrue()
         assertThat(navigator.backStack.size).isEqualTo(1)
     }
@@ -3501,6 +3539,26 @@ class NavControllerRouteTest {
         assertThat(popped).isTrue()
 
         val cleared = navController.clearBackStack<TestClass>()
+        assertThat(cleared).isTrue()
+    }
+
+    @UiThreadTest
+    @Test
+    fun testClearBackStackWithKClassNonReified() {
+        val navController = createNavController()
+        navController.graph =
+            navController.createGraph(startDestination = "start") {
+                test("start")
+                test<TestClass>()
+            }
+
+        navController.navigate(TEST_CLASS_ROUTE)
+        assertThat(navController.currentBackStack.value.size).isEqualTo(3)
+
+        val popped = navController.popBackStack<TestClass>(true, true)
+        assertThat(popped).isTrue()
+
+        val cleared = navController.clearBackStack(TestClass::class)
         assertThat(cleared).isTrue()
     }
 

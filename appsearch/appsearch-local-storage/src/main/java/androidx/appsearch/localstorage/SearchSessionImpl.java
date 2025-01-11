@@ -25,8 +25,6 @@ import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 import androidx.appsearch.app.AppSearchBatchResult;
 import androidx.appsearch.app.AppSearchBlobHandle;
@@ -50,6 +48,7 @@ import androidx.appsearch.app.SearchResults;
 import androidx.appsearch.app.SearchSpec;
 import androidx.appsearch.app.SearchSuggestionResult;
 import androidx.appsearch.app.SearchSuggestionSpec;
+import androidx.appsearch.app.SetBlobVisibilityRequest;
 import androidx.appsearch.app.SetSchemaRequest;
 import androidx.appsearch.app.SetSchemaResponse;
 import androidx.appsearch.app.StorageInfo;
@@ -66,6 +65,9 @@ import androidx.core.util.Preconditions;
 
 import com.google.android.icing.proto.PersistType;
 import com.google.common.util.concurrent.ListenableFuture;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -88,7 +90,7 @@ class SearchSessionImpl implements AppSearchSession {
     private final Executor mExecutor;
     private final Features mFeatures;
     private final String mDatabaseName;
-    @Nullable private final AppSearchLogger mLogger;
+    private final @Nullable AppSearchLogger mLogger;
 
     private final String mPackageName;
     private final CallerAccess mSelfCallerAccess;
@@ -115,8 +117,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<SetSchemaResponse> setSchemaAsync(
+    public @NonNull ListenableFuture<SetSchemaResponse> setSchemaAsync(
             @NonNull SetSchemaRequest request) {
         Preconditions.checkNotNull(request);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
@@ -334,16 +335,14 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<GetSchemaResponse> getSchemaAsync() {
+    public @NonNull ListenableFuture<GetSchemaResponse> getSchemaAsync() {
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
         return execute(
                 () -> mAppSearchImpl.getSchema(mPackageName, mDatabaseName, mSelfCallerAccess));
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Set<String>> getNamespacesAsync() {
+    public @NonNull ListenableFuture<Set<String>> getNamespacesAsync() {
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
         return execute(() -> {
             List<String> namespaces = mAppSearchImpl.getNamespaces(mPackageName, mDatabaseName);
@@ -352,8 +351,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<AppSearchBatchResult<String, Void>> putAsync(
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, Void>> putAsync(
             @NonNull PutDocumentsRequest request) {
         Preconditions.checkNotNull(request);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
@@ -395,9 +393,8 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<AppSearchBatchResult<String, GenericDocument>> getByDocumentIdAsync(
-            @NonNull GetByDocumentIdRequest request) {
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, GenericDocument>>
+            getByDocumentIdAsync(@NonNull GetByDocumentIdRequest request) {
         Preconditions.checkNotNull(request);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
         return execute(() -> {
@@ -419,11 +416,10 @@ class SearchSessionImpl implements AppSearchSession {
         });
     }
 
-    @NonNull
     @Override
     @ExperimentalAppSearchApi
     // TODO(b/273591938) support change notification for put blob.
-    public ListenableFuture<OpenBlobForWriteResponse>
+    public @NonNull ListenableFuture<OpenBlobForWriteResponse>
             openBlobForWriteAsync(@NonNull Set<AppSearchBlobHandle> handles) {
         Preconditions.checkNotNull(handles);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
@@ -445,10 +441,9 @@ class SearchSessionImpl implements AppSearchSession {
         });
     }
 
-    @NonNull
     @Override
     @ExperimentalAppSearchApi
-    public ListenableFuture<RemoveBlobResponse> removeBlobAsync(
+    public @NonNull ListenableFuture<RemoveBlobResponse> removeBlobAsync(
             @NonNull Set<AppSearchBlobHandle> handles) {
         Preconditions.checkNotNull(handles);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
@@ -467,11 +462,10 @@ class SearchSessionImpl implements AppSearchSession {
         });
     }
 
-    @NonNull
     @Override
     @ExperimentalAppSearchApi
     // TODO(b/273591938) support change notification for put blob.
-    public ListenableFuture<CommitBlobResponse> commitBlobAsync(
+    public @NonNull ListenableFuture<CommitBlobResponse> commitBlobAsync(
             @NonNull Set<AppSearchBlobHandle> handles) {
         Preconditions.checkNotNull(handles);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
@@ -493,10 +487,9 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
 
-    @NonNull
     @Override
     @ExperimentalAppSearchApi
-    public ListenableFuture<OpenBlobForReadResponse> openBlobForReadAsync(
+    public @NonNull ListenableFuture<OpenBlobForReadResponse> openBlobForReadAsync(
             @NonNull Set<AppSearchBlobHandle> handles) {
         Preconditions.checkNotNull(handles);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
@@ -519,8 +512,25 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public SearchResults search(
+    @ExperimentalAppSearchApi
+    public @NonNull ListenableFuture<Void> setBlobVisibilityAsync(
+            @NonNull SetBlobVisibilityRequest request) {
+        Preconditions.checkNotNull(request);
+        Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
+        return execute(() -> {
+            List<InternalVisibilityConfig> visibilityConfigs =
+                    InternalVisibilityConfig.toInternalVisibilityConfigs(request);
+            mAppSearchImpl.setBlobNamespaceVisibility(
+                    mPackageName,
+                    mDatabaseName,
+                    visibilityConfigs);
+            mIsMutated = true;
+            return null;
+        });
+    }
+
+    @Override
+    public @NonNull SearchResults search(
             @NonNull String queryExpression,
             @NonNull SearchSpec searchSpec) {
         Preconditions.checkNotNull(queryExpression);
@@ -536,9 +546,8 @@ class SearchSessionImpl implements AppSearchSession {
                 mLogger);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<List<SearchSuggestionResult>> searchSuggestionAsync(
+    public @NonNull ListenableFuture<List<SearchSuggestionResult>> searchSuggestionAsync(
             @NonNull String suggestionQueryExpression,
             @NonNull SearchSuggestionSpec searchSuggestionSpec) {
         Preconditions.checkNotNull(suggestionQueryExpression);
@@ -553,8 +562,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<Void> reportUsageAsync(@NonNull ReportUsageRequest request) {
+    public @NonNull ListenableFuture<Void> reportUsageAsync(@NonNull ReportUsageRequest request) {
         Preconditions.checkNotNull(request);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
         return execute(() -> {
@@ -571,8 +579,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<AppSearchBatchResult<String, Void>> removeAsync(
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, Void>> removeAsync(
             @NonNull RemoveByDocumentIdRequest request) {
         Preconditions.checkNotNull(request);
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
@@ -610,8 +617,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<Void> removeAsync(
+    public @NonNull ListenableFuture<Void> removeAsync(
             @NonNull String queryExpression, @NonNull SearchSpec searchSpec) {
         Preconditions.checkNotNull(queryExpression);
         Preconditions.checkNotNull(searchSpec);
@@ -645,25 +651,22 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
     @ExperimentalAppSearchApi
-    public ListenableFuture<StorageInfo> getStorageInfoAsync() {
+    public @NonNull ListenableFuture<StorageInfo> getStorageInfoAsync() {
         Preconditions.checkState(!mIsClosed, "AppSearchSession has already been closed");
         return execute(() -> mAppSearchImpl.getStorageInfoForDatabase(mPackageName, mDatabaseName));
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Void> requestFlushAsync() {
+    public @NonNull ListenableFuture<Void> requestFlushAsync() {
         return execute(() -> {
             mAppSearchImpl.persistToDisk(PersistType.Code.FULL);
             return null;
         });
     }
 
-    @NonNull
     @Override
-    public Features getFeatures() {
+    public @NonNull Features getFeatures() {
         return mFeatures;
     }
 
@@ -692,7 +695,7 @@ class SearchSessionImpl implements AppSearchSession {
      */
     private SetSchemaResponse setSchemaNoMigrations(@NonNull SetSchemaRequest request,
             @NonNull List<InternalVisibilityConfig> visibilityConfigs,
-            @Nullable SetSchemaStats.Builder setSchemaStatsBuilder)
+            SetSchemaStats.@Nullable Builder setSchemaStatsBuilder)
             throws AppSearchException {
         if (setSchemaStatsBuilder != null) {
             setSchemaStatsBuilder.setSchemaMigrationCallType(SchemaMigrationStats.NO_MIGRATION);

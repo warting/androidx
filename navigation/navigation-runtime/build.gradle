@@ -71,7 +71,7 @@ dependencies {
 }
 
 android {
-    namespace "androidx.navigation"
+    namespace = "androidx.navigation"
 }
 
 androidx {
@@ -79,6 +79,5 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY
     inceptionYear = "2017"
     description = "Android Navigation-Runtime"
-    legacyDisableKotlinStrictApiMode = true
     kotlinTarget = KotlinTarget.KOTLIN_1_9
 }

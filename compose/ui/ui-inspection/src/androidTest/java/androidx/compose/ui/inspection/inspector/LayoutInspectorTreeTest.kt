@@ -166,6 +166,12 @@ class LayoutInspectorTreeTest {
         assertThat(DEBUG).isFalse()
     }
 
+    @Test // regression test for b/383639244
+    fun noViews() {
+        val builder = LayoutInspectorTree()
+        builder.convert(emptyList())
+    }
+
     @Test
     fun buildTree() {
         val slotTableRecord = CompositionDataRecord.create()
@@ -565,7 +571,8 @@ class LayoutInspectorTreeTest {
 
         val builder = LayoutInspectorTree()
 
-        val appNodes = builder.convert(appView)
+        val allNodes = builder.convert(listOf(appView, dialogView))
+        val appNodes = allNodes[appView.uniqueDrawingId] ?: emptyList()
         dumpSlotTableSet(slotTableRecord)
         dumpNodes(appNodes, appView, builder)
 
@@ -585,8 +592,7 @@ class LayoutInspectorTreeTest {
             )
         }
 
-        val dialogContentNodes = builder.convert(dialogView)
-        val dialogNodes = builder.addSubCompositionRoots(dialogView, dialogContentNodes)
+        val dialogNodes = allNodes[dialogView.uniqueDrawingId] ?: emptyList()
         dumpNodes(dialogNodes, dialogView, builder)
 
         // Verify that the AlertDialog is captured with content
@@ -629,7 +635,8 @@ class LayoutInspectorTreeTest {
         popupView.setTag(R.id.inspection_slot_table_set, slotTableRecord.store)
         val builder = LayoutInspectorTree()
 
-        val appNodes = builder.convert(appView)
+        val allNodes = builder.convert(listOf(appView, popupView))
+        val appNodes = allNodes[appView.uniqueDrawingId] ?: emptyList()
         dumpNodes(appNodes, appView, builder)
 
         // Verify that the main app does not contain the Popup
@@ -648,8 +655,7 @@ class LayoutInspectorTreeTest {
             )
         }
 
-        val popupContentNodes = builder.convert(popupView)
-        val popupNodes = builder.addSubCompositionRoots(popupView, popupContentNodes)
+        val popupNodes = allNodes[popupView.uniqueDrawingId] ?: emptyList()
         dumpNodes(popupNodes, popupView, builder)
 
         // Verify that the Popup is captured with content
@@ -772,6 +778,7 @@ class LayoutInspectorTreeTest {
         val firstTextView = textViews.filterIsInstance<TextView>().first { it.text == "first" }
         val secondTextView = textViews.filterIsInstance<TextView>().first { it.text == "second" }
         val composeNodes = nodes.flatMap { it.flatten() }.filter { it.name == "ComposeNode" }
+        assertThat(composeNodes).hasSize(2)
         assertThat(composeNodes[0].viewId).isEqualTo(viewParent(secondTextView)?.uniqueDrawingId)
         assertThat(composeNodes[1].viewId).isEqualTo(viewParent(firstTextView)?.uniqueDrawingId)
     }
@@ -1343,3 +1350,6 @@ internal fun Inspectable(
 fun InlineParameters(size: Dp, fontSize: TextUnit) {
     Text("$size $fontSize")
 }
+
+fun LayoutInspectorTree.convert(view: View): List<InspectorNode> =
+    convert(listOf(view))[view.uniqueDrawingId] ?: emptyList()

@@ -53,9 +53,8 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY
     inceptionYear = "2017"
     description = "Android Lifecycle Reactivestreams"
-    legacyDisableKotlinStrictApiMode = true
 }
 
 android {
-    namespace "androidx.lifecycle.reactivestreams"
+    namespace = "androidx.lifecycle.reactivestreams"
 }

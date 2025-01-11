@@ -21,7 +21,7 @@
  * Please use that script when creating a new project, rather than copying an existing project and
  * modifying its settings.
  */
-import androidx.build.Publish
+import androidx.build.LibraryType
 
 plugins {
     id("AndroidXPlugin")
@@ -40,17 +40,17 @@ dependencies {
     androidTestImplementation(libs.testRules)
     androidTestImplementation(libs.mockitoCore)
     androidTestImplementation(libs.dexmakerMockito)
-    androidTestImplementation project(':internal-testutils-runtime')
+    androidTestImplementation(project(":internal-testutils-runtime"))
     androidTestImplementation(libs.kotlinStdlib)
 }
 
 androidx {
     name = "Profileinstaller Benchmarks"
-    publish = Publish.NONE
+    type = LibraryType.BENCHMARK
     inceptionYear = "2021"
     description = "Profileinstaller Benchmarks"
 }
 
 android {
-    namespace "androidx.profileinstaller.benchmark"
+    namespace = "androidx.profileinstaller.benchmark"
 }

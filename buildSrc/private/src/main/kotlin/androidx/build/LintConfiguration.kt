@@ -15,6 +15,7 @@
  */
 package androidx.build
 
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.api.dsl.Lint
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import com.android.build.gradle.AppPlugin
@@ -79,9 +80,8 @@ private fun Project.configureAndroidProjectForLint(isLibrary: Boolean) =
         configureLint(extension.lint, isLibrary)
     }
 
-@Suppress("TYPEALIAS_EXPANSION_DEPRECATION")
 private fun Project.configureAndroidMultiplatformProjectForLint(
-    extension: DeprecatedKotlinMultiplatformAndroidTarget,
+    extension: KotlinMultiplatformAndroidLibraryTarget,
     componentsExtension: KotlinMultiplatformAndroidComponentsExtension
 ) {
     componentsExtension.finalizeDsl {
@@ -164,7 +164,10 @@ private fun Project.configureLint(lint: Lint, isLibrary: Boolean) {
     val lintChecksProject = findLintProject(":lint-checks") ?: return
     project.dependencies.add("lintChecks", lintChecksProject)
 
-    if (extension.type == LibraryType.GRADLE_PLUGIN) {
+    if (
+        extension.type == LibraryType.GRADLE_PLUGIN ||
+            extension.type == LibraryType.INTERNAL_GRADLE_PLUGIN
+    ) {
         project.rootProject.findProject(":lint:lint-gradle")?.let {
             project.dependencies.add("lintChecks", it)
         }
@@ -287,10 +290,11 @@ private fun Project.configureLint(lint: Lint, isLibrary: Boolean) {
             disable.add("IllegalExperimentalApiUsage")
         }
 
-        // Only allow the JSpecifyNullness check to be run when opted-in, while migrating projects
-        // to use JSpecify annotations.
-        if (!project.useJSpecifyAnnotations()) {
+        // Run the JSpecifyNullness check unless opted-out (for projects that haven't migrated yet).
+        if (extension.optOutJSpecify) {
             disable.add("JSpecifyNullness")
+        } else {
+            fatal.add("JSpecifyNullness")
         }
 
         fatal.add("UastImplementation") // go/hide-uast-impl

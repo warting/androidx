@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
  * <p>In Framework, indicates that a specific test or class should be run only if all of the given
  * feature flags are enabled in the device's current state. Enforced by the {@code CheckFlagsRule}.
  *
- * <p>This annotation works together with RequiresFlagsDisabled to define the value that is
+ * <p>This annotation works together with {@link RequiresFlagsDisabled} to define the value that is
  * required of the flag by the test for the test to run. It is an error for either a method or class
  * to require that a particular flag be both enabled and disabled.
  *

@@ -24,25 +24,27 @@ import android.os.Process
 import androidx.privacysandbox.sdkruntime.core.controller.SdkSandboxControllerCompat
 import androidx.privacysandbox.ui.core.DelegatingSandboxedUiAdapter
 import androidx.privacysandbox.ui.core.ExperimentalFeatures
-import androidx.privacysandbox.ui.core.SandboxedUiAdapter
+import androidx.privacysandbox.ui.integration.mediateesdkprovider.IMediateeSdkApiFactory
 import androidx.privacysandbox.ui.integration.sdkproviderutils.PlayerViewProvider
 import androidx.privacysandbox.ui.integration.sdkproviderutils.PlayerViewabilityHandler
 import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.AdType
+import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.BackNavigation
 import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.MediationOption
+import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.ScreenOrientation
 import androidx.privacysandbox.ui.integration.sdkproviderutils.TestAdapters
 import androidx.privacysandbox.ui.integration.sdkproviderutils.ViewabilityHandler
 import androidx.privacysandbox.ui.integration.sdkproviderutils.fullscreen.FullscreenAd
 import androidx.privacysandbox.ui.integration.testaidl.IMediateeSdkApi
-import androidx.privacysandbox.ui.integration.testaidl.ISdkApi
+import androidx.privacysandbox.ui.provider.AbstractSandboxedUiAdapter
 import androidx.privacysandbox.ui.provider.toCoreLibInfo
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
-class SdkApi(private val sdkContext: Context) : ISdkApi.Stub() {
+class SdkApi(private val sdkContext: Context) : ISdkApi {
     private val testAdapters = TestAdapters(sdkContext)
     private val handler = Handler(Looper.getMainLooper())
 
-    override fun loadBannerAd(
+    override suspend fun loadBannerAd(
         @AdType adType: Int,
         @MediationOption mediationOption: Int,
         waitInsideOnDraw: Boolean,
@@ -56,7 +58,7 @@ class SdkApi(private val sdkContext: Context) : ISdkApi.Stub() {
                 testAdapters.OverlaidAd(mediateeBundle).toCoreLibInfo(sdkContext)
             } else mediateeBundle
         }
-        val adapter: SandboxedUiAdapter =
+        val adapter: AbstractSandboxedUiAdapter =
             when (adType) {
                 AdType.BASIC_NON_WEBVIEW -> {
                     loadNonWebViewBannerAd("Simple Ad", waitInsideOnDraw)
@@ -115,8 +117,8 @@ class SdkApi(private val sdkContext: Context) : ISdkApi.Stub() {
 
     override fun launchFullscreenAd(
         launcherInfo: Bundle,
-        screenOrientation: Int,
-        backButtonNavigation: Int
+        @ScreenOrientation screenOrientation: Int,
+        @BackNavigation backButtonNavigation: Int
     ) {
         val coroutineScope = MainScope()
         coroutineScope.launch {
@@ -157,22 +159,22 @@ class SdkApi(private val sdkContext: Context) : ISdkApi.Stub() {
         Process.killProcess(Process.myPid())
     }
 
-    private fun loadWebViewBannerAd(): SandboxedUiAdapter {
+    private fun loadWebViewBannerAd(): AbstractSandboxedUiAdapter {
         return testAdapters.WebViewBannerAd()
     }
 
-    private fun loadWebViewBannerAdFromLocalAssets(): SandboxedUiAdapter {
+    private fun loadWebViewBannerAdFromLocalAssets(): AbstractSandboxedUiAdapter {
         return testAdapters.WebViewAdFromLocalAssets()
     }
 
     private fun loadNonWebViewBannerAd(
         text: String,
         waitInsideOnDraw: Boolean
-    ): SandboxedUiAdapter {
+    ): AbstractSandboxedUiAdapter {
         return testAdapters.TestBannerAd(text, waitInsideOnDraw)
     }
 
-    private fun loadVideoAd(): SandboxedUiAdapter {
+    private fun loadVideoAd(): AbstractSandboxedUiAdapter {
         val playerViewProvider = PlayerViewProvider()
         val adapter = testAdapters.VideoBannerAd(playerViewProvider)
         PlayerViewabilityHandler.addObserverFactoryToAdapter(adapter, playerViewProvider)
@@ -180,7 +182,7 @@ class SdkApi(private val sdkContext: Context) : ISdkApi.Stub() {
     }
 
     @OptIn(ExperimentalFeatures.DelegatingAdapterApi::class)
-    private fun loadMediatedTestAd(
+    private suspend fun loadMediatedTestAd(
         @MediationOption mediationOption: Int,
         @AdType adType: Int,
         waitInsideOnDraw: Boolean,
@@ -204,7 +206,7 @@ class SdkApi(private val sdkContext: Context) : ISdkApi.Stub() {
 
     override fun requestResize(width: Int, height: Int) {}
 
-    private fun maybeGetMediateeBannerAdBundle(
+    private suspend fun maybeGetMediateeBannerAdBundle(
         mediationOption: Int,
         adType: Int,
         withSlowDraw: Boolean,
@@ -233,7 +235,11 @@ class SdkApi(private val sdkContext: Context) : ISdkApi.Stub() {
             sandboxedSdks.forEach { sandboxedSdkCompat ->
                 if (sandboxedSdkCompat.getSdkInfo()?.name == MEDIATEE_SDK) {
                     val mediateeSdkApi =
-                        IMediateeSdkApi.Stub.asInterface(sandboxedSdkCompat.getInterface())
+                        IMediateeSdkApiFactory.wrapToIMediateeSdkApi(
+                            checkNotNull(sandboxedSdkCompat.getInterface()) {
+                                "Cannot find Mediatee Sdk Service!"
+                            }
+                        )
                     return mediateeSdkApi.loadBannerAd(adType, withSlowDraw, drawViewability)
                 }
             }

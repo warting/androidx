@@ -22,7 +22,6 @@
  * modifying its settings.
  */
 import androidx.build.LibraryType
-import androidx.build.Publish
 
 plugins {
     id("AndroidXPlugin")
@@ -40,7 +39,7 @@ dependencies {
 }
 
 android {
-    namespace "androidx.constraintlayout.widget"
+    namespace = "androidx.constraintlayout.widget"
 }
 
 androidx {
@@ -49,4 +48,6 @@ androidx {
     mavenVersion = LibraryVersions.CONSTRAINTLAYOUT
     inceptionYear = "2022"
     description = "This library offers a flexible and adaptable way to position and animate widgets"
+    // TODO: b/326456246
+    optOutJSpecify = true
 }

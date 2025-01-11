@@ -24,12 +24,7 @@ import org.gradle.api.provider.Provider
 /**
  * Whether to enable constraints for projects in same-version groups
  *
- * This is expected to be true during builds that publish artifacts externally This is expected to
- * be false during most other builds because: Developers may be interested in including only a
- * subset of projects in ANDROIDX_PROJECTS to make Studio run more quickly. If a build contains only
- * a subset of projects, we cannot necessarily add constraints between all pairs of projects in the
- * same group. We want most builds to have high remote cache usage, so we want constraints to be
- * similar across most builds See go/androidx-group-constraints for more information
+ * This is default true.
  */
 const val ADD_GROUP_CONSTRAINTS = "androidx.constraints"
 
@@ -131,15 +126,6 @@ const val XCODEGEN_DOWNLOAD_URI = "androidx.benchmark.darwin.xcodeGenDownloadUri
 /** If true, don't restrict usage of compileSdk property. */
 const val ALLOW_CUSTOM_COMPILE_SDK = "androidx.allowCustomCompileSdk"
 
-/** If true, include Jetpack library projects that live outside of `frameworks/support`. */
-const val INCLUDE_OPTIONAL_PROJECTS = "androidx.includeOptionalProjects"
-
-/**
- * If true, enable the ArrayNullnessMigration lint check to transition to type-use nullness
- * annotations. Defaults to false.
- */
-const val USE_JSPECIFY_ANNOTATIONS = "androidx.useJSpecifyAnnotations"
-
 /** If true, yarn dependencies are fetched from an offline mirror */
 const val YARN_OFFLINE_MODE = "androidx.yarnOfflineMode"
 
@@ -179,8 +165,6 @@ val ALL_ANDROIDX_PROPERTIES =
         ALLOW_CUSTOM_COMPILE_SDK,
         FilteredAnchorTask.PROP_TASK_NAME,
         FilteredAnchorTask.PROP_PATH_PREFIX,
-        INCLUDE_OPTIONAL_PROJECTS,
-        USE_JSPECIFY_ANNOTATIONS,
         YARN_OFFLINE_MODE,
         FORCE_KOTLIN_2_0_TARGET,
         FORCE_BENCHMARK_AOT_COMPILATION,
@@ -193,7 +177,8 @@ fun Project.shouldForceKotlin20Target() =
  * Whether to enable constraints for projects in same-version groups See the property definition for
  * more details
  */
-fun Project.shouldAddGroupConstraints() = booleanPropertyProvider(ADD_GROUP_CONSTRAINTS)
+fun Project.shouldAddGroupConstraints() =
+    project.providers.gradleProperty(ADD_GROUP_CONSTRAINTS).map { s -> s.toBoolean() }.orElse(true)
 
 /**
  * Returns alternative project url that will be used as "url" property in publishing maven artifact
@@ -275,12 +260,6 @@ fun Project.allowMissingLintProject() =
 /** Whether libraries are allowed to customize the value of the compileSdk property. */
 fun Project.isCustomCompileSdkAllowed(): Boolean =
     findBooleanProperty(ALLOW_CUSTOM_COMPILE_SDK) ?: true
-
-/**
- * Whether to enable the JSpecifyNullnessMigration lint check for moving nullness annotations when
- * switching a project to the JSpecify type-use nullness annotations.
- */
-fun Project.useJSpecifyAnnotations() = findBooleanProperty(USE_JSPECIFY_ANNOTATIONS) ?: false
 
 fun Project.findBooleanProperty(propName: String) = booleanPropertyProvider(propName).get()
 

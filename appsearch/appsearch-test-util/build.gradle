@@ -16,12 +16,13 @@
 import androidx.build.LibraryType
 
 plugins {
-    id('AndroidXPlugin')
-    id('com.android.library')
+    id("AndroidXPlugin")
+    id("com.android.library")
 }
 
 dependencies {
-    api('androidx.annotation:annotation:1.1.0')
+    api(libs.jspecify)
+    api("androidx.annotation:annotation:1.1.0")
 
     implementation(project(":appsearch:appsearch"))
     implementation(project(":appsearch:appsearch-local-storage"))
@@ -42,6 +43,6 @@ androidx {
 }
 
 android {
-    compileSdk 35
-    namespace "androidx.appsearch.testutil"
+    compileSdk = 35
+    namespace = "androidx.appsearch.testutil"
 }

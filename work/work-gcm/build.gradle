@@ -30,15 +30,16 @@ plugins {
 }
 
 android {
-    compileSdk 35
+    compileSdk = 35
     buildTypes.configureEach {
         consumerProguardFiles "proguard-rules.pro"
     }
-    namespace "androidx.work.impl.background.gcm"
+    namespace = "androidx.work.impl.background.gcm"
 }
 
 dependencies {
-    api project(":work:work-runtime")
+    api(libs.jspecify)
+    api(project(":work:work-runtime"))
     implementation(libs.gcmNetworkManager)
     annotationProcessor("androidx.room:room-compiler:2.5.0")
     implementation("androidx.room:room-runtime:2.5.0")

@@ -92,16 +92,12 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY_ONLY_USED_BY_KOTLIN_CONSUMERS
     inceptionYear = "2020"
     description = "Compose integration with Navigation"
-    legacyDisableKotlinStrictApiMode = true
     samples(project(":navigation:navigation-compose:navigation-compose-samples"))
-    legacyDisableKotlinStrictApiMode = true
     kotlinTarget = KotlinTarget.KOTLIN_1_9
+    addGoldenImageAssets()
 }
 
 android {
-    compileSdk 35
-    sourceSets.androidTest.assets.srcDirs +=
-            project.rootDir.absolutePath + "/../../golden/navigation/navigation-compose"
-
-    namespace "androidx.navigation.compose"
+    compileSdk = 35
+    namespace = "androidx.navigation.compose"
 }

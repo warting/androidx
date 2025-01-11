@@ -49,6 +49,9 @@ interface HealthConnectFeatures {
         /** Feature constant for reading health data history. */
         const val FEATURE_READ_HEALTH_DATA_HISTORY = 4
 
+        /** Feature constant for mindfulness session. */
+        @RestrictTo(RestrictTo.Scope.LIBRARY) const val FEATURE_MINDFULNESS_SESSION = 5
+
         @Retention(AnnotationRetention.SOURCE)
         @IntDef(
             value =
@@ -56,7 +59,8 @@ interface HealthConnectFeatures {
                     FEATURE_READ_HEALTH_DATA_IN_BACKGROUND,
                     FEATURE_SKIN_TEMPERATURE,
                     FEATURE_PLANNED_EXERCISE,
-                    FEATURE_READ_HEALTH_DATA_HISTORY
+                    FEATURE_READ_HEALTH_DATA_HISTORY,
+                    FEATURE_MINDFULNESS_SESSION
                 ]
         )
         @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -84,11 +88,17 @@ interface HealthConnectFeatures {
         internal val FEATURE_TO_VERSION_INFO_MAP: Map<Int, HealthConnectVersionInfo> =
             mapOf(
                 FEATURE_READ_HEALTH_DATA_IN_BACKGROUND to
-                    HealthConnectVersionInfo(platformVersion = SDK_EXT_13_PLATFORM_VERSION),
+                    HealthConnectVersionInfo(
+                        apkVersionCode = 171302,
+                        platformVersion = SDK_EXT_13_PLATFORM_VERSION
+                    ),
                 FEATURE_SKIN_TEMPERATURE to
                     HealthConnectVersionInfo(platformVersion = SDK_EXT_13_PLATFORM_VERSION),
                 FEATURE_READ_HEALTH_DATA_HISTORY to
-                    HealthConnectVersionInfo(platformVersion = SDK_EXT_13_PLATFORM_VERSION),
+                    HealthConnectVersionInfo(
+                        apkVersionCode = 171302,
+                        platformVersion = SDK_EXT_13_PLATFORM_VERSION
+                    ),
                 FEATURE_PLANNED_EXERCISE to
                     HealthConnectVersionInfo(platformVersion = SDK_EXT_13_PLATFORM_VERSION)
             )

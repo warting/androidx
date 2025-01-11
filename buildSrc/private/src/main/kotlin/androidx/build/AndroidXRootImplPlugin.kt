@@ -81,31 +81,32 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
             }
         }
 
-        val buildOnServerTask = tasks.create(BUILD_ON_SERVER_TASK, BuildOnServerTask::class.java)
-        buildOnServerTask.cacheEvenIfNoOutputs()
-        buildOnServerTask.distributionDirectory = getDistributionDirectory()
-        if (!buildFeatures.isIsolatedProjectsEnabled()) {
-            buildOnServerTask.dependsOn(
+        val verifyPlayground = VerifyPlaygroundGradleConfigurationTask.createIfNecessary(project)
+
+        val aggregateBuildInfo =
+            if (!buildFeatures.isIsolatedProjectsEnabled()) {
                 tasks.register(
                     CREATE_AGGREGATE_BUILD_INFO_FILES_TASK,
                     CreateAggregateLibraryBuildInfoFileTask::class.java
                 )
-            )
-        }
+            } else null
 
-        VerifyPlaygroundGradleConfigurationTask.createIfNecessary(project)?.let {
-            buildOnServerTask.dependsOn(it)
+        tasks.register(BUILD_ON_SERVER_TASK, BuildOnServerTask::class.java) { task ->
+            task.cacheEvenIfNoOutputs()
+            task.distributionDirectory = getDistributionDirectory()
+            verifyPlayground?.let { task.dependsOn(it) }
+            aggregateBuildInfo?.let { task.dependsOn(it) }
         }
 
         extra.set("projects", ConcurrentHashMap<String, String>())
 
         /**
-         * Copy PrivacySandbox related APKs into [getTestConfigDirectory] before zipping. Flatten
-         * directory hierarchy as both TradeFed and FTL work with flat hierarchy.
+         * Copy App APKs (from ApkOutputProviders) into [getTestConfigDirectory] before zipping.
+         * Flatten directory hierarchy as both TradeFed and FTL work with flat hierarchy.
          */
         val finalizeConfigsTask =
             project.tasks.register(FINALIZE_TEST_CONFIGS_WITH_APKS_TASK, Copy::class.java) {
-                it.from(project.getPrivacySandboxFilesDirectory())
+                it.from(project.getAppApksFilesDirectory())
                 it.into(project.getTestConfigDirectory())
                 it.eachFile { f -> f.relativePath = RelativePath(true, f.name) }
                 it.includeEmptyDirs = false

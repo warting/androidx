@@ -17,6 +17,8 @@
 package androidx.compose.ui.node
 
 import androidx.collection.mutableObjectIntMapOf
+import androidx.compose.ui.ComposeUiFlags
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.classKeyForObject
 import androidx.compose.ui.draw.DrawModifier
@@ -147,6 +149,10 @@ internal object Nodes {
     @JvmStatic
     inline val BringIntoView
         get() = NodeKind<BringIntoViewModifierNode>(0b1 shl 19)
+
+    @JvmStatic
+    inline val Unplaced
+        get() = NodeKind<OnUnplacedModifierNode>(0b1 shl 20)
     // ...
 }
 
@@ -253,6 +259,9 @@ internal fun calculateNodeKindSetFrom(node: Modifier.Node): Int {
         if (node is BringIntoViewModifierNode) {
             mask = mask or Nodes.BringIntoView
         }
+        if (node is OnUnplacedModifierNode) {
+            mask = mask or Nodes.Unplaced
+        }
         mask
     }
 }
@@ -332,9 +341,13 @@ private fun autoInvalidateNodeSelf(node: Modifier.Node, selfKindSet: Int, phase:
             node is FocusPropertiesModifierNode &&
             node.specifiesCanFocusProperty()
     ) {
-        when (phase) {
-            Removed -> node.scheduleInvalidationOfAssociatedFocusTargets()
-            else -> node.invalidateFocusProperties()
+        if (@OptIn(ExperimentalComposeUiApi::class) ComposeUiFlags.isTrackFocusEnabled)
+            node.scheduleInvalidationOfAssociatedFocusTargets()
+        else {
+            when (phase) {
+                Removed -> node.scheduleInvalidationOfAssociatedFocusTargets()
+                else -> node.invalidateFocusProperties()
+            }
         }
     }
     if (Nodes.FocusEvent in selfKindSet && node is FocusEventModifierNode) {

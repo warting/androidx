@@ -40,6 +40,11 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/rg_screen_orientation">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/label_back_navigation" />
+
         <RadioButton
             android:id="@+id/radio_enable_back_navigation_immediately"
             android:layout_width="wrap_content"
@@ -52,11 +57,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/option_enable_back_navigation_after_5_sec" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/label_back_navigation" />
     </RadioGroup>
 
     <RadioGroup
@@ -70,6 +70,11 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/label_screen_orientation" />
+
         <RadioButton
             android:id="@+id/radio_non_blocking"
             android:layout_width="wrap_content"
@@ -81,17 +86,12 @@
             android:id="@+id/radio_portrait"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/option_landscape" />
+            android:text="@string/option_portrait" />
 
         <RadioButton
             android:id="@+id/radio_landscape"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/option_portrait" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/label_screen_orientation" />
+            android:text="@string/option_landscape" />
     </RadioGroup>
 </androidx.constraintlayout.widget.ConstraintLayout>

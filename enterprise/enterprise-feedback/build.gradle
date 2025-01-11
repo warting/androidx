@@ -12,6 +12,7 @@ plugins {
     id("com.android.library")
 }
 dependencies {
+    api(libs.jspecify)
     api("androidx.annotation:annotation:1.8.1")
     api(libs.autoValueAnnotations)
     testImplementation(libs.testCore)
@@ -23,7 +24,7 @@ dependencies {
 }
 android {
     testOptions.unitTests.includeAndroidResources = true
-    namespace "androidx.enterprise.feedback"
+    namespace = "androidx.enterprise.feedback"
 }
 
 androidx {

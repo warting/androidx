@@ -35,6 +35,8 @@ import java.util.Objects;
  */
 @ExperimentalAppSearchApi
 @FlaggedApi(Flags.FLAG_ENABLE_ABSTRACT_SYNTAX_TREES)
+// TODO(b/384721898): Switch to JSpecify annotations
+@SuppressWarnings("JSpecifyNullness")
 public final class OrNode implements Node{
     private List<Node> mChildren;
 
@@ -71,9 +73,16 @@ public final class OrNode implements Node{
      * Get the list of nodes being logically ORed over by this node.
      */
     @Override
-    @NonNull
-    public List<Node> getChildren() {
+    public @NonNull List<Node> getChildren() {
         return Collections.unmodifiableList(mChildren);
+    }
+
+    /**
+     * Returns the index of the first instance of the node, or -1 if the node does not exist.
+     */
+    public int getIndexOfChild(@NonNull Node node) {
+        Preconditions.checkNotNull(node);
+        return mChildren.indexOf(node);
     }
 
     /**
@@ -112,16 +121,20 @@ public final class OrNode implements Node{
     }
 
     /**
-     * Remove tbe child {@link Node} at the given index from the list of child nodes.
+     * Removes the given {@link Node} from the list of child nodes. If multiple copies of the node
+     * exist, then the first {@link Node} that matches the provided {@link Node} will be removed.
+     * If the node does not exist, the list will be unchanged.
      *
      * <p>The list of child nodes must contain at least 3 nodes to perform this operation.
+     *
+     * @return {@code true} if the node was removed, {@code false} if the node was not removed i.e.
+     * the node was not found.
      */
-    public void removeChild(int index) {
-        Preconditions.checkState(mChildren.size() > 2, "List of child nodes must"
+    public boolean removeChild(@NonNull Node node) {
+        Preconditions.checkState(mChildren.size() > 2, "List of child nodes must "
                 + "contain at least 3 nodes in order to remove.");
-        Preconditions.checkArgumentInRange(index, /*lower=*/ 0, /*upper=*/ mChildren.size() - 1,
-                /*valueName=*/ "Index");
-        mChildren.remove(index);
+        Preconditions.checkNotNull(node);
+        return mChildren.remove(node);
     }
 
     /**
@@ -130,9 +143,8 @@ public final class OrNode implements Node{
      * <p>The string representation of {@link OrNode} is the string representation of
      * {@link OrNode}'s child nodes joined with "OR", all surrounded by parentheses.
      */
-    @NonNull
     @Override
-    public String toString() {
+    public @NonNull String toString() {
         return "(" + TextUtils.join(" OR ", mChildren) + ")";
     }
 

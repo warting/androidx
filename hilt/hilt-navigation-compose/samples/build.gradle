@@ -24,7 +24,6 @@
 
 import androidx.build.KotlinTarget
 import androidx.build.LibraryType
-import androidx.build.Publish
 
 plugins {
     id("AndroidXPlugin")
@@ -46,10 +45,10 @@ androidx {
     mavenVersion = LibraryVersions.HILT_NAVIGATION_COMPOSE
     inceptionYear = "2021"
     description = "Samples for the Navigation Compose Hilt Integration"
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
+    kotlinTarget = KotlinTarget.KOTLIN_2_0
 }
 
 android {
-    compileSdk 35
-    namespace "androidx.hilt.navigation.compose.samples"
+    compileSdk = 35
+    namespace = "androidx.hilt.navigation.compose.samples"
 }

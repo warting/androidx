@@ -33,7 +33,7 @@ android {
     buildTypes.configureEach {
         consumerProguardFiles "proguard-rules.pro"
     }
-    namespace "androidx.navigation.ui"
+    namespace = "androidx.navigation.ui"
 }
 
 dependencies {
@@ -66,5 +66,4 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY
     inceptionYear = "2018"
     description = "Android Navigation-UI"
-    legacyDisableKotlinStrictApiMode = true
 }

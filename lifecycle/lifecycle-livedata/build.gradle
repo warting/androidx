@@ -60,9 +60,8 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY
     inceptionYear = "2017"
     description = "Android Lifecycle LiveData"
-    legacyDisableKotlinStrictApiMode = true
 }
 
 android {
-    namespace "androidx.lifecycle.livedata"
+    namespace = "androidx.lifecycle.livedata"
 }

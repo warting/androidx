@@ -31,10 +31,9 @@ dependencies {
     implementation(libs.kotlinStdlib)
     implementation(libs.kotlinSerializationCore)
 
-    androidTestImplementation project(":compose:test-utils")
+    androidTestImplementation(project(":compose:test-utils"))
     androidTestImplementation("androidx.navigation:navigation-testing:2.7.7")
     androidTestImplementation(project(":compose:ui:ui-test-junit4"))
-    androidTestImplementation(project(":compose:ui:ui-test-manifest"))
     androidTestImplementation(libs.testRunner)
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.truth)
@@ -53,8 +52,8 @@ androidx {
 }
 
 android {
-    compileSdk 35
-    namespace "androidx.compose.material.navigation"
+    compileSdk = 35
+    namespace = "androidx.compose.material.navigation"
     // TODO(b/349411310)?
     experimentalProperties["android.lint.useK2Uast"] = false
 }

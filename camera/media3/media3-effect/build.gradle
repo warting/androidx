@@ -30,7 +30,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":camera:camera-core"))
+    api("androidx.camera:camera-core:1.4.0")
     implementation("androidx.media3:media3-common:1.5.0-alpha01")
     implementation("androidx.media3:media3-effect:1.5.0-alpha01")
 
@@ -54,9 +54,9 @@ dependencies {
 }
 
 android {
-    compileSdk 35
+    compileSdk = 35
     testOptions.unitTests.includeAndroidResources = true
-    namespace "androidx.camera.media3.effect"
+    namespace = "androidx.camera.media3.effect"
     lint {
         baseline = file("lint-baseline.xml")
     }

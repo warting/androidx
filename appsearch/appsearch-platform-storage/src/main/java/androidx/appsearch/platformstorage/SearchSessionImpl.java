@@ -23,22 +23,15 @@ import android.content.Context;
 import android.os.Build;
 
 import androidx.annotation.DoNotInline;
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.RestrictTo;
 import androidx.appsearch.app.AppSearchBatchResult;
-import androidx.appsearch.app.AppSearchBlobHandle;
 import androidx.appsearch.app.AppSearchSession;
-import androidx.appsearch.app.CommitBlobResponse;
-import androidx.appsearch.app.ExperimentalAppSearchApi;
 import androidx.appsearch.app.Features;
 import androidx.appsearch.app.GenericDocument;
 import androidx.appsearch.app.GetByDocumentIdRequest;
 import androidx.appsearch.app.GetSchemaResponse;
-import androidx.appsearch.app.OpenBlobForReadResponse;
-import androidx.appsearch.app.OpenBlobForWriteResponse;
 import androidx.appsearch.app.PutDocumentsRequest;
-import androidx.appsearch.app.RemoveBlobResponse;
 import androidx.appsearch.app.RemoveByDocumentIdRequest;
 import androidx.appsearch.app.ReportUsageRequest;
 import androidx.appsearch.app.SearchResults;
@@ -66,6 +59,8 @@ import androidx.core.util.Preconditions;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.jspecify.annotations.NonNull;
+
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -85,7 +80,7 @@ class SearchSessionImpl implements AppSearchSession {
     private final Features mFeatures;
 
     SearchSessionImpl(
-            @NonNull android.app.appsearch.AppSearchSession platformSession,
+            android.app.appsearch.@NonNull AppSearchSession platformSession,
             @NonNull Executor executor,
             @NonNull Context context) {
         mPlatformSession = Preconditions.checkNotNull(platformSession);
@@ -95,8 +90,8 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<SetSchemaResponse> setSchemaAsync(@NonNull SetSchemaRequest request) {
+    public @NonNull ListenableFuture<SetSchemaResponse> setSchemaAsync(
+            @NonNull SetSchemaRequest request) {
         Preconditions.checkNotNull(request);
         ResolvableFuture<SetSchemaResponse> future = ResolvableFuture.create();
         if (needsSchemaValidation()) {
@@ -123,8 +118,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<GetSchemaResponse> getSchemaAsync() {
+    public @NonNull ListenableFuture<GetSchemaResponse> getSchemaAsync() {
         ResolvableFuture<GetSchemaResponse> future = ResolvableFuture.create();
         mPlatformSession.getSchema(
                 mExecutor,
@@ -135,9 +129,8 @@ class SearchSessionImpl implements AppSearchSession {
         return future;
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Set<String>> getNamespacesAsync() {
+    public @NonNull ListenableFuture<Set<String>> getNamespacesAsync() {
         ResolvableFuture<Set<String>> future = ResolvableFuture.create();
         mPlatformSession.getNamespaces(
                 mExecutor,
@@ -147,8 +140,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<AppSearchBatchResult<String, Void>> putAsync(
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, Void>> putAsync(
             @NonNull PutDocumentsRequest request) {
         Preconditions.checkNotNull(request);
         ResolvableFuture<AppSearchBatchResult<String, Void>> future = ResolvableFuture.create();
@@ -159,54 +151,9 @@ class SearchSessionImpl implements AppSearchSession {
         return future;
     }
 
-    @NonNull
     @Override
-    @ExperimentalAppSearchApi
-    public ListenableFuture<OpenBlobForWriteResponse> openBlobForWriteAsync(
-            @NonNull Set<AppSearchBlobHandle> handles) {
-        // TODO(b/273591938) Implement this method when blob implementation is synced to the
-        //  framework.
-        throw new UnsupportedOperationException(Features.BLOB_STORAGE
-                + " is not available on this AppSearch implementation.");
-    }
-
-    @NonNull
-    @Override
-    @ExperimentalAppSearchApi
-    public ListenableFuture<CommitBlobResponse> commitBlobAsync(
-            @NonNull Set<AppSearchBlobHandle> handles) {
-        // TODO(b/273591938) Implement this method when blob implementation is synced to the
-        //  framework.
-        throw new UnsupportedOperationException(Features.BLOB_STORAGE
-                + " is not available on this AppSearch implementation.");
-    }
-
-    @NonNull
-    @Override
-    @ExperimentalAppSearchApi
-    public ListenableFuture<RemoveBlobResponse> removeBlobAsync(
-            @NonNull Set<AppSearchBlobHandle> handles) {
-        // TODO(b/273591938) Implement this method when blob implementation is synced to the
-        //  framework.
-        throw new UnsupportedOperationException(Features.BLOB_STORAGE
-                + " is not available on this AppSearch implementation.");
-    }
-
-    @NonNull
-    @Override
-    @ExperimentalAppSearchApi
-    public ListenableFuture<OpenBlobForReadResponse> openBlobForReadAsync(
-            @NonNull Set<AppSearchBlobHandle> handles) {
-        // TODO(b/273591938) Implement this method when blob implementation is synced to the
-        //  framework.
-        throw new UnsupportedOperationException(Features.BLOB_STORAGE
-                + " is not available on this AppSearch implementation.");
-    }
-
-    @Override
-    @NonNull
-    public ListenableFuture<AppSearchBatchResult<String, GenericDocument>> getByDocumentIdAsync(
-            @NonNull GetByDocumentIdRequest request) {
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, GenericDocument>>
+            getByDocumentIdAsync(@NonNull GetByDocumentIdRequest request) {
         Preconditions.checkNotNull(request);
         ResolvableFuture<AppSearchBatchResult<String, GenericDocument>> future =
                 ResolvableFuture.create();
@@ -219,8 +166,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public SearchResults search(
+    public @NonNull SearchResults search(
             @NonNull String queryExpression,
             @NonNull SearchSpec searchSpec) {
         Preconditions.checkNotNull(queryExpression);
@@ -228,13 +174,12 @@ class SearchSessionImpl implements AppSearchSession {
         android.app.appsearch.SearchResults platformSearchResults =
                 mPlatformSession.search(
                         queryExpression,
-                        SearchSpecToPlatformConverter.toPlatformSearchSpec(searchSpec));
-        return new SearchResultsImpl(platformSearchResults, searchSpec, mExecutor);
+                        SearchSpecToPlatformConverter.toPlatformSearchSpec(mContext, searchSpec));
+        return new SearchResultsImpl(platformSearchResults, searchSpec, mExecutor, mContext);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<List<SearchSuggestionResult>> searchSuggestionAsync(
+    public @NonNull ListenableFuture<List<SearchSuggestionResult>> searchSuggestionAsync(
             @NonNull String suggestionQueryExpression,
             @NonNull SearchSuggestionSpec searchSuggestionSpec) {
         Preconditions.checkNotNull(suggestionQueryExpression);
@@ -260,8 +205,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<Void> reportUsageAsync(@NonNull ReportUsageRequest request) {
+    public @NonNull ListenableFuture<Void> reportUsageAsync(@NonNull ReportUsageRequest request) {
         Preconditions.checkNotNull(request);
         ResolvableFuture<Void> future = ResolvableFuture.create();
         mPlatformSession.reportUsage(
@@ -273,8 +217,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<AppSearchBatchResult<String, Void>> removeAsync(
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, Void>> removeAsync(
             @NonNull RemoveByDocumentIdRequest request) {
         Preconditions.checkNotNull(request);
         ResolvableFuture<AppSearchBatchResult<String, Void>> future = ResolvableFuture.create();
@@ -287,8 +230,7 @@ class SearchSessionImpl implements AppSearchSession {
 
     @SuppressLint("WrongConstant")
     @Override
-    @NonNull
-    public ListenableFuture<Void> removeAsync(
+    public @NonNull ListenableFuture<Void> removeAsync(
             @NonNull String queryExpression, @NonNull SearchSpec searchSpec) {
         Preconditions.checkNotNull(queryExpression);
         Preconditions.checkNotNull(searchSpec);
@@ -326,7 +268,7 @@ class SearchSessionImpl implements AppSearchSession {
                                     mPlatformSession.remove(
                                             queryExpression,
                                             SearchSpecToPlatformConverter
-                                                    .toPlatformSearchSpec(searchSpec),
+                                                    .toPlatformSearchSpec(mContext, searchSpec),
                                             mExecutor,
                                             removeResult ->
                                                     AppSearchResultToPlatformConverter
@@ -346,7 +288,7 @@ class SearchSessionImpl implements AppSearchSession {
             // Handle normally for Android T and above.
             mPlatformSession.remove(
                     queryExpression,
-                    SearchSpecToPlatformConverter.toPlatformSearchSpec(searchSpec),
+                    SearchSpecToPlatformConverter.toPlatformSearchSpec(mContext, searchSpec),
                     mExecutor,
                     removeResult -> AppSearchResultToPlatformConverter
                             .platformAppSearchResultToFuture(removeResult, future));
@@ -355,8 +297,7 @@ class SearchSessionImpl implements AppSearchSession {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<StorageInfo> getStorageInfoAsync() {
+    public @NonNull ListenableFuture<StorageInfo> getStorageInfoAsync() {
         ResolvableFuture<StorageInfo> future = ResolvableFuture.create();
         mPlatformSession.getStorageInfo(
                 mExecutor,
@@ -366,9 +307,8 @@ class SearchSessionImpl implements AppSearchSession {
         return future;
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Void> requestFlushAsync() {
+    public @NonNull ListenableFuture<Void> requestFlushAsync() {
         ResolvableFuture<Void> future = ResolvableFuture.create();
         // The data in platform will be flushed by scheduled task. This api won't do anything extra
         // flush.
@@ -376,9 +316,8 @@ class SearchSessionImpl implements AppSearchSession {
         return future;
     }
 
-    @NonNull
     @Override
-    public Features getFeatures() {
+    public @NonNull Features getFeatures() {
         return mFeatures;
     }
 
@@ -394,8 +333,8 @@ class SearchSessionImpl implements AppSearchSession {
         // For these versions, IcingLib and AppSearch would crash if we try to set an
         // invalid schema where the number of sections in a schema type exceeds the maximum
         // limit.
-        return appsearchVersionCode >= AppSearchVersionUtil.MainlineVersions.U_BASE
-                && appsearchVersionCode < AppSearchVersionUtil.MainlineVersions.M2023_11;
+        return appsearchVersionCode >= AppSearchVersionUtil.APPSEARCH_U_BASE_VERSION_CODE
+                && appsearchVersionCode < AppSearchVersionUtil.APPSEARCH_M2023_11_VERSION_CODE;
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
@@ -406,9 +345,9 @@ class SearchSessionImpl implements AppSearchSession {
 
         @DoNotInline
         static void searchSuggestion(
-                @NonNull android.app.appsearch.AppSearchSession appSearchSession,
+                android.app.appsearch.@NonNull AppSearchSession appSearchSession,
                 @NonNull String suggestionQueryExpression,
-                @NonNull android.app.appsearch.SearchSuggestionSpec searchSuggestionSpec,
+                android.app.appsearch.@NonNull SearchSuggestionSpec searchSuggestionSpec,
                 @NonNull Executor executor,
                 @NonNull Consumer<AppSearchResult<
                         List<android.app.appsearch.SearchSuggestionResult>>> callback) {

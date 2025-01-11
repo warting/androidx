@@ -73,10 +73,9 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY
     inceptionYear = "2017"
     description = "Android Navigation-Fragment"
-    legacyDisableKotlinStrictApiMode = true
     kotlinTarget = KotlinTarget.KOTLIN_1_9
 }
 
 android {
-    namespace "androidx.navigation.fragment"
+    namespace = "androidx.navigation.fragment"
 }

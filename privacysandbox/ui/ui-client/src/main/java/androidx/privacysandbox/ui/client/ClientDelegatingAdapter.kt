@@ -21,6 +21,7 @@ import android.os.Bundle
 import android.os.IBinder
 import androidx.annotation.GuardedBy
 import androidx.core.util.Consumer
+import androidx.privacysandbox.ui.client.RemoteCallManager.tryToCallRemoteObject
 import androidx.privacysandbox.ui.client.SandboxedUiAdapterFactory.createFromCoreLibInfo
 import androidx.privacysandbox.ui.client.view.RefreshableSessionClient
 import androidx.privacysandbox.ui.core.IDelegateChangeListener
@@ -28,7 +29,6 @@ import androidx.privacysandbox.ui.core.IDelegatingSandboxedUiAdapter
 import androidx.privacysandbox.ui.core.IDelegatorCallback
 import androidx.privacysandbox.ui.core.ISessionRefreshCallback
 import androidx.privacysandbox.ui.core.SandboxedUiAdapter
-import androidx.privacysandbox.ui.core.SessionObserverFactory
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlinx.coroutines.*
@@ -104,7 +104,9 @@ internal class ClientDelegatingAdapter(
                 client?.onSessionOpened(session)
                 if (observer == null) {
                     createNewDelegateChangeObserver()
-                    delegatingAdapterInterface.addDelegateChangeListener(observer)
+                    tryToCallRemoteObject(delegatingAdapterInterface) {
+                        addDelegateChangeListener(observer)
+                    }
                 }
                 client?.let { sessionClients.add(it) }
             }
@@ -119,7 +121,9 @@ internal class ClientDelegatingAdapter(
             synchronized(lock) {
                 sessionClients.remove(client)
                 if (sessionClients.isEmpty() && observer != null) {
-                    delegatingAdapterInterface.removeDelegateChangeListener(observer)
+                    tryToCallRemoteObject(delegatingAdapterInterface) {
+                        removeDelegateChangeListener(observer)
+                    }
                     observer = null
                 }
                 client?.onSessionError(throwable)
@@ -228,8 +232,4 @@ internal class ClientDelegatingAdapter(
                 }
             }
     }
-
-    override fun addObserverFactory(sessionObserverFactory: SessionObserverFactory) {}
-
-    override fun removeObserverFactory(sessionObserverFactory: SessionObserverFactory) {}
 }

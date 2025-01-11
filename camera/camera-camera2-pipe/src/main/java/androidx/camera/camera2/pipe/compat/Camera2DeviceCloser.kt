@@ -79,6 +79,7 @@ constructor(
                 )
             if (currentCameras == null) {
                 Log.error { "Failed to handle quirks before closing the camera device!" }
+                cameraDeviceWrapper.onDeviceClosed()
                 androidCameraState.onFinalized(unwrappedCameraDevice)
                 return
             }
@@ -88,7 +89,7 @@ constructor(
                 checkNotNull(currentCameraDeviceWrapper.unwrapAs(CameraDevice::class))
 
             closeCameraDevice(currentCameraDevice, currentAndroidCameraState)
-            currentCameraDeviceWrapper.onDeviceClosed()
+            cameraDeviceWrapper.onDeviceClosed()
 
             // If the camera was reopened, make sure to finalize the camera state to finish closing.
             if (shouldReopenCamera) {
@@ -141,7 +142,6 @@ constructor(
                 Debug.trace("Camera2DeviceCloserImpl#reopenCameraDevice") {
                     Log.debug { "Reopening camera device" }
                     closeCameraDevice(cameraDevice, androidCameraState)
-                    cameraDeviceWrapper.onDeviceClosed()
                     retryingCameraStateOpener.openAndAwaitCameraWithRetry(cameraId, this)
                 }
             } else {
@@ -168,8 +168,10 @@ constructor(
         androidCameraState: AndroidCameraState,
     ) {
         Log.debug { "$this#closeCameraDevice($cameraDevice)" }
+        var cameraDeviceClosed = false
         Threading.runBlockingCheckedOrNull(threads.backgroundDispatcher, CAMERA_CLOSE_TIMEOUT_MS) {
             cameraDevice.closeWithTrace()
+            cameraDeviceClosed = true
         }
             ?: run {
                 Log.error {
@@ -177,13 +179,17 @@ constructor(
                         "The camera is likely in a bad state."
                 }
             }
+
         val cameraId = CameraId.fromCamera2Id(cameraDevice.id)
-        if (camera2Quirks.shouldWaitForCameraDeviceOnClosed(cameraId)) {
+        // The Android camera framework invokes onClosed() only after CameraDevice.close() is
+        // done. That means if CameraDevice.close() timed out, we wouldn't get onClosed(), so
+        // waiting for it is unnecessary at this point and should be avoided.
+        if (camera2Quirks.shouldWaitForCameraDeviceOnClosed(cameraId) && cameraDeviceClosed) {
             Log.debug { "Waiting for OnClosed from $cameraId" }
-            if (androidCameraState.awaitCameraDeviceClosed(timeoutMillis = 5000)) {
+            if (androidCameraState.awaitCameraDeviceClosed(timeoutMillis = 2000)) {
                 Log.debug { "Received OnClosed for $cameraId" }
             } else {
-                Log.warn { "Failed to close $cameraId after 5000ms!" }
+                Log.warn { "Failed to close $cameraId after 2000ms!" }
             }
         }
     }
@@ -230,7 +236,9 @@ constructor(
 
                 override fun onActive(session: CameraCaptureSessionWrapper) {}
             }
-        if (!cameraDeviceWrapper.createCaptureSession(listOf(surface), callback)) {
+        if (cameraDeviceWrapper.createCaptureSession(listOf(surface), callback)) {
+            sessionConfigured.await()
+        } else {
             Log.error {
                 "Failed to create a blank capture session! " +
                     "Surfaces may not be disconnected properly."
@@ -240,10 +248,9 @@ constructor(
                 surfaceTexture.release()
             }
         }
-        sessionConfigured.await()
     }
 
     companion object {
-        const val CAMERA_CLOSE_TIMEOUT_MS = 8_000L // 8s
+        const val CAMERA_CLOSE_TIMEOUT_MS = 7_000L // 7s
     }
 }

@@ -320,6 +320,12 @@ internal abstract class NodeCoordinator(
         }
     }
 
+    fun onUnplaced() {
+        if (hasNode(Nodes.Unplaced)) {
+            visitNodes(Nodes.Unplaced) { it.onUnplaced() }
+        }
+    }
+
     /** Places the modified child. */
     /*@CallSuper*/
     override fun placeAt(
@@ -1512,7 +1518,7 @@ internal abstract class NodeCoordinator(
                 override fun interceptOutOfBoundsChildEvents(node: Modifier.Node) = false
 
                 override fun shouldHitTestChildren(parentLayoutNode: LayoutNode) =
-                    parentLayoutNode.collapsedSemantics?.isClearingSemantics != true
+                    parentLayoutNode.semanticsConfiguration?.isClearingSemantics != true
 
                 override fun childHitTest(
                     layoutNode: LayoutNode,

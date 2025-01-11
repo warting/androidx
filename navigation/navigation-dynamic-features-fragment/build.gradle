@@ -65,7 +65,7 @@ dependencies {
 }
 
 android {
-    namespace "androidx.navigation.dynamicfeatures.fragment"
+    namespace = "androidx.navigation.dynamicfeatures.fragment"
 }
 
 androidx {
@@ -73,6 +73,5 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY
     inceptionYear = "2019"
     description = "Android Dynamic Feature Navigation Fragment"
-    legacyDisableKotlinStrictApiMode = true
     kotlinTarget = KotlinTarget.KOTLIN_1_9
 }

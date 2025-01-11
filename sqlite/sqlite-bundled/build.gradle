@@ -22,6 +22,7 @@
  * modifying its settings.
  */
 import androidx.build.AndroidXConfig
+import androidx.build.KotlinTarget
 import androidx.build.PlatformIdentifier
 import androidx.build.ProjectLayoutType
 import androidx.build.LibraryType
@@ -241,7 +242,7 @@ androidXMultiplatform {
 }
 
 android {
-    namespace "androidx.sqlite.driver.bundled"
+    namespace = "androidx.sqlite.driver.bundled"
 }
 
 androidx {
@@ -249,5 +250,5 @@ androidx {
     type = LibraryType.PUBLISHED_LIBRARY
     inceptionYear = "2023"
     description = "The implementation of SQLite library using the bundled SQLite."
-    metalavaK2UastEnabled = false
+    kotlinTarget = KotlinTarget.KOTLIN_2_0
 }
