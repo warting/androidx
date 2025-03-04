@@ -24,13 +24,6 @@ import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmMultifileClass
 import kotlin.jvm.JvmName
 
-@PublishedApi internal const val DEFAULT_BOOLEAN: Boolean = false
-@PublishedApi internal const val DEFAULT_CHAR: Char = 0.toChar()
-@PublishedApi internal const val DEFAULT_FLOAT: Float = 0F
-@PublishedApi internal const val DEFAULT_DOUBLE: Double = 0.0
-@PublishedApi internal const val DEFAULT_INT: Int = 0
-@PublishedApi internal const val DEFAULT_LONG: Long = 0L
-
 /**
  * An inline class that encapsulates an opaque [SavedState], and provides an API for reading the
  * platform specific state.
@@ -238,6 +231,31 @@ internal constructor(
      *   not found or the associated value has the wrong type.
      */
     public inline fun getIntListOrElse(key: String, defaultValue: () -> List<Int>): List<Int>
+
+    /**
+     * Retrieves a [List] of elements of [SavedState] associated with the specified [key].
+     *
+     * @param key The [key] to retrieve the value for.
+     * @return The value associated with the [key].
+     * @throws IllegalArgumentException If the [key] is not found.
+     * @throws IllegalStateException if associated value has wrong type.
+     */
+    public inline fun getSavedStateList(key: String): List<SavedState>
+
+    /**
+     * Retrieves a [List] of elements of [SavedState] associated with the specified [key], or a
+     * default value if the [key] doesn't exist.
+     *
+     * @param key The [key] to retrieve the value for.
+     * @param defaultValue A function providing the default value to return if the key is not found
+     *   or the associated value has the wrong type.
+     * @return The value associated with the [key], or the result of [defaultValue] if the key is
+     *   not found or the associated value has the wrong type.
+     */
+    public inline fun getSavedStateListOrElse(
+        key: String,
+        defaultValue: () -> List<SavedState>
+    ): List<SavedState>
 
     /**
      * Retrieves a [List] of elements of [String] associated with the specified [key].
@@ -453,6 +471,31 @@ internal constructor(
     public inline fun getLongArrayOrElse(key: String, defaultValue: () -> LongArray): LongArray
 
     /**
+     * Retrieves a [Array] of [SavedState] value associated with the specified [key].
+     *
+     * @param key The [key] to retrieve the value for.
+     * @return The value associated with the [key].
+     * @throws IllegalArgumentException If the [key] is not found.
+     * @throws IllegalStateException if associated value has wrong type.
+     */
+    public inline fun getSavedStateArray(key: String): Array<SavedState>
+
+    /**
+     * Retrieves a [Array] of [SavedState] value associated with the specified [key], or a default
+     * value if the [key] doesn't exist.
+     *
+     * @param key The [key] to retrieve the value for.
+     * @param defaultValue A function providing the default value to return if the key is not found
+     *   or the associated value has the wrong type.
+     * @return The value associated with the [key], or the result of [defaultValue] if the key is
+     *   not found or the associated value has the wrong type.
+     */
+    public inline fun getSavedStateArrayOrElse(
+        key: String,
+        defaultValue: () -> Array<SavedState>,
+    ): Array<SavedState>
+
+    /**
      * Retrieves a [Array] of [String] value associated with the specified [key].
      *
      * @param key The [key] to retrieve the value for.
@@ -557,6 +600,15 @@ internal constructor(
      * @return a deep-content-based hash code for [SavedState].
      */
     public fun contentDeepHashCode(): Int
+
+    /**
+     * Returns a string representation of the contents of this [SavedState] as if it is a [List].
+     * Nested [SavedState] are treated as lists too.
+     *
+     * If any of [SavedState] contains itself on any nesting level that reference is rendered as
+     * `"[...]"` to prevent recursion.
+     */
+    public fun contentDeepToString(): String
 
     /**
      * Returns a new [Map] containing all key-value pairs from the [SavedState].

@@ -41,10 +41,11 @@
     <issue id="BanThreadSleep" severity="fatal" />
     <issue id="NewApi" severity="fatal" />
     <issue id="WrongThread" severity="fatal" />
-    <issue id="MissingTestSizeAnnotation" severity="fatal" />
     <issue id="IgnoreClassLevelDetector" severity="fatal" />
     <issue id="WithPluginClasspathUsage" severity="fatal" />
     <issue id="AutoValueNullnessOverride" severity="fatal" />
+    <issue id="UnexpectedTestSizeAnnotation" severity="fatal" />
+    <issue id="LintImplTrimIndent" severity="fatal" />
     <!-- Disable all lint checks on transformed classes by default. b/283812176 -->
     <issue id="all">
         <ignore path="**/.transforms/**" />

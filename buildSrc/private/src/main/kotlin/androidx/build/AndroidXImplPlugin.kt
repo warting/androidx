@@ -120,6 +120,7 @@ import org.gradle.kotlin.dsl.withModule
 import org.gradle.kotlin.dsl.withType
 import org.gradle.plugin.devel.plugins.JavaGradlePluginPlugin
 import org.gradle.plugin.devel.tasks.ValidatePlugins
+import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -159,7 +160,8 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         // Perform different actions based on which plugins have been applied to the project.
         // Many of the actions overlap, ex. API tracking.
         project.plugins.configureEach { plugin ->
-            @Suppress("UnstableApiUsage") // PrivacySandboxSdkPlugin, KMPAndroidPlugin
+            // PrivacySandboxSdkPlugin b/397703898, KotlinMultiplatformAndroidPlugin b/393137152
+            @Suppress("UnstableApiUsage")
             when (plugin) {
                 is JavaGradlePluginPlugin -> configureGradlePluginPlugin(project)
                 is JavaPlugin -> configureWithJavaPlugin(project, androidXExtension)
@@ -247,7 +249,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         project.configureMaxDepVersions(androidXExtension)
         project.configureUnzipChromeBuildService()
 
-        project.plugins.apply("com.autonomousapps.dependency-analysis")
+        project.configureDependencyAnalysisPlugin()
     }
 
     private fun initializeAndroidXExtension(project: Project): AndroidXExtension {
@@ -518,9 +520,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                         defaultTargetVersionForNonAndroidTargets.map { JvmTarget.fromTarget(it) }
                     compilations.configureEach { compilation ->
                         compilation.compileJavaTaskProvider?.configure { javaCompile ->
-                            println(
-                                "target javac ${defaultTargetVersionForNonAndroidTargets.get()}"
-                            )
                             javaCompile.targetCompatibility =
                                 defaultTargetVersionForNonAndroidTargets.get()
                             javaCompile.sourceCompatibility =
@@ -658,6 +657,10 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             }
         }
 
+        project.configureJavaCompilationWarnings(
+            androidXExtension = androidXExtension,
+            isTestApp = true
+        )
         project.buildOnServerDependsOnAssembleRelease()
         project.buildOnServerDependsOnLint()
     }
@@ -811,7 +814,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         }
     }
 
-    @Suppress("UnstableApiUsage") // usage of PrivacySandboxSdkExtension
+    @Suppress("UnstableApiUsage") // usage of PrivacySandboxSdkExtension b/397703898
     private fun configureWithPrivacySandboxSdkPlugin(project: Project) {
         project.extensions.getByType<PrivacySandboxSdkExtension>().apply {
             configureLocalAsbSigning(experimentalProperties, project.getKeystore())
@@ -849,12 +852,11 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     }
 
     private fun Project.buildOnServerDependsOnLint() {
-        if (!project.usingMaxDepVersions()) {
+        if (!project.usingMaxDepVersions().get()) {
             project.addToBuildOnServer("lint")
         }
     }
 
-    @Suppress("UnstableApiUsage") // HasDeviceTests is @Incubating b/372495504
     private fun HasDeviceTests.configureTests() {
         deviceTests.forEach { (_, deviceTest) ->
             deviceTest.packaging.resources.apply {
@@ -879,7 +881,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         }
     }
 
-    @Suppress("UnstableApiUsage") // usage of experimentalProperties
+    @Suppress("UnstableApiUsage") // usage of experimentalProperties b/397703898
     private fun Variant.configureLocalAsbSigning(keyStore: File) {
         experimentalProperties.put(ASB_SIGNING_CONFIG_PROPERTY_NAME, keyStore.absolutePath)
     }
@@ -1022,7 +1024,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                     getDefaultTargetJavaVersion(androidXExtension.type, project.name)
                 sourceCompatibility = defaultTargetJavaVersion
                 targetCompatibility = defaultTargetJavaVersion
-                project.disableJava8TargetObsoleteWarnings()
             }
             if (!project.plugins.hasPlugin(KotlinBasePluginWrapper::class.java)) {
                 project.configureSourceJarForJava(androidXExtension.samplesProjects)
@@ -1097,7 +1098,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             sourceCompatibility = VERSION_1_8
             targetCompatibility = VERSION_1_8
         }
-        project.disableJava8TargetObsoleteWarnings()
 
         val defaultMinSdk = project.defaultAndroidConfig.minSdk
         val defaultCompileSdk = project.defaultAndroidConfig.compileSdk
@@ -1323,10 +1323,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         if (buildFeatures.isIsolatedProjectsEnabled()) return
         afterEvaluate {
             if (androidXExtension.type.requiresDependencyVerification()) {
-                val verifyDependencyVersionsTask = project.createVerifyDependencyVersionsTask()
-                if (verifyDependencyVersionsTask != null) {
-                    taskConfigurator(verifyDependencyVersionsTask)
-                }
+                taskConfigurator(project.createVerifyDependencyVersionsTask())
             }
         }
     }
@@ -1563,27 +1560,38 @@ internal fun Project.configureTaskTimeouts() {
     }
 }
 
-private fun Project.disableJava8TargetObsoleteWarnings() {
-    afterEvaluate {
-        project.tasks.withType(JavaCompile::class.java).configureEach { task ->
-            // JDK 21 considers Java 8 an obsolete source and target value. Disable this warning.
-            task.options.compilerArgs.add("-Xlint:-options")
+private class JavaCompileArgumentProvider(
+    private val isTestApp: Boolean,
+    private val failOnDeprecationWarnings: Provider<Boolean>,
+    private val usingMaxDepVersions: Provider<Boolean>,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): List<String> {
+        // JDK 21 considers Java 8 an obsolete source and target value. Disable this warning.
+        val args = mutableListOf("-Xlint:-options")
+        // If we're running a hypothetical test build confirming that tip-of-tree versions
+        // are compatible, then we're not concerned about warnings
+        if (!usingMaxDepVersions.get() && !isTestApp) {
+            args.add("-Xlint:unchecked")
+            if (failOnDeprecationWarnings.get()) {
+                args.add("-Xlint:deprecation")
+            }
         }
+        return args
     }
 }
 
-private fun Project.configureJavaCompilationWarnings(androidXExtension: AndroidXExtension) {
-    afterEvaluate {
-        project.tasks.withType(JavaCompile::class.java).configureEach { task ->
-            // If we're running a hypothetical test build confirming that tip-of-tree versions
-            // are compatible, then we're not concerned about warnings
-            if (!project.usingMaxDepVersions()) {
-                task.options.compilerArgs.add("-Xlint:unchecked")
-                if (androidXExtension.failOnDeprecationWarnings) {
-                    task.options.compilerArgs.add("-Xlint:deprecation")
-                }
-            }
-        }
+private fun Project.configureJavaCompilationWarnings(
+    androidXExtension: AndroidXExtension,
+    isTestApp: Boolean = false,
+) {
+    project.tasks.withType(JavaCompile::class.java).configureEach { task ->
+        task.options.compilerArgumentProviders.add(
+            JavaCompileArgumentProvider(
+                isTestApp = isTestApp,
+                failOnDeprecationWarnings = androidXExtension.failOnDeprecationWarnings,
+                usingMaxDepVersions = usingMaxDepVersions()
+            )
+        )
     }
 }
 

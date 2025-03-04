@@ -41,7 +41,6 @@ import androidx.health.connect.client.aggregate.AggregationResultGroupedByDurati
 import androidx.health.connect.client.aggregate.AggregationResultGroupedByPeriod
 import androidx.health.connect.client.changes.DeletionChange
 import androidx.health.connect.client.changes.UpsertionChange
-import androidx.health.connect.client.feature.ExperimentalFeatureAvailabilityApi
 import androidx.health.connect.client.feature.HealthConnectFeaturesPlatformImpl
 import androidx.health.connect.client.impl.platform.aggregate.AGGREGATE_METRICS_ADDED_IN_SDK_EXT_10
 import androidx.health.connect.client.impl.platform.aggregate.aggregateFallback
@@ -75,7 +74,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 
 /** Implements the [HealthConnectClient] with APIs in UpsideDownCake. */
 @RequiresApi(api = 34)
-@OptIn(ExperimentalFeatureAvailabilityApi::class)
 class HealthConnectClientUpsideDownImpl : HealthConnectClient, PermissionController {
 
     private val executor = Dispatchers.Default.asExecutor()
@@ -280,23 +278,21 @@ class HealthConnectClientUpsideDownImpl : HealthConnectClient, PermissionControl
                 ) {
                     platformResponse.toSdkResponse(request.metrics)
                 } else {
-                    // Handle bug in the Platform for versions of module before SDK extensions 10
+                    // Handle bug in the Platform for versions of module before SDK extensions 10,
+                    // where bucket endTime < bucket startTime (b/298290400)
                     val requestTimeRangeFilter =
                         request.timeRangeFilter.toPlatformLocalTimeRangeFilter()
                     val bucketStartTime =
-                        requestTimeRangeFilter.startTime!!.plus(
+                        requestTimeRangeFilter.startTime!! +
                             request.timeRangeSlicer.multipliedBy(index)
-                        )
-                    val bucketEndTime = bucketStartTime.plus(request.timeRangeSlicer)
                     platformResponse.toSdkResponse(
                         metrics = request.metrics,
                         bucketStartTime = bucketStartTime,
                         bucketEndTime =
-                            if (requestTimeRangeFilter.endTime!!.isBefore(bucketEndTime)) {
+                            minOf(
+                                bucketStartTime + request.timeRangeSlicer,
                                 requestTimeRangeFilter.endTime!!
-                            } else {
-                                bucketEndTime
-                            }
+                            )
                     )
                 }
             }

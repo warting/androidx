@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:Suppress("UnstableApiUsage")
+@file:Suppress("UnstableApiUsage") // b/393137152
 
 package androidx.build
 
@@ -351,7 +351,7 @@ open class AndroidXMultiplatformExtension(val project: Project) {
 
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     @JvmOverloads
-    fun android(block: Action<KotlinAndroidTarget>? = null): KotlinAndroidTarget? {
+    fun androidTarget(block: Action<KotlinAndroidTarget>? = null): KotlinAndroidTarget? {
         supportedPlatforms.add(PlatformIdentifier.ANDROID)
         return if (project.enableJvm()) {
             kotlinExtension.androidTarget {
@@ -638,8 +638,6 @@ open class AndroidXMultiplatformExtension(val project: Project) {
 
     @JvmOverloads
     fun linuxX64Stubs(block: Action<KotlinNativeTarget>? = null): KotlinNativeTarget? {
-        // don't enable binary compatibility validator for stubs
-        enableBinaryCompatibilityValidator = false
         supportedPlatforms.add(PlatformIdentifier.LINUX_X_64_STUBS)
         return if (project.enableLinux()) {
             kotlinExtension.linuxX64("linuxx64Stubs") {

@@ -25,11 +25,16 @@ public class AppFunctionComponentsMetadata
 @JvmOverloads
 constructor(
     /**
-     * The list of data types that can be reused across the schema. For example, a Person type can
-     * be defined here and referenced in multiple places. See {@link
-     * AppFunctionReferenceTypeMetadata#referenceDataType}.
+     * The map of data types that can be reused across the schema.
+     *
+     * The *key* of this map is a string that serves as an *identifier* for the data type. This
+     * identifier can then be used to reference and reuse this `AppFunctionDataTypeMetadata`
+     * definition in other parts of the schema. For example, a Person type can be defined here with
+     * a key "Person" and referenced in multiple places by `#components/dataTypes/Person`.
+     *
+     * @see [AppFunctionReferenceTypeMetadata.referenceDataType]
      */
-    public val dataTypes: List<AppFunctionDataTypeMetadata> = emptyList(),
+    public val dataTypes: Map<String, AppFunctionDataTypeMetadata> = emptyMap(),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -47,6 +52,24 @@ constructor(
     override fun toString(): String {
         return "AppFunctionComponentsMetadata(dataTypes=$dataTypes)"
     }
+
+    /**
+     * Converts the [AppFunctionComponentsMetadata] to a [AppFunctionComponentsMetadataDocument].
+     *
+     * @return the [AppFunctionComponentsMetadataDocument] representation of the metadata.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public fun toAppFunctionComponentsMetadataDocument(): AppFunctionComponentsMetadataDocument {
+        return AppFunctionComponentsMetadataDocument(
+            dataTypes =
+                dataTypes.map { (name, dataType) ->
+                    AppFunctionNamedDataTypeMetadataDocument(
+                        name = name,
+                        dataTypeMetadata = dataType.toAppFunctionDataTypeMetadataDocument()
+                    )
+                }
+        )
+    }
 }
 
 /** Represents the persistent storage format of [AppFunctionComponentsMetadata]. */
@@ -56,5 +79,13 @@ public data class AppFunctionComponentsMetadataDocument(
     @Document.Namespace public val namespace: String = APP_FUNCTION_NAMESPACE,
     @Document.Id public val id: String = APP_FUNCTION_ID_EMPTY,
     /** The list of data types that ban be reusable across the schema. */
-    @Document.DocumentProperty public val dataTypes: List<AppFunctionDataTypeMetadata>,
-)
+    @Document.DocumentProperty public val dataTypes: List<AppFunctionNamedDataTypeMetadataDocument>,
+) {
+    public fun toAppFunctionComponentsMetadata(): AppFunctionComponentsMetadata =
+        AppFunctionComponentsMetadata(
+            dataTypes =
+                dataTypes.associate {
+                    it.name to it.dataTypeMetadata.toAppFunctionDataTypeMetadata()
+                }
+        )
+}

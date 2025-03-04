@@ -33,21 +33,19 @@ internal actual constructor(
 
     public actual inline fun getBoolean(key: String): Boolean {
         if (key !in this) keyNotFoundError(key)
-        return source.map[key] as? Boolean ?: DEFAULT_BOOLEAN
+        return source.map[key] as? Boolean ?: valueNotFoundError(key)
     }
 
     public actual inline fun getBooleanOrElse(key: String, defaultValue: () -> Boolean): Boolean {
-        if (key !in this) defaultValue()
         return source.map[key] as? Boolean ?: defaultValue()
     }
 
     public actual inline fun getChar(key: String): Char {
         if (key !in this) keyNotFoundError(key)
-        return source.map[key] as? Char ?: DEFAULT_CHAR
+        return source.map[key] as? Char ?: valueNotFoundError(key)
     }
 
     public actual inline fun getCharOrElse(key: String, defaultValue: () -> Char): Char {
-        if (key !in this) defaultValue()
         return source.map[key] as? Char ?: defaultValue()
     }
 
@@ -60,47 +58,42 @@ internal actual constructor(
         key: String,
         defaultValue: () -> CharSequence
     ): CharSequence {
-        if (key !in this) defaultValue()
         return source.map[key] as? CharSequence ?: defaultValue()
     }
 
     public actual inline fun getDouble(key: String): Double {
         if (key !in this) keyNotFoundError(key)
-        return source.map[key] as? Double ?: DEFAULT_DOUBLE
+        return source.map[key] as? Double ?: valueNotFoundError(key)
     }
 
     public actual inline fun getDoubleOrElse(key: String, defaultValue: () -> Double): Double {
-        if (key !in this) defaultValue()
         return source.map[key] as? Double ?: defaultValue()
     }
 
     public actual inline fun getFloat(key: String): Float {
         if (key !in this) keyNotFoundError(key)
-        return source.map[key] as? Float ?: DEFAULT_FLOAT
+        return source.map[key] as? Float ?: valueNotFoundError(key)
     }
 
     public actual inline fun getFloatOrElse(key: String, defaultValue: () -> Float): Float {
-        if (key !in this) defaultValue()
         return source.map[key] as? Float ?: defaultValue()
     }
 
     public actual inline fun getInt(key: String): Int {
         if (key !in this) keyNotFoundError(key)
-        return source.map[key] as? Int ?: DEFAULT_INT
+        return source.map[key] as? Int ?: valueNotFoundError(key)
     }
 
     public actual inline fun getIntOrElse(key: String, defaultValue: () -> Int): Int {
-        if (key !in this) defaultValue()
         return source.map[key] as? Int ?: defaultValue()
     }
 
     public actual inline fun getLong(key: String): Long {
         if (key !in this) keyNotFoundError(key)
-        return source.map[key] as? Long ?: DEFAULT_LONG
+        return source.map[key] as? Long ?: valueNotFoundError(key)
     }
 
     public actual inline fun getLongOrElse(key: String, defaultValue: () -> Long): Long {
-        if (key !in this) defaultValue()
         return source.map[key] as? Long ?: defaultValue()
     }
 
@@ -110,7 +103,6 @@ internal actual constructor(
     }
 
     public actual inline fun getStringOrElse(key: String, defaultValue: () -> String): String {
-        if (key !in this) defaultValue()
         return source.map[key] as? String ?: defaultValue()
     }
 
@@ -124,7 +116,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> List<CharSequence>
     ): List<CharSequence> {
-        if (key !in this) defaultValue()
         @Suppress("UNCHECKED_CAST") return source.map[key] as? List<CharSequence> ?: defaultValue()
     }
 
@@ -137,8 +128,20 @@ internal actual constructor(
         key: String,
         defaultValue: () -> List<Int>
     ): List<Int> {
-        if (key !in this) defaultValue()
         @Suppress("UNCHECKED_CAST") return source.map[key] as? List<Int> ?: defaultValue()
+    }
+
+    public actual inline fun getSavedStateList(key: String): List<SavedState> {
+        if (key !in this) keyNotFoundError(key)
+        @Suppress("UNCHECKED_CAST")
+        return source.map[key] as? List<SavedState> ?: valueNotFoundError(key)
+    }
+
+    public actual inline fun getSavedStateListOrElse(
+        key: String,
+        defaultValue: () -> List<SavedState>
+    ): List<SavedState> {
+        @Suppress("UNCHECKED_CAST") return source.map[key] as? List<SavedState> ?: defaultValue()
     }
 
     public actual inline fun getStringList(key: String): List<String> {
@@ -151,7 +154,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> List<String>
     ): List<String> {
-        if (key !in this) defaultValue()
         @Suppress("UNCHECKED_CAST") return source.map[key] as? List<String> ?: defaultValue()
     }
 
@@ -164,7 +166,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> CharArray
     ): CharArray {
-        if (key !in this) defaultValue()
         return source.map[key] as? CharArray ?: defaultValue()
     }
 
@@ -178,7 +179,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> Array<CharSequence>
     ): Array<CharSequence> {
-        if (key !in this) defaultValue()
         @Suppress("UNCHECKED_CAST") return source.map[key] as? Array<CharSequence> ?: defaultValue()
     }
 
@@ -191,7 +191,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> BooleanArray
     ): BooleanArray {
-        if (key !in this) defaultValue()
         return source.map[key] as? BooleanArray ?: defaultValue()
     }
 
@@ -204,7 +203,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> DoubleArray,
     ): DoubleArray {
-        if (key !in this) defaultValue()
         return source.map[key] as? DoubleArray ?: defaultValue()
     }
 
@@ -217,7 +215,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> FloatArray
     ): FloatArray {
-        if (key !in this) defaultValue()
         return source.map[key] as? FloatArray ?: defaultValue()
     }
 
@@ -230,7 +227,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> IntArray
     ): IntArray {
-        if (key !in this) defaultValue()
         return source.map[key] as? IntArray ?: defaultValue()
     }
 
@@ -243,8 +239,21 @@ internal actual constructor(
         key: String,
         defaultValue: () -> LongArray
     ): LongArray {
-        if (key !in this) defaultValue()
         return source.map[key] as? LongArray ?: defaultValue()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    public actual inline fun getSavedStateArray(key: String): Array<SavedState> {
+        if (key !in this) keyNotFoundError(key)
+        return source.map[key] as? Array<SavedState> ?: valueNotFoundError(key)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    public actual inline fun getSavedStateArrayOrElse(
+        key: String,
+        defaultValue: () -> Array<SavedState>
+    ): Array<SavedState> {
+        return source.map[key] as? Array<SavedState> ?: defaultValue()
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -258,7 +267,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> Array<String>
     ): Array<String> {
-        if (key !in this) defaultValue()
         return source.map[key] as? Array<String> ?: defaultValue()
     }
 
@@ -271,7 +279,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> SavedState
     ): SavedState {
-        if (key !in this) defaultValue()
         return source.map[key] as? SavedState ?: defaultValue()
     }
 
@@ -287,6 +294,8 @@ internal actual constructor(
         source.contentDeepEquals(other)
 
     public actual fun contentDeepHashCode(): Int = source.contentDeepHashCode()
+
+    public actual fun contentDeepToString(): String = source.contentDeepToString()
 
     public actual fun toMap(): Map<String, Any?> {
         return buildMap(capacity = source.map.size) {
@@ -358,4 +367,53 @@ private fun SavedState.contentDeepHashCode(): Int {
     }
 
     return result
+}
+
+private fun SavedState.contentDeepToString(): String {
+    // in order not to overflow Int.MAX_VALUE
+    val length = map.size.coerceAtMost((Int.MAX_VALUE - 2) / 5) * 5 + 2
+    return buildString(length) { contentDeepToStringInternal(this, mutableListOf()) }
+}
+
+@OptIn(ExperimentalUnsignedTypes::class)
+private fun SavedState.contentDeepToStringInternal(
+    result: StringBuilder,
+    processed: MutableList<SavedState>,
+) {
+    if (this in processed) {
+        result.append("[...]")
+        return
+    }
+    processed += this
+    result.append('[')
+
+    for ((i, k) in map.keys.withIndex()) {
+        if (i != 0) {
+            result.append(", ")
+        }
+        result.append("$k=")
+        when (@Suppress("DEPRECATION") val element = map[k]) {
+            null -> result.append("null")
+
+            // container types
+            is SavedState -> element.contentDeepToStringInternal(result, processed)
+            is Array<*> -> result.append(element.contentDeepToString())
+
+            // primitive arrays
+            is ByteArray -> result.append(element.contentToString())
+            is ShortArray -> result.append(element.contentToString())
+            is IntArray -> result.append(element.contentToString())
+            is LongArray -> result.append(element.contentToString())
+            is FloatArray -> result.append(element.contentToString())
+            is DoubleArray -> result.append(element.contentToString())
+            is CharArray -> result.append(element.contentToString())
+            is BooleanArray -> result.append(element.contentToString())
+
+            // if nothing else works
+            else -> result.append(element.toString())
+        }
+    }
+
+    result.append(']')
+    processed.removeAt(processed.lastIndex)
 }

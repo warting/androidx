@@ -84,6 +84,7 @@ import androidx.core.util.ObjectsCompat;
 import androidx.core.util.Preconditions;
 
 import com.google.android.icing.IcingSearchEngine;
+import com.google.android.icing.IcingSearchEngineInterface;
 import com.google.android.icing.proto.BlobProto;
 import com.google.android.icing.proto.DebugInfoProto;
 import com.google.android.icing.proto.DebugInfoResultProto;
@@ -130,7 +131,12 @@ import org.jspecify.annotations.Nullable;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -192,10 +198,11 @@ public final class AppSearchImpl implements Closeable {
     private final ReadWriteLock mReadWriteLock = new ReentrantReadWriteLock();
     private final OptimizeStrategy mOptimizeStrategy;
     private final AppSearchConfig mConfig;
+    private final File mBlobFilesDir;
 
     @GuardedBy("mReadWriteLock")
     @VisibleForTesting
-    final IcingSearchEngine mIcingSearchEngineLocked;
+    final IcingSearchEngineInterface mIcingSearchEngineLocked;
 
     @GuardedBy("mReadWriteLock")
     private final SchemaCache mSchemaCacheLocked = new SchemaCache();
@@ -271,6 +278,8 @@ public final class AppSearchImpl implements Closeable {
      * @param visibilityChecker The {@link VisibilityChecker} that check whether the caller has
      *                          access to aa specific schema. Pass null will lost that ability and
      *                          global querier could only get their own data.
+     * @param icingSearchEngine the underlying icing instance to use. If not provided, a new {@link
+     *     IcingSearchEngine} instance will be created and used.
      */
     @OptIn(markerClass = ExperimentalAppSearchApi.class)
     public static @NonNull AppSearchImpl create(
@@ -279,10 +288,11 @@ public final class AppSearchImpl implements Closeable {
             InitializeStats.@Nullable Builder initStatsBuilder,
             @Nullable VisibilityChecker visibilityChecker,
             @Nullable RevocableFileDescriptorStore revocableFileDescriptorStore,
+            @Nullable IcingSearchEngineInterface icingSearchEngine,
             @NonNull OptimizeStrategy optimizeStrategy)
             throws AppSearchException {
         return new AppSearchImpl(icingDir, config, initStatsBuilder, visibilityChecker,
-                revocableFileDescriptorStore, optimizeStrategy);
+                revocableFileDescriptorStore, icingSearchEngine, optimizeStrategy);
     }
 
     /**
@@ -295,9 +305,16 @@ public final class AppSearchImpl implements Closeable {
             InitializeStats.@Nullable Builder initStatsBuilder,
             @Nullable VisibilityChecker visibilityChecker,
             @Nullable RevocableFileDescriptorStore revocableFileDescriptorStore,
+            @Nullable IcingSearchEngineInterface icingSearchEngine,
             @NonNull OptimizeStrategy optimizeStrategy)
             throws AppSearchException {
         Preconditions.checkNotNull(icingDir);
+        // This directory stores blob files. It is the same directory that Icing used to manage
+        // blob files when Flags.enableAppSearchManageBlobFiles() was false. After the rollout of
+        // this flag, AppSearch will continue to manage blob files in this same directory within
+        // Icing's directory. The location remains unchanged to ensure that the flag does not
+        // introduce any behavioral changes.
+        mBlobFilesDir = new File(icingDir, "blob_dir/blob_files");
         mConfig = Preconditions.checkNotNull(config);
         mOptimizeStrategy = Preconditions.checkNotNull(optimizeStrategy);
         mVisibilityCheckerLocked = visibilityChecker;
@@ -307,40 +324,18 @@ public final class AppSearchImpl implements Closeable {
         try {
             // We synchronize here because we don't want to call IcingSearchEngine.initialize() more
             // than once. It's unnecessary and can be a costly operation.
-            IcingSearchEngineOptions options = IcingSearchEngineOptions.newBuilder()
-                    .setBaseDir(icingDir.getAbsolutePath())
-                    .setMaxTokenLength(mConfig.getMaxTokenLength())
-                    .setIndexMergeSize(mConfig.getIndexMergeSize())
-                    .setDocumentStoreNamespaceIdFingerprint(
-                            mConfig.getDocumentStoreNamespaceIdFingerprint())
-                    .setOptimizeRebuildIndexThreshold(
-                            mConfig.getOptimizeRebuildIndexThreshold())
-                    .setCompressionLevel(mConfig.getCompressionLevel())
-                    .setAllowCircularSchemaDefinitions(
-                            mConfig.getAllowCircularSchemaDefinitions())
-                    .setPreMappingFbv(mConfig.getUsePreMappingWithFileBackedVector())
-                    .setUsePersistentHashMap(mConfig.getUsePersistentHashMap())
-                    .setIntegerIndexBucketSplitThreshold(
-                            mConfig.getIntegerIndexBucketSplitThreshold())
-                    .setLiteIndexSortAtIndexing(mConfig.getLiteIndexSortAtIndexing())
-                    .setLiteIndexSortSize(mConfig.getLiteIndexSortSize())
-                    .setUseNewQualifiedIdJoinIndex(mConfig.getUseNewQualifiedIdJoinIndex())
-                    .setBuildPropertyExistenceMetadataHits(
-                            mConfig.getBuildPropertyExistenceMetadataHits())
-                    .setEnableBlobStore(Flags.enableBlobStore())
-                    .setOrphanBlobTimeToLiveMs(mConfig.getOrphanBlobTimeToLiveMs())
-                    .setEnableEmbeddingIndex(Flags.enableSchemaEmbeddingPropertyConfig())
-                    .setEnableEmbeddingQuantization(Flags.enableSchemaEmbeddingQuantization())
-                    .setEnableScorableProperties(Flags.enableScorableProperty())
-                    .setEnableQualifiedIdJoinIndexV3AndDeletePropagateFrom(
-                            Flags.enableDeletePropagationType())
-                    .build();
-            LogUtil.piiTrace(TAG, "Constructing IcingSearchEngine, request", options);
-            mIcingSearchEngineLocked = new IcingSearchEngine(options);
-            LogUtil.piiTrace(
-                    TAG,
-                    "Constructing IcingSearchEngine, response",
-                    ObjectsCompat.hashCode(mIcingSearchEngineLocked));
+            if (icingSearchEngine == null) {
+                IcingSearchEngineOptions options = mConfig.toIcingSearchEngineOptions(
+                        icingDir.getAbsolutePath());
+                LogUtil.piiTrace(TAG, "Constructing IcingSearchEngine, request", options);
+                mIcingSearchEngineLocked = new IcingSearchEngine(options);
+                LogUtil.piiTrace(
+                        TAG,
+                        "Constructing IcingSearchEngine, response",
+                        ObjectsCompat.hashCode(mIcingSearchEngineLocked));
+            } else {
+                mIcingSearchEngineLocked = icingSearchEngine;
+            }
 
             // The core initialization procedure. If any part of this fails, we bail into
             // resetLocked(), deleting all data (but hopefully allowing AppSearchImpl to come up).
@@ -363,6 +358,13 @@ public final class AppSearchImpl implements Closeable {
                             initializeResultProto.getInitializeStats(), initStatsBuilder);
                 }
                 checkSuccess(initializeResultProto.getStatus());
+
+                if (Flags.enableAppSearchManageBlobFiles() && !mBlobFilesDir.exists()
+                        && !mBlobFilesDir.mkdirs()) {
+                    throw new AppSearchException(AppSearchResult.RESULT_IO_ERROR,
+                            "Cannot create the blob file directory: "
+                                    + mBlobFilesDir.getAbsolutePath());
+                }
 
                 // Read all protos we need to construct AppSearchImpl's cache maps
                 long prepareSchemaAndNamespacesLatencyStartMillis = SystemClock.elapsedRealtime();
@@ -1183,10 +1185,8 @@ public final class AppSearchImpl implements Closeable {
             PropertyProto.BlobHandleProto blobHandleProto =
                     BlobHandleToProtoConverter.toBlobHandleProto(handle);
             BlobProto result = mIcingSearchEngineLocked.openWriteBlob(blobHandleProto);
-
-            checkSuccess(result.getStatus());
-            pfd = ParcelFileDescriptor.adoptFd(result.getFileDescriptor());
-
+            pfd = retrieveFileDescriptorLocked(result,
+                    ParcelFileDescriptor.MODE_CREATE | ParcelFileDescriptor.MODE_READ_WRITE);
             mNamespaceCacheLocked.addToBlobNamespaceMap(createPrefix(packageName, databaseName),
                     blobHandleProto.getNamespace());
 
@@ -1227,9 +1227,88 @@ public final class AppSearchImpl implements Closeable {
                     BlobHandleToProtoConverter.toBlobHandleProto(handle));
 
             checkSuccess(result.getStatus());
+            if (Flags.enableAppSearchManageBlobFiles()) {
+                File blobFileToRemove = new File(mBlobFilesDir, result.getFileName());
+                if (!blobFileToRemove.delete()) {
+                    throw new AppSearchException(AppSearchResult.RESULT_IO_ERROR,
+                            "Cannot delete the blob file: " + blobFileToRemove.getName());
+                }
+            }
             mRevocableFileDescriptorStore.revokeFdForWrite(packageName, handle);
         } finally {
             mReadWriteLock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Verifies the integrity of a blob file by comparing its SHA-256 digest with the expected
+     * digest.
+     *
+     * <p>This method is used when AppSearch manages blob files directly. It opens the blob file
+     * associated with the given {@link AppSearchBlobHandle}, calculates its SHA-256 digest, and
+     * compares it with the digest provided in the handle. If the file does not exist or the
+     * calculated digest does not match the expected digest, the blob is considered invalid and is
+     * removed.
+     *
+     * @param handle The {@link AppSearchBlobHandle} representing the blob to verify.
+     * @throws AppSearchException if the blob file does not exist, the calculated digest does not
+     *                            match the expected digest, or if there is an error removing the
+     *                            invalid blob.
+     * @throws IOException        if there is an error opening or reading the blob file.
+     */
+    @GuardedBy("mReadWriteLock")
+    @OptIn(markerClass = ExperimentalAppSearchApi.class)
+    private void verifyBlobIntegrityLocked(@NonNull AppSearchBlobHandle handle)
+            throws AppSearchException, IOException {
+        // Since the blob has not yet been committed, we open the blob for *write* again to
+        // get the file name.
+        BlobProto result = mIcingSearchEngineLocked.openWriteBlob(
+                BlobHandleToProtoConverter.toBlobHandleProto(handle));
+        checkSuccess(result.getStatus());
+        File blobFile = new File(mBlobFilesDir, result.getFileName());
+        boolean fileExists = blobFile.exists();
+        boolean digestMatches = false;
+
+        if (fileExists) {
+            // Read the file to check the digest.
+            byte[] digest;
+            ParcelFileDescriptor pfd = ParcelFileDescriptor.open(blobFile,
+                    ParcelFileDescriptor.MODE_READ_ONLY);
+            try (InputStream inputStream =
+                         new ParcelFileDescriptor.AutoCloseInputStream(pfd);
+                 DigestInputStream digestInputStream =
+                         new DigestInputStream(inputStream, MessageDigest.getInstance("SHA-256"))) {
+                byte[] buffer = new byte[8192];
+                while (digestInputStream.read(buffer) != -1) {
+                    // pass
+                }
+                digest = digestInputStream.getMessageDigest().digest();
+            } catch (NoSuchAlgorithmException e) {
+                throw new AppSearchException(AppSearchResult.RESULT_INTERNAL_ERROR,
+                        "Failed to get MessageDigest for SHA-256.", e);
+            }
+            digestMatches = Arrays.equals(digest, handle.getSha256Digest());
+        }
+
+        // If the file does not exist or the digest is wrong, delete the blob and throw
+        // an exception.
+        if (!fileExists || !digestMatches) {
+            BlobProto removeResult = mIcingSearchEngineLocked.removeBlob(
+                    BlobHandleToProtoConverter.toBlobHandleProto(handle));
+            checkSuccess(removeResult.getStatus());
+
+            if (!fileExists) {
+                throw new AppSearchException(AppSearchResult.RESULT_NOT_FOUND,
+                        "Cannot find the blob for handle: " + handle);
+            } else {
+                File blobFileToRemove = new File(mBlobFilesDir, removeResult.getFileName());
+                if (!blobFileToRemove.delete()) {
+                    throw new AppSearchException(AppSearchResult.RESULT_IO_ERROR,
+                            "Cannot delete the blob file: " + blobFileToRemove.getName());
+                }
+                throw new AppSearchException(AppSearchResult.RESULT_INVALID_ARGUMENT,
+                        "The blob content doesn't match to the digest.");
+            }
         }
     }
 
@@ -1247,7 +1326,8 @@ public final class AppSearchImpl implements Closeable {
     public void commitBlob(
             @NonNull String packageName,
             @NonNull String databaseName,
-            @NonNull AppSearchBlobHandle handle) throws AppSearchException, IOException {
+            @NonNull AppSearchBlobHandle handle)
+            throws AppSearchException, IOException {
         if (mRevocableFileDescriptorStore == null) {
             throw new UnsupportedOperationException(
                     "BLOB_STORAGE is not available on this AppSearch implementation.");
@@ -1256,6 +1336,13 @@ public final class AppSearchImpl implements Closeable {
         try {
             throwIfClosedLocked();
             verifyCallingBlobHandle(packageName, databaseName, handle);
+
+            // If AppSearch manages blob files, it is responsible for verifying the digest of the
+            // blob file.
+            if (Flags.enableAppSearchManageBlobFiles()) {
+                verifyBlobIntegrityLocked(handle);
+            }
+
             BlobProto result = mIcingSearchEngineLocked.commitBlob(
                     BlobHandleToProtoConverter.toBlobHandleProto(handle));
 
@@ -1295,10 +1382,9 @@ public final class AppSearchImpl implements Closeable {
             mRevocableFileDescriptorStore.checkBlobStoreLimit(packageName);
             BlobProto result = mIcingSearchEngineLocked.openReadBlob(
                     BlobHandleToProtoConverter.toBlobHandleProto(handle));
+            ParcelFileDescriptor pfd = retrieveFileDescriptorLocked(result,
+                    ParcelFileDescriptor.MODE_READ_ONLY);
 
-            checkSuccess(result.getStatus());
-
-            ParcelFileDescriptor pfd = ParcelFileDescriptor.fromFd(result.getFileDescriptor());
             // We do NOT need to look up the revocable file descriptor for read, skip passing the
             // blob handle key.
             return mRevocableFileDescriptorStore.wrapToRevocableFileDescriptor(
@@ -1348,10 +1434,9 @@ public final class AppSearchImpl implements Closeable {
             }
 
             BlobProto result = mIcingSearchEngineLocked.openReadBlob(blobHandleProto);
+            ParcelFileDescriptor pfd = retrieveFileDescriptorLocked(result,
+                    ParcelFileDescriptor.MODE_READ_ONLY);
 
-            checkSuccess(result.getStatus());
-
-            ParcelFileDescriptor pfd = ParcelFileDescriptor.fromFd(result.getFileDescriptor());
             // We do NOT need to look up the revocable file descriptor for read, skip passing the
             // blob handle key.
             return mRevocableFileDescriptorStore.wrapToRevocableFileDescriptor(
@@ -1418,6 +1503,32 @@ public final class AppSearchImpl implements Closeable {
             }
         } finally {
             mReadWriteLock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Retrieves the {@link ParcelFileDescriptor} from a {@link BlobProto}.
+     *
+     * <p>This method handles retrieving the actual file descriptor from the provided
+     * {@link BlobProto}, taking into account whether AppSearch manages blob files directly.
+     * If AppSearch manages blob files ({@code Flags.enableAppSearchManageBlobFiles()} is true),
+     * it opens the file using the file name from the {@link BlobProto}. Otherwise, it retrieves
+     * the file descriptor directly from the {@link BlobProto}.
+     *
+     * @return The {@link ParcelFileDescriptor} for the blob.
+     * @throws AppSearchException if the {@link BlobProto}'s status indicates an error.
+     * @throws IOException        if there is an error opening the file, such as the file not
+     *                            being found.
+     */
+    @GuardedBy("mReadWriteLock")
+    private ParcelFileDescriptor retrieveFileDescriptorLocked(
+            BlobProto blobProto, int mode) throws AppSearchException, IOException {
+        checkSuccess(blobProto.getStatus());
+        if (Flags.enableAppSearchManageBlobFiles()) {
+            File blobFile = new File(mBlobFilesDir, blobProto.getFileName());
+            return ParcelFileDescriptor.open(blobFile, mode);
+        } else {
+            return ParcelFileDescriptor.fromFd(blobProto.getFileDescriptor());
         }
     }
 
@@ -2513,7 +2624,7 @@ public final class AppSearchImpl implements Closeable {
      *                           values.
      */
     @ExperimentalAppSearchApi
-    private static void getBlobStorageInfoForPrefix(
+    private void getBlobStorageInfoForPrefix(
             @NonNull StorageInfoProto storageInfoProto,
             @NonNull String prefix,
             StorageInfo.@NonNull Builder storageInfoBuilder) {
@@ -2527,8 +2638,17 @@ public final class AppSearchImpl implements Closeable {
         for (int i = 0; i < blobStorageInfoProtos.size(); i++) {
             NamespaceBlobStorageInfoProto blobStorageInfoProto = blobStorageInfoProtos.get(i);
             if (blobStorageInfoProto.getNamespace().startsWith(prefix)) {
-                blobSizeBytes += blobStorageInfoProto.getBlobSize();
-                blobCount += blobStorageInfoProto.getNumBlobs();
+                if (Flags.enableAppSearchManageBlobFiles()) {
+                    List<String> blobFileNames = blobStorageInfoProto.getBlobFileNamesList();
+                    for (int j = 0; j < blobFileNames.size(); j++) {
+                        File blobFile = new File(mBlobFilesDir, blobFileNames.get(j));
+                        blobSizeBytes += blobFile.length();
+                    }
+                    blobCount += blobFileNames.size();
+                } else {
+                    blobSizeBytes += blobStorageInfoProto.getBlobSize();
+                    blobCount += blobStorageInfoProto.getNumBlobs();
+                }
             }
         }
         storageInfoBuilder.setBlobsCount(blobCount)
@@ -3092,6 +3212,19 @@ public final class AppSearchImpl implements Closeable {
                         builder);
             }
             checkSuccess(optimizeResultProto.getStatus());
+
+            // If AppSearch manages blob files, remove the optimized blob files.
+            if (Flags.enableAppSearchManageBlobFiles()) {
+                List<String> blobFileNamesToRemove =
+                        optimizeResultProto.getBlobFileNamesToRemoveList();
+                for (int i = 0; i < blobFileNamesToRemove.size(); i++) {
+                    File blobFileToRemove = new File(mBlobFilesDir, blobFileNamesToRemove.get(i));
+                    if (!blobFileToRemove.delete()) {
+                        Log.e(TAG, "Cannot delete the optimized blob file: "
+                                + blobFileToRemove.getName());
+                    }
+                }
+            }
         } finally {
             mReadWriteLock.writeLock().unlock();
         }

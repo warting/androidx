@@ -34,7 +34,6 @@ import androidx.wear.protolayout.LayoutElementBuilders.ArcSpacer
 import androidx.wear.protolayout.LayoutElementBuilders.Box
 import androidx.wear.protolayout.LayoutElementBuilders.DashedArcLine
 import androidx.wear.protolayout.LayoutElementBuilders.DashedLinePattern
-import androidx.wear.protolayout.LayoutElementBuilders.LayoutElement
 import androidx.wear.protolayout.ModifiersBuilders.Modifiers
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicColor
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicFloat
@@ -56,7 +55,7 @@ import androidx.wear.protolayout.types.dp
 import kotlin.math.min
 
 /**
- * Protolayout Material3 design circular progress indicator.
+ * ProtoLayout Material3 design circular progress indicator.
  *
  * Note that, the proper implementation of this component requires a ProtoLayout renderer with
  * version equal to or above 1.403. When the renderer is lower than 1.403, this component will
@@ -65,6 +64,11 @@ import kotlin.math.min
  *
  * This component consumes 3 animation quotas when [dynamicProgress] is specified with animation by
  * the caller. It is highly recommend to use the [recommendedAnimationSpec] to animate the progress.
+ *
+ * The progress indicator's [colors] default to using [ColorScheme] from the [MaterialScope] it's
+ * defined in, which defaults to [dynamicColorScheme], meaning that the colors follow system theme
+ * if available on device. If not, or switched off by user, uses fallback [ColorScheme] defined in
+ * its [MaterialScope].
  *
  * @param staticProgress The static progress of this progress indicator where 0 represent no
  *   progress and 1 represents completion. Progress above 1 is also allowed. If [dynamicProgress] is
@@ -108,7 +112,7 @@ public fun MaterialScope.circularProgressIndicator(
     colors: ProgressIndicatorColors =
         defaultProgressIndicatorStyle.color ?: filledProgressIndicatorColors(),
     size: ContainerDimension = expand(),
-): LayoutElement {
+): Box {
     // CircularProgressIndicator could not have size as wrap
     verifySize(size)
 
@@ -117,9 +121,13 @@ public fun MaterialScope.circularProgressIndicator(
         deviceConfiguration.rendererSchemaVersion.hasDashedArcLineSupport()
     // With the fallback implementation, expandable size is not supported, fallback to dp size.
     val containerSize =
-        if (hasDashedArcLineSupport || size is DpProp) size else CPI_DEFAULT_DP_SIZE.dp
+        if (hasDashedArcLineSupport || size is DpProp) {
+            size
+        } else {
+            CPI_DEFAULT_DP_SIZE.dp
+        }
     val boxBuilder =
-        if (hasDashedArcLineSupport)
+        if (hasDashedArcLineSupport) {
             singleSegmentImpl(
                 startAngleDegrees = startAngleDegrees,
                 endAngleDegrees = checkAndAdjustEndAngle(startAngleDegrees, endAngleDegrees),
@@ -129,7 +137,7 @@ public fun MaterialScope.circularProgressIndicator(
                 gapSize = gapSize,
                 colors = colors
             )
-        else
+        } else {
             circularProgressIndicatorFallbackImpl(
                 // Without DashedArcLine support, container size fell back to dp size.
                 arcContainerSize = (containerSize as DpProp).value,
@@ -141,6 +149,7 @@ public fun MaterialScope.circularProgressIndicator(
                 gapSize = gapSize,
                 colors = colors
             )
+        }
 
     return boxBuilder
         .setModifiers(modifiers)
@@ -150,7 +159,7 @@ public fun MaterialScope.circularProgressIndicator(
 }
 
 /**
- * Protolayout Material3 design segmented circular progress indicator.
+ * ProtoLayout Material3 design segmented circular progress indicator.
  *
  * A segmented variant of [circularProgressIndicator] that is divided into equally sized segments.
  *
@@ -161,6 +170,11 @@ public fun MaterialScope.circularProgressIndicator(
  *
  * This component consumes 2 animation quotas when [dynamicProgress] is specified with animation by
  * the caller. It is highly recommend to use the [recommendedAnimationSpec] to animate the progress.
+ *
+ * The progress indicator's [colors] default to using [ColorScheme] from the [MaterialScope] it's
+ * defined in, which defaults to [dynamicColorScheme], meaning that the colors follow system theme
+ * if available on device. If not, or switched off by user, uses fallback [ColorScheme] defined in
+ * its [MaterialScope].
  *
  * @param segmentCount Number of equal segments that the progress indicator should be divided into.
  *   Has to be a number greater than or equal to 1.
@@ -204,9 +218,10 @@ public fun MaterialScope.segmentedCircularProgressIndicator(
     endAngleDegrees: Float = startAngleDegrees + 360F,
     @Dimension(DP) strokeWidth: Float = LARGE_STROKE_WIDTH,
     @Dimension(DP) gapSize: Float = calculateRecommendedGapSize(strokeWidth),
-    colors: ProgressIndicatorColors = filledProgressIndicatorColors(),
+    colors: ProgressIndicatorColors =
+        defaultProgressIndicatorStyle.color ?: filledProgressIndicatorColors(),
     size: ContainerDimension = expand(),
-): LayoutElement {
+): Box {
     // CircularProgressIndicator could not have size as wrap
     verifySize(size)
 
@@ -215,9 +230,13 @@ public fun MaterialScope.segmentedCircularProgressIndicator(
         deviceConfiguration.rendererSchemaVersion.hasDashedArcLineSupport()
     // Without using DashedArcLine, expandable size is not supported, fallback to dp size.
     val containerSize =
-        if (hasDashedArcLineSupport || size is DpProp) size else CPI_DEFAULT_DP_SIZE.dp
+        if (hasDashedArcLineSupport || size is DpProp) {
+            size
+        } else {
+            CPI_DEFAULT_DP_SIZE.dp
+        }
     val boxBuilder =
-        if (hasDashedArcLineSupport)
+        if (hasDashedArcLineSupport) {
             multipleSegmentsImpl(
                 segmentCount = segmentCount,
                 startAngleDegrees = startAngleDegrees,
@@ -228,7 +247,7 @@ public fun MaterialScope.segmentedCircularProgressIndicator(
                 gapSize = gapSize,
                 colors = colors
             )
-        else
+        } else {
             circularProgressIndicatorFallbackImpl(
                 // Without DashedArcLine support, container size fell back to dp size.
                 arcContainerSize = (containerSize as DpProp).value,
@@ -240,6 +259,7 @@ public fun MaterialScope.segmentedCircularProgressIndicator(
                 gapSize = gapSize,
                 colors = colors
             )
+        }
 
     return boxBuilder
         .setModifiers(modifiers)
@@ -344,9 +364,9 @@ private fun MaterialScope.multipleSegmentsImpl(
             .setGapInterval(sweepAngle / segmentCount)
             .build()
 
-    // We need to make the indicator arc a bit wider than the indicator arc to make sure the top
+    // We need to make the indicator arc a bit wider than the track arc to make sure the top
     // arc covers the bottom one completely in the overlapped area.
-    val insetPadding = INDICATOR_STROKE_WIDTH_INCREMENT_PX / deviceConfiguration.screenWidthDp / 2F
+    val insetPadding = INDICATOR_STROKE_WIDTH_INCREMENT_PX / deviceConfiguration.screenDensity / 2F
     return Box.Builder()
         .addContent(
             // the track
@@ -437,8 +457,11 @@ internal fun trackColor(
     colors: ProgressIndicatorColors
 ): ColorProp =
     ColorProp.Builder(
-            if (staticProgress > 1) colors.trackOverflowColor.prop.argb
-            else colors.trackColor.prop.argb
+            if (staticProgress > 1) {
+                colors.trackOverflowColor.prop.argb
+            } else {
+                colors.trackColor.prop.argb
+            }
         )
         .apply {
             dynamicProgress?.let {

@@ -63,23 +63,45 @@ internal actual constructor(
      *   not found or the associated value has the wrong type.
      */
     public inline fun getBinderOrElse(key: String, defaultValue: () -> IBinder): IBinder {
-        if (key !in this) defaultValue()
         return source.getBinder(key) ?: defaultValue()
     }
 
     public actual inline fun getBoolean(key: String): Boolean {
-        if (key !in this) keyNotFoundError(key)
-        return source.getBoolean(key, DEFAULT_BOOLEAN)
+        val result = source.getBoolean(key, false)
+        if (result == false) {
+            val reference = source.getBoolean(key, true)
+            if (reference == true) {
+                if (key in this) {
+                    valueNotFoundError(key)
+                } else {
+                    keyNotFoundError(key)
+                }
+            }
+        }
+        return result
     }
 
     public actual inline fun getBooleanOrElse(key: String, defaultValue: () -> Boolean): Boolean {
-        if (key !in this) defaultValue()
         return source.getBoolean(key, defaultValue())
     }
 
     public actual inline fun getChar(key: String): Char {
-        if (key !in this) keyNotFoundError(key)
-        return source.getChar(key, DEFAULT_CHAR)
+        val result = source.getChar(key, Char.MIN_VALUE)
+        if (result == Char.MIN_VALUE) {
+            val reference = source.getChar(key, Char.MAX_VALUE)
+            if (reference == Char.MAX_VALUE) {
+                if (key in this) {
+                    valueNotFoundError(key)
+                } else {
+                    keyNotFoundError(key)
+                }
+            }
+        }
+        return result
+    }
+
+    public actual inline fun getCharOrElse(key: String, defaultValue: () -> Char): Char {
+        return source.getChar(key, defaultValue())
     }
 
     public actual inline fun getCharSequence(key: String): CharSequence {
@@ -91,52 +113,84 @@ internal actual constructor(
         key: String,
         defaultValue: () -> CharSequence
     ): CharSequence {
-        if (key !in this) defaultValue()
         return source.getCharSequence(key) ?: defaultValue()
     }
 
-    public actual inline fun getCharOrElse(key: String, defaultValue: () -> Char): Char {
-        if (key !in this) defaultValue()
-        return source.getChar(key, defaultValue())
-    }
-
     public actual inline fun getDouble(key: String): Double {
-        if (key !in this) keyNotFoundError(key)
-        return source.getDouble(key, DEFAULT_DOUBLE)
+        val result = source.getDouble(key, Double.MIN_VALUE)
+
+        if (result == Double.MIN_VALUE) {
+            val reference = source.getDouble(key, Double.MAX_VALUE)
+            if (reference == Double.MAX_VALUE) {
+                if (key in this) {
+                    valueNotFoundError(key)
+                } else {
+                    keyNotFoundError(key)
+                }
+            }
+        }
+        return result
     }
 
     public actual inline fun getDoubleOrElse(key: String, defaultValue: () -> Double): Double {
-        if (key !in this) defaultValue()
         return source.getDouble(key, defaultValue())
     }
 
     public actual inline fun getFloat(key: String): Float {
-        if (key !in this) keyNotFoundError(key)
-        return source.getFloat(key, DEFAULT_FLOAT)
+        val result = source.getFloat(key, Float.MIN_VALUE)
+
+        if (result == Float.MIN_VALUE) {
+            val reference = source.getFloat(key, Float.MAX_VALUE)
+            if (reference == Float.MAX_VALUE) {
+                if (key in this) {
+                    valueNotFoundError(key)
+                } else {
+                    keyNotFoundError(key)
+                }
+            }
+        }
+        return result
     }
 
     public actual inline fun getFloatOrElse(key: String, defaultValue: () -> Float): Float {
-        if (key !in this) defaultValue()
         return source.getFloat(key, defaultValue())
     }
 
     public actual inline fun getInt(key: String): Int {
-        if (key !in this) keyNotFoundError(key)
-        return source.getInt(key, DEFAULT_INT)
+        val result = source.getInt(key, Int.MIN_VALUE)
+        if (result == Int.MIN_VALUE) {
+            val reference = source.getInt(key, Int.MAX_VALUE)
+            if (reference == Int.MAX_VALUE) {
+                if (key in this) {
+                    valueNotFoundError(key)
+                } else {
+                    keyNotFoundError(key)
+                }
+            }
+        }
+        return result
     }
 
     public actual inline fun getIntOrElse(key: String, defaultValue: () -> Int): Int {
-        if (key !in this) defaultValue()
         return source.getInt(key, defaultValue())
     }
 
     public actual inline fun getLong(key: String): Long {
-        if (key !in this) keyNotFoundError(key)
-        return source.getLong(key, DEFAULT_LONG)
+        val result = source.getLong(key, Long.MIN_VALUE)
+        if (result == Long.MIN_VALUE) {
+            val reference = source.getLong(key, Long.MAX_VALUE)
+            if (reference == Long.MAX_VALUE) {
+                if (key in this) {
+                    valueNotFoundError(key)
+                } else {
+                    keyNotFoundError(key)
+                }
+            }
+        }
+        return result
     }
 
     public actual inline fun getLongOrElse(key: String, defaultValue: () -> Long): Long {
-        if (key !in this) defaultValue()
         return source.getLong(key, defaultValue())
     }
 
@@ -166,7 +220,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> T
     ): T {
-        if (key !in this) defaultValue()
         return getParcelable(source, key, T::class.java) ?: defaultValue()
     }
 
@@ -196,7 +249,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> T
     ): T {
-        if (key !in this) defaultValue()
         return getSerializable(source, key, T::class.java) ?: defaultValue()
     }
 
@@ -223,7 +275,6 @@ internal actual constructor(
      *   not found or the associated value has the wrong type.
      */
     public inline fun getSizeOrElse(key: String, defaultValue: () -> Size): Size {
-        if (key !in this) defaultValue()
         return source.getSize(key) ?: defaultValue()
     }
 
@@ -250,8 +301,20 @@ internal actual constructor(
      *   not found or the associated value has the wrong type.
      */
     public inline fun getSizeFOrElse(key: String, defaultValue: () -> SizeF): SizeF {
-        if (key !in this) defaultValue()
         return source.getSizeF(key) ?: defaultValue()
+    }
+
+    @Suppress("ArrayReturn")
+    public actual inline fun getSavedStateArray(key: String): Array<SavedState> {
+        return getParcelableArray(key)
+    }
+
+    @Suppress("ArrayReturn")
+    public actual inline fun getSavedStateArrayOrElse(
+        key: String,
+        defaultValue: () -> Array<SavedState>,
+    ): Array<SavedState> {
+        return getParcelableArrayOrElse(key, defaultValue)
     }
 
     public actual inline fun getString(key: String): String {
@@ -260,7 +323,6 @@ internal actual constructor(
     }
 
     public actual inline fun getStringOrElse(key: String, defaultValue: () -> String): String {
-        if (key !in this) defaultValue()
         return source.getString(key, defaultValue())
     }
 
@@ -273,7 +335,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> List<Int>
     ): List<Int> {
-        if (key !in this) defaultValue()
         return source.getIntegerArrayList(key) ?: defaultValue()
     }
 
@@ -286,8 +347,18 @@ internal actual constructor(
         key: String,
         defaultValue: () -> List<CharSequence>
     ): List<CharSequence> {
-        if (key !in this) defaultValue()
         return source.getCharSequenceArrayList(key) ?: defaultValue()
+    }
+
+    public actual inline fun getSavedStateList(key: String): List<SavedState> {
+        return getParcelableList(key)
+    }
+
+    public actual inline fun getSavedStateListOrElse(
+        key: String,
+        defaultValue: () -> List<SavedState>
+    ): List<SavedState> {
+        return getParcelableListOrElse(key, defaultValue)
     }
 
     public actual inline fun getStringList(key: String): List<String> {
@@ -299,7 +370,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> List<String>
     ): List<String> {
-        if (key !in this) defaultValue()
         return source.getStringArrayList(key) ?: defaultValue()
     }
 
@@ -330,7 +400,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> List<T>
     ): List<T> {
-        if (key !in this) defaultValue()
         return getParcelableArrayList(source, key, T::class.java) ?: defaultValue()
     }
 
@@ -343,7 +412,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> BooleanArray
     ): BooleanArray {
-        if (key !in this) defaultValue()
         return source.getBooleanArray(key) ?: defaultValue()
     }
 
@@ -356,7 +424,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> CharArray
     ): CharArray {
-        if (key !in this) defaultValue()
         return source.getCharArray(key) ?: defaultValue()
     }
 
@@ -371,7 +438,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> Array<CharSequence>
     ): Array<CharSequence> {
-        if (key !in this) defaultValue()
         return source.getCharSequenceArray(key) ?: defaultValue()
     }
 
@@ -384,7 +450,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> DoubleArray
     ): DoubleArray {
-        if (key !in this) defaultValue()
         return source.getDoubleArray(key) ?: defaultValue()
     }
 
@@ -397,7 +462,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> FloatArray
     ): FloatArray {
-        if (key !in this) defaultValue()
         return source.getFloatArray(key) ?: defaultValue()
     }
 
@@ -410,7 +474,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> IntArray
     ): IntArray {
-        if (key !in this) defaultValue()
         return source.getIntArray(key) ?: defaultValue()
     }
 
@@ -423,7 +486,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> LongArray
     ): LongArray {
-        if (key !in this) defaultValue()
         return source.getLongArray(key) ?: defaultValue()
     }
 
@@ -436,7 +498,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> Array<String>
     ): Array<String> {
-        if (key !in this) defaultValue()
         return source.getStringArray(key) ?: defaultValue()
     }
 
@@ -471,7 +532,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> Array<T>
     ): Array<T> {
-        if (key !in this) defaultValue()
         @Suppress("UNCHECKED_CAST")
         return getParcelableArray(source, key, T::class.java) as? Array<T> ?: defaultValue()
     }
@@ -506,7 +566,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> SparseArray<T>
     ): SparseArray<T> {
-        if (key !in this) defaultValue()
         return getSparseParcelableArray(source, key, T::class.java) as? SparseArray<T>
             ?: defaultValue()
     }
@@ -520,7 +579,6 @@ internal actual constructor(
         key: String,
         defaultValue: () -> SavedState
     ): SavedState {
-        if (key !in this) defaultValue()
         return source.getBundle(key) ?: defaultValue()
     }
 
@@ -541,6 +599,8 @@ internal actual constructor(
         source.contentDeepEquals(other)
 
     public actual fun contentDeepHashCode(): Int = source.contentDeepHashCode()
+
+    public actual fun contentDeepToString(): String = source.contentDeepToString()
 
     public actual fun toMap(): Map<String, Any?> {
         return buildMap(capacity = source.size()) {
@@ -612,4 +672,51 @@ private fun SavedState.contentDeepHashCode(): Int {
     }
 
     return result
+}
+
+private fun SavedState.contentDeepToString(): String {
+    // in order not to overflow Int.MAX_VALUE
+    val length = size().coerceAtMost((Int.MAX_VALUE - 2) / 5) * 5 + 2
+    return buildString(length) { contentDeepToStringInternal(this, mutableListOf()) }
+}
+
+private fun SavedState.contentDeepToStringInternal(
+    result: StringBuilder,
+    processed: MutableList<SavedState>,
+) {
+    if (this in processed) {
+        result.append("[...]")
+        return
+    }
+    processed += this
+    result.append('[')
+
+    for ((i, k) in keySet().withIndex()) {
+        if (i != 0) {
+            result.append(", ")
+        }
+        result.append("$k=")
+        when (@Suppress("DEPRECATION") val element = this[k]) {
+            null -> result.append("null")
+            // container types
+            is SavedState -> element.contentDeepToStringInternal(result, processed)
+            is Array<*> -> result.append(element.contentDeepToString())
+
+            // primitive arrays
+            is ByteArray -> result.append(element.contentToString())
+            is ShortArray -> result.append(element.contentToString())
+            is IntArray -> result.append(element.contentToString())
+            is LongArray -> result.append(element.contentToString())
+            is FloatArray -> result.append(element.contentToString())
+            is DoubleArray -> result.append(element.contentToString())
+            is CharArray -> result.append(element.contentToString())
+            is BooleanArray -> result.append(element.contentToString())
+
+            // if nothing else works
+            else -> result.append(element.toString())
+        }
+    }
+
+    result.append(']')
+    processed.removeAt(processed.lastIndex)
 }

@@ -24,28 +24,42 @@ import org.junit.Test
 class RecyclingTest {
     private val sink = NoOpSink()
 
-    private val context: TraceContext =
-        TraceContext(sequenceId = 1, sink = sink, isEnabled = true, isDebug = true)
+    private val context: TraceContext = TraceContext(sink = sink, isEnabled = true, isDebug = true)
+
+    fun TraceContext.validateEachTrackHasOnePoolable() {
+        validateTrackPools { track -> assertEquals(1, track.pool.poolableCount()) }
+    }
 
     @Test
     internal fun testProcessTrackEvents() {
         context.use {
-            val process = context.ProcessTrack(id = 1, name = "process")
-            val thread = process.ThreadTrack(1, "thread")
+            val process = context.getOrCreateProcessTrack(id = 1, name = "process")
+            val thread = process.getOrCreateThreadTrack(1, "thread")
             thread.trace("section") {}
         }
         assertTrue(context.isDebug)
-        assertEquals(0, context.poolableCount())
+        context.validateEachTrackHasOnePoolable()
     }
 
     @Test
     internal fun testProcessTrackFlows() = runTest {
         context.use {
-            val process = context.ProcessTrack(id = 1, name = "process")
-            val thread = process.ThreadTrack(1, "thread")
+            val process = context.getOrCreateProcessTrack(id = 1, name = "process")
+            val thread = process.getOrCreateThreadTrack(1, "thread")
             thread.traceFlow("section") {}
         }
         assertTrue(context.isDebug)
-        assertEquals(0, context.poolableCount())
+        context.validateEachTrackHasOnePoolable()
+    }
+
+    @Test
+    internal fun testProcessTrackCounter() = runTest {
+        context.use {
+            val process = context.getOrCreateProcessTrack(id = 1, name = "process")
+            val counter = process.getOrCreateCounterTrack("counter")
+            counter.setCounter(0L)
+        }
+        assertTrue(context.isDebug)
+        context.validateEachTrackHasOnePoolable()
     }
 }

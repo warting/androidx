@@ -23,6 +23,22 @@ import kotlin.test.Test
 internal class SavedStateTest : RobolectricTest() {
 
     @Test
+    fun factory_withMap_hasInitialState() {
+        val oldState = createDefaultSavedState().read { toMap() }
+        val newState = savedState(oldState).read { toMap() }
+
+        assertThat(newState).isEqualTo(oldState)
+    }
+
+    @Test
+    fun factory_withSavedState_hasInitialState() {
+        val oldState = createDefaultSavedState()
+        val newState = savedState(oldState)
+
+        assertThat(oldState.read { contentDeepEquals(newState) }).isTrue()
+    }
+
+    @Test
     fun contains_whenHasKey_returnsTrue() {
         val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
 
@@ -221,6 +237,71 @@ internal class SavedStateTest : RobolectricTest() {
     }
 
     @Test
+    fun contentDeepToString_isEmpty_returnsEmptyBrackets() {
+        val savedState = savedState()
+        assertThat(savedState.read { contentDeepToString() }).isEqualTo("[]")
+    }
+
+    @Test
+    fun contentDeepToString_hasPrimitiveValues_returnsFormattedString() {
+        val savedState = savedState {
+            putInt("intKey", 42)
+            putString("stringKey", "Hello")
+            putBoolean("boolKey", true)
+        }
+        val expected = "[intKey=42, stringKey=Hello, boolKey=true]"
+        assertThat(savedState.read { contentDeepToString() }).isEqualTo(expected)
+    }
+
+    @Test
+    fun contentDeepToString_hasArrayValues_returnsFormattedArrayString() {
+        val savedState = savedState {
+            putStringArray("stringArray", arrayOf("A", "B", "C"))
+            putIntArray("intArray", intArrayOf(1, 2, 3))
+        }
+        val expected = "[stringArray=[A, B, C], intArray=[1, 2, 3]]"
+        assertThat(savedState.read { contentDeepToString() }).isEqualTo(expected)
+    }
+
+    @Test
+    fun contentDeepToString_hasNestedSavedState_returnsFormattedNestedString() {
+        val savedState = savedState {
+            putSavedState("nested", savedState { putString("nestedKey", "NestedValue") })
+        }
+        val expected = "[nested=[nestedKey=NestedValue]]"
+        assertThat(savedState.read { contentDeepToString() }).isEqualTo(expected)
+    }
+
+    @Test
+    fun contentDeepToString_hasNullValues_returnsStringWithNull() {
+        val savedState = savedState { putNull("nullKey") }
+        val expected = "[nullKey=null]"
+        assertThat(savedState.read { contentDeepToString() }).isEqualTo(expected)
+    }
+
+    @Test
+    fun contentDeepToString_hasSameContent_returnsEqualStrings() {
+        val state1 = createDefaultSavedState()
+        val state2 = createDefaultSavedState()
+
+        val toString1 = state1.read { contentDeepToString() }
+        val toString2 = state2.read { contentDeepToString() }
+
+        assertThat(toString1).isEqualTo(toString2)
+    }
+
+    @Test
+    fun contentDeepToString_hasDifferentContent_returnsDifferentStrings() {
+        val state1 = savedState(createDefaultSavedState()) { putInt("id", 1) }
+        val state2 = savedState(createDefaultSavedState()) { putInt("id", 2) }
+
+        val toString1 = state1.read { contentDeepToString() }
+        val toString2 = state2.read { contentDeepToString() }
+
+        assertThat(toString1).isNotEqualTo(toString2)
+    }
+
+    @Test
     fun toMap() {
         val sharedState = savedState {
             putInt(KEY_1, Int.MIN_VALUE)
@@ -255,11 +336,9 @@ internal class SavedStateTest : RobolectricTest() {
     }
 
     @Test
-    fun getBoolean_whenSet_differentType_returnsDefault() {
+    fun getBoolean_whenSet_differentType_throws() {
         val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
-        val actual = underTest.read { getBoolean(KEY_1) }
-
-        assertThat(actual).isEqualTo(DEFAULT_BOOLEAN)
+        assertThrows<IllegalStateException> { underTest.read { getBoolean(KEY_1) } }
     }
 
     @Test
@@ -301,11 +380,9 @@ internal class SavedStateTest : RobolectricTest() {
     }
 
     @Test
-    fun getChar_whenSet_differentType_returnsDefault() {
+    fun getChar_whenSet_differentType_throws() {
         val underTest = savedState { putInt(KEY_1, Int.MIN_VALUE) }
-        val actual = underTest.read { getChar(KEY_1) }
-
-        assertThat(actual).isEqualTo(DEFAULT_CHAR)
+        assertThrows<IllegalStateException> { underTest.read { getChar(KEY_1) } }
     }
 
     @Test
@@ -388,11 +465,9 @@ internal class SavedStateTest : RobolectricTest() {
     }
 
     @Test
-    fun getDouble_whenSet_differentType_returnsDefault() {
+    fun getDouble_whenSet_differentType_throws() {
         val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
-        val actual = underTest.read { getDouble(KEY_1) }
-
-        assertThat(actual).isEqualTo(DEFAULT_DOUBLE)
+        assertThrows<IllegalStateException> { underTest.read { getDouble(KEY_1) } }
     }
 
     @Test
@@ -432,11 +507,9 @@ internal class SavedStateTest : RobolectricTest() {
     }
 
     @Test
-    fun getFloat_whenSet_differentType_returnsDefault() {
+    fun getFloat_whenSet_differentType_throws() {
         val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
-        val actual = underTest.read { getFloat(KEY_1) }
-
-        assertThat(actual).isEqualTo(DEFAULT_FLOAT)
+        assertThrows<IllegalStateException> { underTest.read { getFloat(KEY_1) } }
     }
 
     @Test
@@ -476,11 +549,9 @@ internal class SavedStateTest : RobolectricTest() {
     }
 
     @Test
-    fun getInt_whenSet_differentType_returnsDefault() {
+    fun getInt_whenSet_differentType_throws() {
         val underTest = savedState { putBoolean(KEY_1, false) }
-        val actual = underTest.read { getInt(KEY_1) }
-
-        assertThat(actual).isEqualTo(DEFAULT_INT)
+        assertThrows<IllegalStateException> { underTest.read { getInt(KEY_1) } }
     }
 
     @Test
@@ -522,9 +593,7 @@ internal class SavedStateTest : RobolectricTest() {
     @Test
     fun getLong_whenSet_differentType_returnsDefault() {
         val underTest = savedState { putBoolean(KEY_1, false) }
-        val actual = underTest.read { getLong(KEY_1) }
-
-        assertThat(actual).isEqualTo(DEFAULT_LONG)
+        assertThrows<IllegalStateException> { underTest.read { getLong(KEY_1) } }
     }
 
     @Test
@@ -712,6 +781,53 @@ internal class SavedStateTest : RobolectricTest() {
         val actual = underTest.read { getCharSequenceListOrElse(KEY_1) { emptyList() } }
 
         assertThat(actual).isEqualTo(emptyList<CharSequence>())
+    }
+
+    @Test
+    fun getSavedStateList_whenSet_returns() {
+        val expected = List(size = 5) { savedState() }
+
+        val underTest = savedState { putSavedStateList(KEY_1, expected) }
+        val actual = underTest.read { getSavedStateList(KEY_1) }
+
+        assertThat(actual).isEqualTo(expected)
+    }
+
+    @Test
+    fun getSavedStateList_whenNotSet_throws() {
+        assertThrows<IllegalArgumentException> { savedState().read { getSavedStateList(KEY_1) } }
+    }
+
+    @Test
+    fun getSavedStateList_whenSet_differentType_throws() {
+        val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
+
+        assertThrows<IllegalStateException> { underTest.read { getSavedStateList(KEY_1) } }
+    }
+
+    @Test
+    fun getSavedStateListOrElse_whenSet_returns() {
+        val expected = List(size = 5) { savedState() }
+
+        val underTest = savedState { putSavedStateList(KEY_1, expected) }
+        val actual = underTest.read { getSavedStateListOrElse(KEY_1) { emptyList() } }
+
+        assertThat(actual).isEqualTo(expected)
+    }
+
+    @Test
+    fun getSavedStateListOrElse_whenNotSet_returnsElse() {
+        val actual = savedState().read { getSavedStateListOrElse(KEY_1) { emptyList() } }
+
+        assertThat(actual).isEqualTo(emptyList<SavedState>())
+    }
+
+    @Test
+    fun getSavedStateListOrElse_whenSet_differentType_throws() {
+        val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
+        val actual = underTest.read { getSavedStateListOrElse(KEY_1) { emptyList() } }
+
+        assertThat(actual).isEqualTo(emptyList<SavedState>())
     }
 
     @Test
@@ -1130,6 +1246,53 @@ internal class SavedStateTest : RobolectricTest() {
         val actual = underTest.read { getLongArrayOrElse(KEY_1) { expected } }
 
         assertThat(actual).isEqualTo(expected)
+    }
+
+    @Test
+    fun getSavedStateArray_whenSet_returns() {
+        val expected = Array(size = 5) { savedState() }
+
+        val underTest = savedState { putSavedStateArray(KEY_1, expected) }
+        val actual = underTest.read { getSavedStateArray(KEY_1) }
+
+        assertThat(actual).isEqualTo(expected)
+    }
+
+    @Test
+    fun getSavedStateArray_ofParcelable_whenNotSet_throws() {
+        assertThrows<IllegalArgumentException> { savedState().read { getSavedStateArray(KEY_1) } }
+    }
+
+    @Test
+    fun getSavedStateArray_whenSet_differentType_throws() {
+        val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
+
+        assertThrows<IllegalStateException> { underTest.read { getSavedStateArray(KEY_1) } }
+    }
+
+    @Test
+    fun getSavedStateArrayOrElse_whenSet_returns() {
+        val expected = Array(size = 5) { savedState() }
+
+        val underTest = savedState { putSavedStateArray(KEY_1, expected) }
+        val actual = underTest.read { getSavedStateArrayOrElse(KEY_1) { emptyArray() } }
+
+        assertThat(actual).isEqualTo(expected)
+    }
+
+    @Test
+    fun getSavedStateArrayOrElse_ofParcelable_whenNotSet_returnsElse() {
+        val actual = savedState().read { getSavedStateArrayOrElse(KEY_1) { emptyArray() } }
+
+        assertThat(actual).isEqualTo(emptyArray<SavedState>())
+    }
+
+    @Test
+    fun getSavedStateArrayOrElse_whenSet_differentType_throws() {
+        val underTest = savedState { putInt(KEY_1, Int.MAX_VALUE) }
+        val actual = underTest.read { getSavedStateArrayOrElse(KEY_1) { emptyArray() } }
+
+        assertThat(actual).isEqualTo(emptyArray<SavedState>())
     }
 
     @Test

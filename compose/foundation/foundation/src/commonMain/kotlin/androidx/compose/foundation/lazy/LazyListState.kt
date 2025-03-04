@@ -52,6 +52,7 @@ import androidx.compose.ui.layout.RemeasurementModifier
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.util.fastRoundToInt
+import androidx.compose.ui.util.traceValue
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
@@ -276,7 +277,10 @@ constructor(
                 // cause us to recompose when the measure result changes. We don't care since the
                 // prefetch is best effort.
                 val lastMeasureResult = Snapshot.withoutReadObservation { layoutInfoState.value }
-                return prefetchState.schedulePrefetch(index, lastMeasureResult.childConstraints) {
+                return prefetchState.schedulePrecompositionAndPremeasure(
+                    index,
+                    lastMeasureResult.childConstraints
+                ) {
                     if (onPrefetchFinished != null) {
                         var mainAxisItemSize = 0
                         repeat(placeablesCount) {
@@ -518,6 +522,7 @@ constructor(
             if (visibleItemsStayedTheSame) {
                 scrollPosition.updateScrollOffset(result.firstVisibleItemScrollOffset)
             } else {
+                traceVisibleItems(result) // trace when visible window changed
                 scrollPosition.updateFromMeasureResult(result)
                 if (prefetchingEnabled) {
                     with(prefetchStrategy) { prefetchScope.onVisibleItemsUpdated(result) }
@@ -533,6 +538,13 @@ constructor(
             }
             numMeasurePasses++
         }
+    }
+
+    private fun traceVisibleItems(measureResult: LazyListMeasureResult) {
+        val firstVisibleItem = measureResult.visibleItemsInfo.firstOrNull()
+        val lastVisibleItem = measureResult.visibleItemsInfo.lastOrNull()
+        traceValue("firstVisibleItem:index", firstVisibleItem?.index?.toLong() ?: -1L)
+        traceValue("lastVisibleItem:index", lastVisibleItem?.index?.toLong() ?: -1L)
     }
 
     internal val scrollDeltaBetweenPasses: Float

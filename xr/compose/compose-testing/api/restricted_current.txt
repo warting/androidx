@@ -1,5 +1,5 @@
 // Signature format: 4.0
-package androidx.xr.compose.testing {
+package @RequiresApi(34) androidx.xr.compose.testing {
 
   public final class SubspaceAssertionsKt {
     method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) @com.google.errorprone.annotations.CanIgnoreReturnValue public static androidx.xr.compose.testing.SubspaceSemanticsNodeInteraction assertDepthIsAtLeast(androidx.xr.compose.testing.SubspaceSemanticsNodeInteraction, float expectedMinDepth);
@@ -68,8 +68,8 @@ package androidx.xr.compose.testing {
     ctor public SubspaceTestingActivity();
     method public androidx.xr.scenecore.testing.FakeXrExtensions getExtensions();
     method public androidx.xr.scenecore.Session getSession();
-    property public final androidx.xr.scenecore.testing.FakeXrExtensions extensions;
-    property public final androidx.xr.scenecore.Session session;
+    property public androidx.xr.scenecore.testing.FakeXrExtensions extensions;
+    property public androidx.xr.scenecore.Session session;
   }
 
   public final class SubspaceTestingActivityKt {
