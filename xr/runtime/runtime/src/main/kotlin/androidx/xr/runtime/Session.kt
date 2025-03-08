@@ -60,8 +60,8 @@ internal constructor(
         /**
          * Creates a new [Session].
          *
-         * Creating a session requires the `android.permission.SCENE_UNDERSTANDING` permission to be
-         * granted.
+         * Creating a session requires the `android.permission.SCENE_UNDERSTANDING` and
+         * `android.permission.HAND_TRACKING` permissions to be granted.
          *
          * @param activity the [Activity] that owns the session.
          * @param coroutineDispatcher the [CoroutineDispatcher] that will be used to handle the
@@ -133,7 +133,8 @@ internal constructor(
     /**
      * Starts or resumes the session.
      *
-     * Resuming a session requires the `android.permission.SCENE_UNDERSTANDING` to be granted.
+     * Resuming a session requires the `android.permission.SCENE_UNDERSTANDING` and
+     * `android.permission.HAND_TRACKING` permissions to be granted.
      *
      * @return the result of the operation. Can be [SessionResumeSuccess] if the session was
      *   successfully resumed, or [SessionResumePermissionsNotGranted] if the required permissions

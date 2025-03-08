@@ -18,8 +18,11 @@ package androidx.pdf.view.fastscroll
 
 import android.animation.ValueAnimator
 import android.graphics.Canvas
-import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.util.Range
+import androidx.annotation.RestrictTo
 
 /**
  * Manages and draws the fast scroller UI element.
@@ -33,11 +36,13 @@ import android.util.Range
  *   scroller UI.
  * @param scrollCalculator The [FastScrollCalculator] that performs scroll-related calculations.
  */
-internal class FastScroller(
-    val fastScrollDrawer: FastScrollDrawer,
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+public class FastScroller(
+    public val fastScrollDrawer: FastScrollDrawer,
     private val scrollCalculator: FastScrollCalculator
 ) {
-    internal var fastScrollY: Int = 0
+    // Init position for fastScrollY with the top margin of the scroller.
+    internal var fastScrollY: Int = scrollCalculator.scrollerTopMarginPx
 
     // This is used to optimize performance. If the scroll position has already been updated
     // by another method the calculation is skipped.
@@ -54,34 +59,39 @@ internal class FastScroller(
      * `renderer`.
      *
      * @param canvas The canvas on which to draw the scroller.
+     * @param scrollX The raw horizontal scroll position in pixels.
      * @param scrollY The raw vertical scroll position in pixels.
-     * @param zoom The current zoom level.
+     * @param viewWidth The width of the view in pixels.
      * @param viewHeight The height of the view in pixels.
-     * @param visibleArea The rectangular area of the view that is currently visible.
      * @param visiblePages The range of pages that are currently visible.
+     * @param estimatedFullHeight The estimated full height of the pdf document in pixels.
      */
-    fun drawScroller(
+    public fun drawScroller(
         canvas: Canvas,
+        scrollX: Int,
         scrollY: Int,
-        zoom: Float,
+        viewWidth: Int,
         viewHeight: Int,
-        visibleArea: Rect,
         visiblePages: Range<Int>,
-        estimatedFullHeight: Int
+        estimatedFullHeight: Float
     ) {
         if (scrollY != lastScrollY) {
             fastScrollY =
                 scrollCalculator.computeThumbPosition(
-                    scrollY,
-                    zoom,
-                    viewHeight,
-                    fastScrollDrawer.thumbHeightPx,
-                    estimatedFullHeight
+                    scrollY = scrollY,
+                    viewHeight = viewHeight,
+                    thumbHeightPx = fastScrollDrawer.thumbHeightPx,
+                    estimatedFullHeight = estimatedFullHeight
                 )
             lastScrollY = scrollY
         }
 
-        fastScrollDrawer.draw(canvas, zoom, fastScrollY, visibleArea, visiblePages)
+        fastScrollDrawer.draw(
+            canvas,
+            xOffset = scrollX + viewWidth,
+            yOffset = scrollY + fastScrollY,
+            visiblePages
+        )
     }
 
     /**
@@ -93,15 +103,13 @@ internal class FastScroller(
      * into account the zoom level.
      *
      * @param scrollY The raw vertical scroll position of the fast scroller in pixels.
-     * @param zoom The current zoom level.
      * @param viewHeight The height of the view in pixels.
      * @return The calculated content scroll position in pixels.
      */
-    fun viewScrollPositionFromFastScroller(
+    public fun viewScrollPositionFromFastScroller(
         scrollY: Float,
-        zoom: Float,
         viewHeight: Int,
-        estimatedFullHeight: Int
+        estimatedFullHeight: Float
     ): Int {
         fastScrollY =
             scrollCalculator.constrainScrollPosition(
@@ -111,34 +119,64 @@ internal class FastScroller(
             )
 
         return scrollCalculator.computeViewScroll(
-            fastScrollY,
-            viewHeight,
-            zoom,
-            estimatedFullHeight
+            fastScrollY = fastScrollY,
+            viewHeight = viewHeight,
+            thumbHeightPx = fastScrollDrawer.thumbHeightPx,
+            estimatedFullHeight = estimatedFullHeight
         )
     }
 
-    fun show(onAnimationUpdate: () -> Unit) {
+    public fun show(onAnimationUpdate: () -> Unit) {
         hideValueAnimator?.cancel()
         fastScrollDrawer.alpha = FastScrollDrawer.VISIBLE_ALPHA
         animate(onAnimationUpdate)
     }
 
-    private fun animate(onAnimationUpdate: () -> Unit) {
-        hideValueAnimator =
-            ValueAnimator.ofInt(FastScrollDrawer.VISIBLE_ALPHA, FastScrollDrawer.GONE_ALPHA).apply {
-                startDelay = HIDE_DELAY_MS
-                duration = HIDE_ANIMATION_DURATION_MILLIS
-                addUpdateListener { animation ->
-                    fastScrollDrawer.alpha = animation.animatedValue as Int
-                    onAnimationUpdate()
-                }
-                start()
-            }
+    public fun hide() {
+        hideValueAnimator?.cancel()
+        fastScrollDrawer.alpha = FastScrollDrawer.GONE_ALPHA
     }
 
-    companion object {
-        private const val HIDE_ANIMATION_DURATION_MILLIS = 200L
-        private const val HIDE_DELAY_MS = 1300L
+    private fun animate(onAnimationUpdate: () -> Unit) {
+        if (areAnimationsEnabled()) {
+            hideValueAnimator =
+                ValueAnimator.ofInt(FastScrollDrawer.VISIBLE_ALPHA, FastScrollDrawer.GONE_ALPHA)
+                    .apply {
+                        startDelay = HIDE_DELAY_MS
+                        duration = HIDE_ANIMATION_DURATION_MILLIS
+                        addUpdateListener { animation ->
+                            fastScrollDrawer.alpha = animation.animatedValue as Int
+                            onAnimationUpdate()
+                        }
+                        start()
+                    }
+        } else {
+            // Handle when animations are disabled
+            fastScrollDrawer.alpha = FastScrollDrawer.VISIBLE_ALPHA
+
+            Handler(Looper.getMainLooper())
+                .postDelayed(
+                    {
+                        fastScrollDrawer.alpha = FastScrollDrawer.GONE_ALPHA
+                        onAnimationUpdate()
+                    },
+                    HIDE_DELAY_MS + HIDE_ANIMATION_DURATION_MILLIS
+                ) // Simulate total time
+        }
+    }
+
+    // In case of integration tests, animations are disabled by default. In that case, we will need
+    // to explicit check the settings and handle the visibility of the scrubber.
+    private fun areAnimationsEnabled(): Boolean {
+        return Settings.Global.getFloat(
+            fastScrollDrawer.context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        ) != 0f
+    }
+
+    public companion object {
+        public const val HIDE_ANIMATION_DURATION_MILLIS: Long = 200L
+        public const val HIDE_DELAY_MS: Long = 1300L
     }
 }

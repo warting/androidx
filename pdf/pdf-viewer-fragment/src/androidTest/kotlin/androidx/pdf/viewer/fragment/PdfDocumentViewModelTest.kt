@@ -17,6 +17,7 @@
 package androidx.pdf.viewer.fragment
 
 import android.net.Uri
+import androidx.core.os.OperationCanceledException
 import androidx.lifecycle.SavedStateHandle
 import androidx.pdf.SandboxedPdfLoader
 import androidx.pdf.viewer.coroutines.collectTill
@@ -114,6 +115,24 @@ class PdfDocumentViewModelTest {
     }
 
     @Test
+    fun test_pdfDocumentViewModel_dismissPasswordDialogCheckOperationCanceledException() = runTest {
+        val savedState = SavedStateHandle()
+
+        val pdfViewModel =
+            PdfDocumentViewModel(savedState, SandboxedPdfLoader(appContext, dispatcher))
+
+        pdfViewModel.passwordDialogCancelled()
+
+        // Assert fragmentUiState is set to DocumentError
+        assertTrue(pdfViewModel.fragmentUiScreenState.value is PdfFragmentUiState.DocumentError)
+
+        val state = pdfViewModel.fragmentUiScreenState.value as PdfFragmentUiState.DocumentError
+
+        // Assert exception is OperationCanceledException
+        assertTrue(state.exception is OperationCanceledException)
+    }
+
+    @Test
     fun test_pdfDocumentViewModel_toogleToolboxInLoadingState() = runTest {
         val savedState = SavedStateHandle()
         // Not Providing document uri, so the state should be loading
@@ -123,7 +142,7 @@ class PdfDocumentViewModelTest {
         // Assert fragmentUiState is set to Loading
         assertTrue(pdfViewModel.fragmentUiScreenState.value is PdfFragmentUiState.Loading)
 
-        pdfViewModel.updateToolboxState(true)
+        pdfViewModel.updateToolboxState(isToolboxActive = true)
 
         // Assert toolboxState never set to visible
         assertFalse(pdfViewModel.isToolboxVisibleFromState)
@@ -152,7 +171,7 @@ class PdfDocumentViewModelTest {
             pdfDocumentViewModel.fragmentUiScreenState.value is PdfFragmentUiState.DocumentError
         )
 
-        pdfDocumentViewModel.updateToolboxState(true)
+        pdfDocumentViewModel.updateToolboxState(isToolboxActive = true)
 
         // Assert toolboxState never set to visible
         assertFalse(pdfDocumentViewModel.isToolboxVisibleFromState)

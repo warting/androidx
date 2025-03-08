@@ -138,6 +138,13 @@ class DialogTest {
         textInteraction.assertIsDisplayed()
 
         clickOutsideDialog()
+        rule.waitForIdle()
+
+        // Wait for the dialog to disappear AND events to fully propagate. The cancel event to
+        // pointer input will wait until any other events (clicks) are finished before executing.
+        rule.mainClock.autoAdvance = false
+        rule.mainClock.advanceTimeBy(1000)
+
         textInteraction.assertDoesNotExist()
     }
 
@@ -148,6 +155,13 @@ class DialogTest {
         textInteraction.assertIsDisplayed()
 
         clickOutsideDialog()
+        rule.waitForIdle()
+
+        // Wait for the dialog to disappear AND events to fully propagate. The cancel event to
+        // pointer input will wait until any other events (clicks) are finished before executing.
+        rule.mainClock.autoAdvance = false
+        rule.mainClock.advanceTimeBy(1000)
+
         textInteraction.assertDoesNotExist()
     }
 

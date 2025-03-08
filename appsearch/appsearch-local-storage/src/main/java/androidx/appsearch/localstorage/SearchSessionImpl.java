@@ -364,19 +364,28 @@ class SearchSessionImpl implements AppSearchSession {
                     new AppSearchBatchResult.Builder<>();
 
             // Normal documents.
-            for (int i = 0; i < documents.size(); i++) {
-                GenericDocument document = documents.get(i);
-                putGenericDocument(document, resultBuilder);
-            }
+            mAppSearchImpl.batchPutDocuments(
+                    mPackageName,
+                    mDatabaseName,
+                    documents,
+                    resultBuilder,
+                    /*sendChangeNotifications=*/ true,
+                    mLogger,
+                    // PersistToDisk is not necessary to call here, since it will be called in
+                    // the next batch put request below.
+                    PersistType.Code.UNKNOWN);
 
             // TakenAction documents.
-            for (int i = 0; i < takenActions.size(); i++) {
-                GenericDocument takenActionGenericDocument = takenActions.get(i);
-                putGenericDocument(takenActionGenericDocument, resultBuilder);
-            }
+            mAppSearchImpl.batchPutDocuments(
+                    mPackageName,
+                    mDatabaseName,
+                    takenActions,
+                    resultBuilder,
+                    /*sendChangeNotifications=*/ true,
+                    mLogger,
+                    // Persist the newly written data.
+                    mAppSearchImpl.getConfig().getLightweightPersistType());
 
-            // Now that the batch has been written. Persist the newly written data.
-            mAppSearchImpl.persistToDisk(mAppSearchImpl.getConfig().getLightweightPersistType());
             mIsMutated = true;
 
             // Schedule a task to dispatch change notifications. See requirements for where the
@@ -730,28 +739,6 @@ class SearchSessionImpl implements AppSearchSession {
     @WorkerThread
     private void dispatchChangeNotifications() {
         mAppSearchImpl.dispatchAndClearChangeNotifications();
-    }
-
-    /**
-     * Calls {@link AppSearchImpl} to put a generic document and sets the result.
-     *
-     * @param document the {@link GenericDocument} to put.
-     * @param resultBuilder an {@link AppSearchBatchResult.Builder} object for collecting the
-     *                      result.
-     */
-    private void putGenericDocument(
-            GenericDocument document, AppSearchBatchResult.Builder<String, Void> resultBuilder) {
-        try {
-            mAppSearchImpl.putDocument(
-                    mPackageName,
-                    mDatabaseName,
-                    document,
-                    /*sendChangeNotifications=*/ true,
-                    mLogger);
-            resultBuilder.setSuccess(document.getId(), /*value=*/ null);
-        } catch (Throwable t) {
-            resultBuilder.setResult(document.getId(), throwableToFailedResult(t));
-        }
     }
 
     private void checkForOptimize(int mutateBatchSize) {

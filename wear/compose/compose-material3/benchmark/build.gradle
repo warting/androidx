@@ -21,6 +21,8 @@
  * Please use that script when creating a new project, rather than copying an existing project and
  * modifying its settings.
  */
+
+import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 
 plugins {
@@ -53,6 +55,7 @@ dependencies {
     androidTestImplementation(project(":compose:benchmark-utils"))
     androidTestImplementation(project(":wear:compose:compose-foundation"))
     androidTestImplementation(project(":wear:compose:compose-material3"))
+    androidTestImplementation("androidx.compose.material:material-icons-core:1.6.7")
     androidTestImplementation(libs.testRules)
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.kotlinStdlib)
@@ -62,4 +65,5 @@ dependencies {
 }
 androidx {
     type = SoftwareType.BENCHMARK
+    kotlinTarget = KotlinTarget.KOTLIN_2_0
 }

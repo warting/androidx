@@ -47,7 +47,7 @@ internal class AccessibilityPageHelper(
     private var isLinksLoaded = false
 
     public override fun getVirtualViewAt(x: Float, y: Float): Int {
-        val visiblePages = pageLayoutManager.visiblePages.value
+        val visiblePages = pageLayoutManager.visiblePages
 
         val contentX = pdfView.toContentX(x).toInt()
         val contentY = pdfView.toContentY(y).toInt()
@@ -81,7 +81,7 @@ internal class AccessibilityPageHelper(
     }
 
     public override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
-        val visiblePages = pageLayoutManager.visiblePages.value
+        val visiblePages = pageLayoutManager.visiblePages
         loadPageLinks()
 
         virtualViewIds.apply {
@@ -209,7 +209,7 @@ internal class AccessibilityPageHelper(
      * them in the corresponding maps.
      */
     fun loadPageLinks() {
-        val visiblePages = pageLayoutManager.visiblePages.value
+        val visiblePages = pageLayoutManager.visiblePages
 
         // Clear existing links and fetch new ones for the visible pages
         gotoLinks.clear()
