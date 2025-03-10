@@ -28,6 +28,7 @@ import androidx.wear.protolayout.LayoutElementBuilders.Row
 import androidx.wear.protolayout.ModifiersBuilders.Padding
 import androidx.wear.protolayout.material3.Typography.TypographyToken
 import java.util.Optional
+import kotlin.jvm.optionals.getOrNull
 
 public object TitleCardDefaults {
     /**
@@ -67,12 +68,12 @@ public object TitleCardDefaults {
                                 .setWidth(expand())
                                 .build()
                         }
-                        .orElse(null)
+                        .getOrNull()
                 )
                 .addElement(time, verticalSpacer(style.titleToTimeSpaceDp))
 
         ContainerWithSpacersBuilder<LayoutElement>(
-                { it: LayoutElement? -> verticalElementBuilder.addContent(it!!) },
+                { element: LayoutElement? -> verticalElementBuilder.addContent(element!!) },
                 if (headerBuilder.isEmpty) null else headerSlot.build()
             )
             .addElement(content, horizontalSpacer(style.titleToContentSpaceDp))
@@ -92,8 +93,10 @@ internal constructor(
     @TypographyToken internal val timeTypography: Int
 ) {
     public companion object {
-        /** The default spacer width or height that should be between different elements. */
+        /** The small spacer width or height that should be between different elements. */
         @Dimension(unit = DP) private const val SMALL_SPACE_DP: Int = 2
+        /** The mid spacer width or height that should be between different elements. */
+        @Dimension(unit = DP) private const val MID_SPACE_DP: Int = 3
         /** The default spacer width or height that should be between different elements. */
         @Dimension(unit = DP) private const val DEFAULT_SPACE_DP: Int = 4
 
@@ -151,7 +154,7 @@ internal constructor(
                         .setEnd(14.toDp())
                         .build(),
                 titleToTimeSpaceDp = DEFAULT_SPACE_DP,
-                titleToContentSpaceDp = SMALL_SPACE_DP,
+                titleToContentSpaceDp = MID_SPACE_DP,
                 titleTypography = Typography.TITLE_MEDIUM,
                 contentTypography = Typography.LABEL_SMALL,
                 timeTypography = Typography.BODY_MEDIUM,
@@ -171,7 +174,7 @@ internal constructor(
                         .setEnd(14.toDp())
                         .build(),
                 titleToTimeSpaceDp = DEFAULT_SPACE_DP,
-                titleToContentSpaceDp = SMALL_SPACE_DP,
+                titleToContentSpaceDp = DEFAULT_SPACE_DP,
                 titleTypography = Typography.LABEL_LARGE,
                 contentTypography = Typography.LABEL_SMALL,
                 timeTypography = Typography.BODY_MEDIUM,

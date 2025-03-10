@@ -18,7 +18,6 @@ package androidx.health.connect.client.impl.platform.aggregate
 
 import android.annotation.TargetApi
 import android.content.Context
-import android.health.connect.datatypes.Metadata.RECORDING_METHOD_MANUAL_ENTRY
 import android.os.Build
 import android.os.ext.SdkExtensions
 import androidx.health.connect.client.HealthConnectClient
@@ -48,6 +47,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.rule.GrantPermissionRule
 import com.google.common.truth.Truth.assertThat
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlinx.coroutines.flow.fold
@@ -100,12 +100,12 @@ class HealthConnectClientAggregationExtensionsTest {
     @After
     fun tearDown() = runTest {
         for (recordType in SDK_TO_PLATFORM_RECORD_CLASS.keys) {
-            healthConnectClient.deleteRecords(recordType, TimeRangeFilter.none())
+            healthConnectClient.deleteRecords(recordType, TimeRangeFilter.after(Instant.EPOCH))
         }
 
         if (SdkExtensions.getExtensionVersion(Build.VERSION_CODES.UPSIDE_DOWN_CAKE) >= 13) {
             for (recordType in SDK_TO_PLATFORM_RECORD_CLASS_EXT_13.keys) {
-                healthConnectClient.deleteRecords(recordType, TimeRangeFilter.none())
+                healthConnectClient.deleteRecords(recordType, TimeRangeFilter.after(Instant.EPOCH))
             }
         }
     }
@@ -119,7 +119,7 @@ class HealthConnectClientAggregationExtensionsTest {
                 BloodPressureRecord(
                     time = START_TIME,
                     zoneOffset = ZoneOffset.UTC,
-                    metadata = Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY),
+                    metadata = Metadata.manualEntry(),
                     diastolic = 70.millimetersOfMercury,
                     systolic = 110.millimetersOfMercury
                 ),
@@ -128,7 +128,7 @@ class HealthConnectClientAggregationExtensionsTest {
                     endTime = START_TIME + 30.minutes,
                     startZoneOffset = ZoneOffset.UTC,
                     endZoneOffset = ZoneOffset.UTC,
-                    metadata = Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY),
+                    metadata = Metadata.manualEntry(),
                     samples =
                         listOf(
                             CyclingPedalingCadenceRecord.Sample(
@@ -148,14 +148,14 @@ class HealthConnectClientAggregationExtensionsTest {
                     calcium = 0.1.grams,
                     startZoneOffset = ZoneOffset.UTC,
                     endZoneOffset = ZoneOffset.UTC,
-                    metadata = Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY),
+                    metadata = Metadata.manualEntry(),
                 ),
                 SpeedRecord(
                     startTime = START_TIME,
                     endTime = START_TIME + 15.minutes,
                     startZoneOffset = ZoneOffset.UTC,
                     endZoneOffset = ZoneOffset.UTC,
-                    metadata = Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY),
+                    metadata = Metadata.manualEntry(),
                     samples =
                         listOf(
                             SpeedRecord.Sample(
@@ -173,7 +173,7 @@ class HealthConnectClientAggregationExtensionsTest {
                     endTime = START_TIME + 10.minutes,
                     startZoneOffset = ZoneOffset.UTC,
                     endZoneOffset = ZoneOffset.UTC,
-                    metadata = Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY),
+                    metadata = Metadata.manualEntry(),
                     samples =
                         listOf(
                             StepsCadenceRecord.Sample(time = START_TIME + 3.minutes, rate = 170.0)
@@ -188,7 +188,7 @@ class HealthConnectClientAggregationExtensionsTest {
             healthConnectClient.aggregateFallback(
                 AggregateRequest(
                     metrics = AGGREGATE_METRICS_ADDED_IN_SDK_EXT_10 + NutritionRecord.CALCIUM_TOTAL,
-                    timeRangeFilter = TimeRangeFilter.none()
+                    timeRangeFilter = TimeRangeFilter.after(Instant.EPOCH)
                 )
             )
 
@@ -223,7 +223,7 @@ class HealthConnectClientAggregationExtensionsTest {
             healthConnectClient.aggregateFallback(
                 AggregateRequest(
                     metrics = AGGREGATE_METRICS_ADDED_IN_SDK_EXT_10,
-                    timeRangeFilter = TimeRangeFilter.none()
+                    timeRangeFilter = TimeRangeFilter.after(Instant.EPOCH)
                 )
             )
 
@@ -241,7 +241,11 @@ class HealthConnectClientAggregationExtensionsTest {
         val count =
             healthConnectClient
                 .readRecordsFlow(
-                    ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.none(), emptySet())
+                    ReadRecordsRequest(
+                        StepsRecord::class,
+                        TimeRangeFilter.after(Instant.EPOCH),
+                        emptySet()
+                    )
                 )
                 .fold(0) { currentCount, records -> currentCount + records.size }
 
@@ -280,7 +284,7 @@ class HealthConnectClientAggregationExtensionsTest {
                 .readRecordsFlow(
                     ReadRecordsRequest(
                         StepsRecord::class,
-                        TimeRangeFilter.none(),
+                        TimeRangeFilter.after(Instant.EPOCH),
                         setOf(DataOrigin(context.packageName))
                     )
                 )
@@ -298,7 +302,7 @@ class HealthConnectClientAggregationExtensionsTest {
                 .readRecordsFlow(
                     ReadRecordsRequest(
                         StepsRecord::class,
-                        TimeRangeFilter.none(),
+                        TimeRangeFilter.after(Instant.EPOCH),
                         setOf(DataOrigin("some random package name"))
                     )
                 )
@@ -319,7 +323,7 @@ class HealthConnectClientAggregationExtensionsTest {
                         count = 10L,
                         startZoneOffset = ZoneOffset.UTC,
                         endZoneOffset = ZoneOffset.UTC,
-                        metadata = Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY),
+                        metadata = Metadata.manualEntry(),
                     )
                 }
             )

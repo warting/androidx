@@ -28,7 +28,6 @@ import androidx.wear.protolayout.DimensionBuilders.wrap
 import androidx.wear.protolayout.LayoutElementBuilders.Box
 import androidx.wear.protolayout.LayoutElementBuilders.Column
 import androidx.wear.protolayout.LayoutElementBuilders.LayoutElement
-import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ModifiersBuilders.Clickable
 import androidx.wear.protolayout.ModifiersBuilders.ElementMetadata
 import androidx.wear.protolayout.ModifiersBuilders.Modifiers
@@ -44,7 +43,6 @@ import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.BOTTOM_SLOT_OTH
 import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.BOTTOM_SLOT_OTHER_MARGIN_SIDE_PERCENTAGE
 import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.BOTTOM_SLOT_OTHER_MARGIN_TOP_DP
 import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.FOOTER_LABEL_SLOT_MARGIN_SIDE_PERCENTAGE
-import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.FOOTER_LABEL_TO_BOTTOM_SLOT_SPACER_HEIGHT_DP
 import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.HEADER_ICON_SIZE_DP
 import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.HEADER_ICON_TITLE_SPACER_HEIGHT_LARGE_DP
 import androidx.wear.protolayout.material3.PrimaryLayoutDefaults.HEADER_ICON_TITLE_SPACER_HEIGHT_SMALL_DP
@@ -63,9 +61,13 @@ import androidx.wear.protolayout.material3.PrimaryLayoutMarginsImpl.Companion.MA
 import androidx.wear.protolayout.material3.PrimaryLayoutMarginsImpl.Companion.MID
 import androidx.wear.protolayout.material3.PrimaryLayoutMarginsImpl.Companion.MIN
 import androidx.wear.protolayout.modifiers.LayoutModifier
+import androidx.wear.protolayout.modifiers.background
+import androidx.wear.protolayout.modifiers.clip
 import androidx.wear.protolayout.modifiers.padding
 import androidx.wear.protolayout.modifiers.toProtoLayoutModifiers
+import androidx.wear.protolayout.types.LayoutColor
 import androidx.wear.protolayout.types.dp
+import kotlin.math.ceil
 
 /**
  * ProtoLayout Material3 full screen layout that represents a suggested Material3 layout style that
@@ -157,6 +159,7 @@ public fun MaterialScope.primaryLayout(
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public fun MaterialScope.primaryLayoutWithOverrideIcon(
     overrideIcon: Boolean,
+    overrideIconColor: LayoutColor? = null,
     titleSlot: (MaterialScope.() -> LayoutElement)? = null,
     mainSlot: (MaterialScope.() -> LayoutElement)? = null,
     bottomSlot: (MaterialScope.() -> LayoutElement)? = null,
@@ -202,11 +205,22 @@ public fun MaterialScope.primaryLayoutWithOverrideIcon(
                             )
                             .titleSlot()
                     },
-                    overrideIcon
+                    overrideIcon,
+                    overrideIconColor,
                 )
             )
 
-    val bottomSlotValue = bottomSlot?.let { bottomSlot() }
+    val bottomSlotValue =
+        bottomSlot?.let {
+            withStyle(
+                    defaultTextElementStyle =
+                        TextElementStyle(
+                            typography = Typography.TITLE_MEDIUM,
+                            color = theme.colorScheme.onBackground,
+                        )
+                )
+                .bottomSlot()
+        }
 
     val marginsValues: Padding =
         withStyle(
@@ -258,18 +272,16 @@ public fun MaterialScope.primaryLayoutWithOverrideIcon(
     return mainLayout.build()
 }
 
-private fun MaterialScope.getIconPlaceholder(overrideIcon: Boolean): LayoutElement {
+private fun MaterialScope.getIconPlaceholder(
+    overrideIcon: Boolean,
+    overrideIconColor: LayoutColor? = null,
+): LayoutElement {
     val iconSlot = Box.Builder().setWidth(HEADER_ICON_SIZE_DP.dp).setHeight(HEADER_ICON_SIZE_DP.dp)
     if (overrideIcon) {
         iconSlot.setModifiers(
-            Modifiers.Builder()
-                .setBackground(
-                    ModifiersBuilders.Background.Builder()
-                        .setCorner(shapes.full)
-                        .setColor(theme.colorScheme.onBackground.prop)
-                        .build()
-                )
-                .build()
+            LayoutModifier.background(overrideIconColor ?: theme.colorScheme.onBackground)
+                .clip(shapes.full)
+                .toProtoLayoutModifiers()
         )
     }
     return iconSlot.build()
@@ -278,22 +290,25 @@ private fun MaterialScope.getIconPlaceholder(overrideIcon: Boolean): LayoutEleme
 /** Returns header content with the mandatory icon and optional title. */
 private fun MaterialScope.getHeaderContent(
     titleSlot: LayoutElement?,
-    overrideIcon: Boolean
+    overrideIcon: Boolean,
+    overrideIconColor: LayoutColor? = null,
 ): Column {
     val headerBuilder =
         Column.Builder()
             .setWidth(wrap())
             .setHeight(wrap())
             .setModifiers(Modifiers.Builder().setPadding(getMarginForHeader()).build())
-            .addContent(getIconPlaceholder(overrideIcon))
+            .addContent(getIconPlaceholder(overrideIcon, overrideIconColor))
 
     titleSlot?.apply {
         headerBuilder
             .addContent(
                 horizontalSpacer(
-                    if (deviceConfiguration.screenHeightDp.isBreakpoint())
+                    if (deviceConfiguration.screenHeightDp.isBreakpoint()) {
                         HEADER_ICON_TITLE_SPACER_HEIGHT_LARGE_DP
-                    else HEADER_ICON_TITLE_SPACER_HEIGHT_SMALL_DP
+                    } else {
+                        HEADER_ICON_TITLE_SPACER_HEIGHT_SMALL_DP
+                    }
                 )
             )
             .addContent(titleSlot)
@@ -365,15 +380,13 @@ private fun MaterialScope.getFooterContent(
         )
 
         labelSlot?.apply {
-            otherBottomSlot
-                .addContent(
-                    generateLabelContent(
-                        (FOOTER_LABEL_SLOT_MARGIN_SIDE_PERCENTAGE *
-                                deviceConfiguration.screenWidthDp)
-                            .dp
-                    )
+            otherBottomSlot.addContent(
+                generateLabelContent(
+                    (FOOTER_LABEL_SLOT_MARGIN_SIDE_PERCENTAGE * deviceConfiguration.screenWidthDp)
+                        .dp
                 )
-                .addContent(horizontalSpacer(FOOTER_LABEL_TO_BOTTOM_SLOT_SPACER_HEIGHT_DP))
+            )
+            // vertical spacing between the label slot and bottom slot is zero
         }
 
         footer.addContent(
@@ -424,11 +437,11 @@ private fun MaterialScope.getMarginForHeader() =
 internal object PrimaryLayoutDefaults {
     internal fun MaterialScope.percentageWidthToDp(
         @FloatRange(from = 0.0, to = 1.0) percentage: Float
-    ): Float = percentage * deviceConfiguration.screenWidthDp
+    ): Float = ceil(percentage * deviceConfiguration.screenWidthDp)
 
     internal fun MaterialScope.percentageHeightToDp(
         @FloatRange(from = 0.0, to = 1.0) percentage: Float
-    ): Float = percentage * deviceConfiguration.screenHeightDp
+    ): Float = ceil(percentage * deviceConfiguration.screenHeightDp)
 
     /** Tool tag for Metadata in Modifiers, so we know that Row is actually a PrimaryLayout. */
     @VisibleForTesting internal const val METADATA_TAG: String = "M3_PL"
@@ -451,8 +464,6 @@ internal object PrimaryLayoutDefaults {
     internal const val BOTTOM_SLOT_OTHER_MARGIN_BOTTOM_PERCENTAGE = 5.2f
 
     internal const val BOTTOM_SLOT_OTHER_MARGIN_SIDE_PERCENTAGE = 26f / 100
-
-    @Dimension(DP) internal const val FOOTER_LABEL_TO_BOTTOM_SLOT_SPACER_HEIGHT_DP = 2
 
     internal const val FOOTER_LABEL_SLOT_MARGIN_SIDE_PERCENTAGE = 16.64f / 100
 }

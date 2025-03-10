@@ -74,7 +74,7 @@ internal class PdfDocumentViewModel(
 
     /**
      * Parent [Job] for search query and result collectors. All children jobs will be cancelled upon
-     * disabling [PdfViewerFragmentV2.isTextSearchActive].
+     * disabling [PdfViewerFragment.isTextSearchActive].
      */
     private val searchCollector = SupervisorJob(viewModelScope.coroutineContext[Job])
 
@@ -101,6 +101,9 @@ internal class PdfDocumentViewModel(
     /** Stream of UI states of the PdfSearchView. */
     internal val searchViewUiState: StateFlow<SearchViewUiState>
         get() = _searchViewUiState.asStateFlow()
+
+    internal val toolboxViewUiState: StateFlow<Boolean>
+        get() = state.getStateFlow(TOOLBOX_STATE_KEY, false)
 
     private val _highlightsFlow = MutableStateFlow<HighlightData>(EMPTY_HIGHLIGHTS)
 
@@ -145,7 +148,13 @@ internal class PdfDocumentViewModel(
             [PdfFragmentUiState.DocumentLoaded] state.
             */
             documentLoadJob?.invokeOnCompletion { maybeRestoreSearchState() }
+            documentLoadJob?.invokeOnCompletion { maybeRestoreToolboxState() }
         }
+    }
+
+    private fun maybeRestoreToolboxState() {
+        if (!isToolboxVisibleFromState) return
+        updateToolboxState(isToolboxActive = isToolboxVisibleFromState)
     }
 
     private fun maybeRestoreSearchState() {
@@ -202,6 +211,7 @@ internal class PdfDocumentViewModel(
                 // Loading a new document should not persist a search session from previous
                 // document.
                 updateSearchState(isTextSearchActive = false)
+                updateToolboxState(isToolboxActive = false)
 
                 documentLoadJob = viewModelScope.launch { openDocument(uri, password) }
             }
@@ -210,7 +220,7 @@ internal class PdfDocumentViewModel(
 
     /**
      * Called when the user toggles the search view's active state
-     * [PdfViewerFragmentV2.isTextSearchActive].
+     * [PdfViewerFragment.isTextSearchActive].
      *
      * This function updates the search state in the [SavedStateHandle] and performs actions related
      * to enabling/disabling the search view.
@@ -306,12 +316,17 @@ internal class PdfDocumentViewModel(
         /**
          * Toolbox state should be updated only after document is loaded. else it will be a No-Op.
          */
-        // TODO b/385288421 - Applying toolbox state and handling visibility
         if (fragmentUiScreenState.value !is PdfFragmentUiState.DocumentLoaded) return
         state[TOOLBOX_STATE_KEY] = isToolboxActive
     }
 
     private suspend fun openDocument(uri: Uri, password: String? = null) {
+        /**
+         * PdfDocument, if ever created, will be stored in DocumentLoaded state. This state could be
+         * transitioned to other only if a new uri is submitted.
+         */
+        releaseDocument()
+
         /** Move to [PdfFragmentUiState.Loading] state before we begin load operation. */
         _fragmentUiScreenState.update { PdfFragmentUiState.Loading }
 
@@ -324,6 +339,7 @@ internal class PdfDocumentViewModel(
 
             /** Successful load, move to [PdfFragmentUiState.DocumentLoaded] state. */
             _fragmentUiScreenState.update { PdfFragmentUiState.DocumentLoaded(document) }
+            updateToolboxState(isToolboxActive = true)
 
             /** Resets the [passwordFailed] state after a document is successfully loaded. */
             passwordFailed = false
@@ -389,6 +405,19 @@ internal class PdfDocumentViewModel(
                 OperationCanceledException("Password cancelled. Cannot open PDF.")
             )
         }
+    }
+
+    /**
+     * Closes the currently loaded PDF document, if one exists. This is important to release
+     * resources and prevent leaks.
+     */
+    private fun releaseDocument() {
+        (_fragmentUiScreenState.value as? PdfFragmentUiState.DocumentLoaded)?.pdfDocument?.close()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        releaseDocument()
     }
 
     @Suppress("UNCHECKED_CAST")

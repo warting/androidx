@@ -22,7 +22,6 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.animation.splineBasedDecay
-import androidx.compose.foundation.ComposeFoundationFlags.NewNestedFlingPropagationEnabled
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.FocusedBoundsObserverNode
 import androidx.compose.foundation.LocalOverscrollFactory
@@ -780,44 +779,48 @@ internal class ScrollingLogic(
     suspend fun doFlingAnimation(available: Velocity): Velocity {
         var result: Velocity = available
         isFlinging = true
-        scroll(scrollPriority = MutatePriority.Default) {
-            val nestedScrollScope = this
-            val reverseScope =
-                object : ScrollScope {
-                    override fun scrollBy(pixels: Float): Float {
-                        // Fling has hit the bounds or node left composition,
-                        // cancel it to allow continuation. This will conclude this node's fling,
-                        // allowing the onPostFling signal to be called
-                        // with the leftover velocity from the fling animation. Any nested scroll
-                        // node above will be able to pick up the left over velocity and continue
-                        // the fling.
-                        if (
-                            NewNestedFlingPropagationEnabled &&
-                                pixels.absoluteValue != 0.0f &&
-                                shouldCancelFling(pixels)
-                        ) {
-                            throw FlingCancellationException()
-                        }
+        try {
+            scroll(scrollPriority = MutatePriority.Default) {
+                val nestedScrollScope = this
+                val reverseScope =
+                    object : ScrollScope {
+                        override fun scrollBy(pixels: Float): Float {
+                            // Fling has hit the bounds or node left composition,
+                            // cancel it to allow continuation. This will conclude this node's
+                            // fling,
+                            // allowing the onPostFling signal to be called
+                            // with the leftover velocity from the fling animation. Any nested
+                            // scroll
+                            // node above will be able to pick up the left over velocity and
+                            // continue
+                            // the fling.
+                            if (pixels.absoluteValue != 0.0f && shouldCancelFling(pixels)) {
+                                throw FlingCancellationException()
+                            }
 
-                        return nestedScrollScope
-                            .scrollByWithOverscroll(
-                                offset = pixels.toOffset().reverseIfNeeded(),
-                                source = SideEffect
+                            return nestedScrollScope
+                                .scrollByWithOverscroll(
+                                    offset = pixels.toOffset().reverseIfNeeded(),
+                                    source = SideEffect
+                                )
+                                .toFloat()
+                                .reverseIfNeeded()
+                        }
+                    }
+                with(reverseScope) {
+                    with(flingBehavior) {
+                        result =
+                            result.update(
+                                performFling(available.toFloat().reverseIfNeeded())
+                                    .reverseIfNeeded()
                             )
-                            .toFloat()
-                            .reverseIfNeeded()
                     }
                 }
-            with(reverseScope) {
-                with(flingBehavior) {
-                    result =
-                        result.update(
-                            performFling(available.toFloat().reverseIfNeeded()).reverseIfNeeded()
-                        )
-                }
             }
+        } finally {
+            isFlinging = false
         }
-        isFlinging = false
+
         return result
     }
 
@@ -892,12 +895,8 @@ private class ScrollableNestedScrollConnection(
     override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
         return if (enabled) {
             val velocityLeft =
-                if (NewNestedFlingPropagationEnabled) {
-                    if (scrollingLogic.isFlinging) {
-                        Velocity.Zero
-                    } else {
-                        scrollingLogic.doFlingAnimation(available)
-                    }
+                if (scrollingLogic.isFlinging) {
+                    Velocity.Zero
                 } else {
                     scrollingLogic.doFlingAnimation(available)
                 }

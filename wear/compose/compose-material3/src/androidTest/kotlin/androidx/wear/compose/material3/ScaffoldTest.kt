@@ -111,6 +111,18 @@ class ScaffoldTest {
 
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
     @Test
+    fun app_scaffold_contains_container_color() {
+        val containerColor = Color.Red
+
+        rule.setContentWithTheme {
+            AppScaffold(modifier = Modifier.testTag(TEST_TAG), containerColor = containerColor) {}
+        }
+
+        rule.onNodeWithTag(TEST_TAG).captureToImage().assertContainsColor(containerColor)
+    }
+
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
+    @Test
     fun displays_scroll_indicator_initially_when_scrollable() {
         val scrollIndicatorColor = Color.Red
 

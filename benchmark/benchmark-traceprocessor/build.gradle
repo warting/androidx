@@ -65,6 +65,7 @@ tasks.withType(KotlinCompile).configureEach {
         // Enable using experimental APIs from within same version group
         freeCompilerArgs += [
                 "-opt-in=androidx.benchmark.traceprocessor.ExperimentalTraceProcessorApi",
+                "-opt-in=androidx.benchmark.traceprocessor.ExperimentalInsightApi",
         ]
     }
 }
@@ -139,4 +140,5 @@ androidx {
     description = "AndroidX Benchmark TraceProcessor"
     metalavaK2UastEnabled = false
     kotlinTarget = KotlinTarget.KOTLIN_2_0
+    samples(project(":benchmark:benchmark-samples"))
 }

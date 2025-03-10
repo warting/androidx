@@ -15,7 +15,6 @@
  */
 package androidx.navigation3
 
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
@@ -30,7 +29,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation3.SinglePaneNavDisplay.DEFAULT_TRANSITION_DURATION_MILLISECOND
 import androidx.navigation3.SinglePaneNavDisplay.ENTER_TRANSITION_KEY
 import androidx.navigation3.SinglePaneNavDisplay.EXIT_TRANSITION_KEY
@@ -77,7 +83,7 @@ public object SinglePaneNavDisplay {
  *
  * The NavDisplay displays the content associated with the last key on the back stack.
  *
- * @param backstack the collection of keys that represents the state that needs to be handled
+ * @param backStack the collection of keys that represents the state that needs to be handled
  * @param localProviders list of [NavLocalProvider] to add information to the provided entriess
  * @param modifier the modifier to be applied to the layout.
  * @param contentAlignment The [Alignment] of the [AnimatedContent]
@@ -100,9 +106,9 @@ public object SinglePaneNavDisplay {
  */
 @Composable
 public fun <T : Any> SinglePaneNavDisplay(
-    backstack: List<T>,
+    backStack: List<T>,
     modifier: Modifier = Modifier,
-    localProviders: List<NavLocalProvider> = listOf(SaveableStateNavLocalProvider()),
+    localProviders: List<NavLocalProvider> = listOf(SaveableStateNavLocalProvider),
     contentAlignment: Alignment = Alignment.TopStart,
     sizeTransform: SizeTransform? = null,
     enterTransition: EnterTransition =
@@ -133,22 +139,28 @@ public fun <T : Any> SinglePaneNavDisplay(
                     DEFAULT_TRANSITION_DURATION_MILLISECOND,
                 )
         ),
-    onBack: () -> Unit = { if (backstack is MutableList) backstack.removeAt(backstack.size - 1) },
-    entryProvider: (key: T) -> NavEntry<out T>
+    onBack: () -> Unit = { if (backStack is MutableList) backStack.removeAt(backStack.size - 1) },
+    entryProvider: (key: T) -> NavEntry<T>
 ) {
-    require(backstack.isNotEmpty()) { "NavDisplay backstack cannot be empty" }
+    require(backStack.isNotEmpty()) { "NavDisplay backstack cannot be empty" }
 
-    BackHandler(backstack.size > 1, onBack)
-    NavBackStackProvider(backstack, entryProvider, localProviders) { entries ->
+    val transitionAwareLifecycleNavLocalProvider = remember {
+        TransitionAwareLifecycleNavLocalProvider()
+    }
+    NavBackStackProvider(
+        backStack,
+        entryProvider,
+        localProviders + transitionAwareLifecycleNavLocalProvider
+    ) { entries ->
         // Make a copy shallow copy so that transition.currentState and transition.targetState are
         // different backstack instances. This ensures currentState reflects the old backstack when
         // the backstack (targetState) is updated.
-        val newStack = backstack.toList()
+        val newStack = backStack.toList()
         val entry = entries.last()
 
         var progress by remember { mutableFloatStateOf(0f) }
         var inPredictiveBack by remember { mutableStateOf(false) }
-        PredictiveBackHandler(backstack.size > 1) { backEvent ->
+        PredictiveBackHandler(backStack.size > 1) { backEvent ->
             progress = 0f
             try {
                 backEvent.collect { value ->
@@ -234,13 +246,19 @@ public fun <T : Any> SinglePaneNavDisplay(
             contentAlignment = contentAlignment,
             contentKey = { it.last() }
         ) { innerStack ->
-            val lastKey = innerStack.last()
-            val lastEntry = entries.findLast { entry -> entry.key == lastKey }
-            lastEntry?.let { entry ->
-                CompositionLocalProvider(LocalNavAnimatedContentScope provides this) {
-                    entry.content.invoke(lastKey)
+            // popped entries will be remembered and retrieved so it can animate out properly
+            val currEntry =
+                remember(innerStack) {
+                    entries.findLast { entry -> entry.key == innerStack.last() }
                 }
+            CompositionLocalProvider(LocalNavAnimatedContentScope provides this) {
+                currEntry!!.content.invoke(currEntry.key)
             }
+        }
+        LaunchedEffect(transition.currentState, transition.targetState) {
+            // If we've reached the targetState, our animation has settled
+            val settled = transition.currentState == transition.targetState
+            transitionAwareLifecycleNavLocalProvider.isSettled = settled
         }
     }
 }
@@ -256,4 +274,94 @@ private fun <T : Any> isPop(oldBackStack: List<T>, newBackStack: List<T>): Boole
     // if newBackStack never diverged from oldBackStack, then it is a clean subset of the oldStack
     // and is a pop
     return divergingIndex == null
+}
+
+private class TransitionAwareLifecycleNavLocalProvider : NavLocalProvider {
+
+    var isSettled by mutableStateOf(false)
+
+    @Composable
+    override fun ProvideToBackStack(backStack: List<Any>, content: @Composable (() -> Unit)) {
+        val localInfo = remember(backStack) { TransitionAwareLifecycleNavLocalInfo(backStack) }
+        CompositionLocalProvider(LocalTransitionAwareLifecycleNavLocalInfo provides localInfo) {
+            content.invoke()
+        }
+    }
+
+    @Composable
+    override fun <T : Any> ProvideToEntry(entry: NavEntry<T>) {
+        val backStack = LocalTransitionAwareLifecycleNavLocalInfo.current.backStack
+        // TODO: Handle duplicate keys
+        val isInBackStack = entry.key in backStack
+        val maxLifecycle =
+            when {
+                isInBackStack && isSettled -> Lifecycle.State.RESUMED
+                isInBackStack && !isSettled -> Lifecycle.State.STARTED
+                else /* !isInBackStack */ -> Lifecycle.State.CREATED
+            }
+        LifecycleOwner(maxLifecycle = maxLifecycle) { entry.content.invoke(entry.key) }
+    }
+}
+
+private val LocalTransitionAwareLifecycleNavLocalInfo =
+    compositionLocalOf<TransitionAwareLifecycleNavLocalInfo> {
+        error(
+            "CompositionLocal LocalTransitionAwareLifecycleNavLocalInfo not present. You must " +
+                "call ProvideToBackStack before calling ProvideToEntry."
+        )
+    }
+
+private class TransitionAwareLifecycleNavLocalInfo(val backStack: List<Any>)
+
+@Composable
+private fun LifecycleOwner(
+    maxLifecycle: Lifecycle.State = Lifecycle.State.RESUMED,
+    parentLifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
+    content: @Composable () -> Unit
+) {
+    val childLifecycleOwner = remember(parentLifecycleOwner) { ChildLifecycleOwner() }
+    // Pass LifecycleEvents from the parent down to the child
+    DisposableEffect(childLifecycleOwner, parentLifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            childLifecycleOwner.handleLifecycleEvent(event)
+        }
+
+        parentLifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose { parentLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // Ensure that the child lifecycle is capped at the maxLifecycle
+    LaunchedEffect(childLifecycleOwner, maxLifecycle) {
+        childLifecycleOwner.maxLifecycle = maxLifecycle
+    }
+    // Now install the LifecycleOwner as a composition local
+    CompositionLocalProvider(LocalLifecycleOwner provides childLifecycleOwner) { content.invoke() }
+}
+
+private class ChildLifecycleOwner : LifecycleOwner {
+    private val lifecycleRegistry = LifecycleRegistry(this)
+
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
+
+    var maxLifecycle: Lifecycle.State = Lifecycle.State.INITIALIZED
+        set(maxState) {
+            field = maxState
+            updateState()
+        }
+
+    private var parentLifecycleState: Lifecycle.State = Lifecycle.State.CREATED
+
+    fun handleLifecycleEvent(event: Lifecycle.Event) {
+        parentLifecycleState = event.targetState
+        updateState()
+    }
+
+    fun updateState() {
+        if (parentLifecycleState.ordinal < maxLifecycle.ordinal) {
+            lifecycleRegistry.currentState = parentLifecycleState
+        } else {
+            lifecycleRegistry.currentState = maxLifecycle
+        }
+    }
 }
