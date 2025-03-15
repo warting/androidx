@@ -30,7 +30,7 @@ import androidx.privacysandbox.ui.client.view.SandboxedSdkView
 import androidx.privacysandbox.ui.core.DelegatingSandboxedUiAdapter
 import androidx.privacysandbox.ui.core.ExperimentalFeatures
 import androidx.privacysandbox.ui.core.SandboxedUiAdapter
-import androidx.privacysandbox.ui.core.SessionConstants
+import androidx.privacysandbox.ui.core.SessionData
 import androidx.privacysandbox.ui.core.SessionObserver
 import androidx.privacysandbox.ui.core.SessionObserverContext
 import androidx.privacysandbox.ui.core.SessionObserverFactory
@@ -64,15 +64,18 @@ class TestSessionManager(
      * the created adapter is set on [viewForSession] to establish the session.
      */
     fun createAdapterAndEstablishSession(
+        passedAdapter: TestSandboxedUiAdapter? = null,
         failToProvideUi: Boolean = false,
         placeViewInsideFrameLayout: Boolean = false,
         viewForSession: SandboxedSdkView?,
         testSessionClient: TestSessionClient = TestSessionClient(),
         sessionObserverFactories: List<SessionObserverFactory>? = null,
-        sessionConstants: SessionConstants = SessionConstants()
+        sessionData: SessionData = SessionData()
     ): TestSandboxedUiAdapter {
-
-        val adapter = TestSandboxedUiAdapter(failToProvideUi, placeViewInsideFrameLayout)
+        var adapter = passedAdapter
+        if (adapter == null) {
+            adapter = TestSandboxedUiAdapter(failToProvideUi, placeViewInsideFrameLayout)
+        }
         sessionObserverFactories?.forEach { adapter.addObserverFactory(it) }
         val adapterFromCoreLibInfo =
             SandboxedUiAdapterFactory.createFromCoreLibInfo(getCoreLibInfoFromAdapter(adapter))
@@ -81,7 +84,7 @@ class TestSessionManager(
         } else {
             adapterFromCoreLibInfo.openSession(
                 context,
-                sessionConstants,
+                sessionData,
                 INITIAL_WIDTH,
                 INITIAL_HEIGHT,
                 isZOrderOnTop = true,
@@ -199,7 +202,7 @@ class TestSessionManager(
 
         override fun openSession(
             context: Context,
-            sessionConstants: SessionConstants,
+            sessionData: SessionData,
             initialWidth: Int,
             initialHeight: Int,
             isZOrderOnTop: Boolean,
@@ -402,9 +405,10 @@ class TestSessionManager(
         }
     }
 
-    class SessionObserverFactoryImpl : SessionObserverFactory {
+    class SessionObserverFactoryImpl(override val signalOptions: Set<String> = setOf()) :
+        SessionObserverFactory {
         val sessionObservers: MutableList<SessionObserverImpl> = mutableListOf()
-        private val sessionObserverCreatedLatch = CountDownLatch(1)
+        private var sessionObserverCreatedLatch = CountDownLatch(1)
 
         override fun create(): SessionObserver {
             sessionObserverCreatedLatch.countDown()
@@ -413,8 +417,12 @@ class TestSessionManager(
             return sessionObserver
         }
 
-        fun assertNoSessionsAreCreated() {
+        fun assertNoSessionObserversAreCreated() {
             assertThat(sessionObserverCreatedLatch.await(TIMEOUT, TimeUnit.MILLISECONDS)).isFalse()
+        }
+
+        fun resetSessionObserverCreatedLatch() {
+            sessionObserverCreatedLatch = CountDownLatch(1)
         }
     }
 
@@ -445,6 +453,10 @@ class TestSessionManager(
 
         fun assertOnUiContainerChangedSent() {
             assertThat(uiContainerChangedLatch.await(TIMEOUT, TimeUnit.MILLISECONDS)).isTrue()
+        }
+
+        fun assertOnUiContainerChangedNotSent() {
+            assertThat(uiContainerChangedLatch.await(TIMEOUT, TimeUnit.MILLISECONDS)).isFalse()
         }
 
         fun assertSessionClosed() {

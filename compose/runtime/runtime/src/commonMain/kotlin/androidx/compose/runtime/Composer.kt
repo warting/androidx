@@ -46,19 +46,22 @@ import androidx.compose.runtime.snapshots.currentSnapshot
 import androidx.compose.runtime.snapshots.fastForEach
 import androidx.compose.runtime.snapshots.fastMap
 import androidx.compose.runtime.snapshots.fastToSet
-import androidx.compose.runtime.tooling.ComposeTraceFrame
+import androidx.compose.runtime.tooling.ComposeStackTraceFrame
 import androidx.compose.runtime.tooling.CompositionData
+import androidx.compose.runtime.tooling.CompositionErrorContextImpl
 import androidx.compose.runtime.tooling.CompositionGroup
 import androidx.compose.runtime.tooling.CompositionInstance
+import androidx.compose.runtime.tooling.LocalCompositionErrorContext
 import androidx.compose.runtime.tooling.LocalInspectionTables
-import androidx.compose.runtime.tooling.attachComposeTrace
-import androidx.compose.runtime.tooling.currentTrace
+import androidx.compose.runtime.tooling.attachComposeStackTrace
+import androidx.compose.runtime.tooling.buildTrace
 import androidx.compose.runtime.tooling.findLocation
 import androidx.compose.runtime.tooling.findSubcompositionContextGroup
 import androidx.compose.runtime.tooling.traceForGroup
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName
 
@@ -1249,7 +1252,7 @@ sealed interface Composer {
          *   builds. Enabling this flag in minified builds will have no effect.
          */
         fun setDiagnosticStackTraceEnabled(enabled: Boolean) {
-            compositionStackTraceEnabled = enabled
+            composeStackTraceEnabled = enabled
         }
     }
 }
@@ -1318,7 +1321,7 @@ interface CompositionTracer {
 
 @OptIn(InternalComposeTracingApi::class) private var compositionTracer: CompositionTracer? = null
 
-internal var compositionStackTraceEnabled: Boolean = false
+internal var composeStackTraceEnabled: Boolean = false
 
 /**
  * Internal tracing API.
@@ -1415,8 +1418,7 @@ internal class ComposerImpl(
     private var nodeExpected = false
     private val invalidations: MutableList<Invalidation> = mutableListOf()
     private val entersStack = IntStack()
-    private var parentProvider: PersistentCompositionLocalMap =
-        persistentCompositionLocalHashMapOf()
+    private var rootProvider: PersistentCompositionLocalMap = persistentCompositionLocalHashMapOf()
     private var providerUpdates: MutableIntObjectMap<PersistentCompositionLocalMap>? = null
     private var providersInvalid = false
     private val providersInvalidStack = IntStack()
@@ -1424,8 +1426,10 @@ internal class ComposerImpl(
     private var reusingGroup = -1
     private var childrenComposing: Int = 0
     private var compositionToken: Int = 0
+
     private var sourceMarkersEnabled =
         parentContext.collectingSourceInformation || parentContext.collectingCallByInformation
+
     private val derivedStateObserver =
         object : DerivedStateObserver {
             override fun start(derivedState: DerivedState<*>) {
@@ -1471,8 +1475,11 @@ internal class ComposerImpl(
     private var pausable: Boolean = false
     private var shouldPauseCallback: ShouldPauseCallback? = null
 
-    override val applyCoroutineContext: CoroutineContext
-        @TestOnly get() = parentContext.effectCoroutineContext
+    internal val errorContext: CompositionErrorContextImpl? = CompositionErrorContextImpl(this)
+        get() = if (sourceMarkersEnabled) field else null
+
+    override val applyCoroutineContext: CoroutineContext =
+        parentContext.effectCoroutineContext + (errorContext ?: EmptyCoroutineContext)
 
     /**
      * Inserts a "Replaceable Group" starting marker in the slot table at the current execution
@@ -1661,7 +1668,7 @@ internal class ComposerImpl(
 
         // parent reference management
         parentContext.startComposing()
-        parentProvider = parentContext.getCompositionLocalScope()
+        val parentProvider = parentContext.getCompositionLocalScope()
         providersInvalidStack.push(providersInvalid.asInt())
         providersInvalid = changed(parentProvider)
         providerCache = null
@@ -1676,10 +1683,22 @@ internal class ComposerImpl(
             sourceMarkersEnabled = parentContext.collectingSourceInformation
         }
 
-        parentProvider.read(LocalInspectionTables)?.let {
+        rootProvider =
+            if (sourceMarkersEnabled) {
+                @Suppress("UNCHECKED_CAST") // ProvidableCompositionLocal to CompositionLocal
+                parentProvider.putValue(
+                    LocalCompositionErrorContext as CompositionLocal<Any?>,
+                    StaticValueHolder(errorContext)
+                )
+            } else {
+                parentProvider
+            }
+
+        rootProvider.read(LocalInspectionTables)?.let {
             it.add(compositionData)
             parentContext.recordInspectionTable(it)
         }
+
         startGroup(parentContext.compoundHashKey)
     }
 
@@ -2272,8 +2291,8 @@ internal class ComposerImpl(
                 current = reader.parent(current)
             }
         }
-        providerCache = parentProvider
-        return parentProvider
+        providerCache = rootProvider
+        return rootProvider
     }
 
     /**
@@ -3622,38 +3641,38 @@ internal class ComposerImpl(
         sourceMarkersEnabled = false
     }
 
-    internal fun compositionTraceForValue(value: Any): List<ComposeTraceFrame> {
+    internal fun stackTraceForValue(value: Any?): List<ComposeStackTraceFrame> {
         if (!sourceMarkersEnabled) return emptyList()
 
         return slotTable
-            .findLocation { it === value }
+            .findLocation { it === value || (it as? RememberObserverHolder)?.wrapped === value }
             ?.let { (groupIndex, dataIndex) ->
-                sourceTraceForGroup(groupIndex, dataIndex) + parentContext.sourceTrace()
+                stackTraceForGroup(groupIndex, dataIndex) + parentStackTrace()
             } ?: emptyList()
     }
 
-    private fun currentSourceTrace(): List<ComposeTraceFrame> {
+    private fun currentStackTrace(): List<ComposeStackTraceFrame> {
         if (!sourceMarkersEnabled) return emptyList()
 
-        val trace = mutableListOf<ComposeTraceFrame>()
-        trace.addAll(writer.currentTrace())
-        trace.addAll(reader.currentTrace())
+        val trace = mutableListOf<ComposeStackTraceFrame>()
+        trace.addAll(writer.buildTrace())
+        trace.addAll(reader.buildTrace())
 
-        return trace.apply { addAll(parentContext.sourceTrace()) }
+        return trace.apply { addAll(parentStackTrace()) }
     }
 
-    private fun sourceTraceForGroup(group: Int, dataOffset: Int?): List<ComposeTraceFrame> {
+    private fun stackTraceForGroup(group: Int, dataOffset: Int?): List<ComposeStackTraceFrame> {
         if (!sourceMarkersEnabled) return emptyList()
 
         return slotTable.read { it.traceForGroup(group, dataOffset) }
     }
 
-    private fun CompositionContext.sourceTrace(): List<ComposeTraceFrame> {
-        val composition = composition as? CompositionImpl ?: return emptyList()
+    fun parentStackTrace(): List<ComposeStackTraceFrame> {
+        val composition = parentContext.composition as? CompositionImpl ?: return emptyList()
         val position = composition.slotTable.findSubcompositionContextGroup(parentContext)
 
         return if (position != null) {
-            composition.slotTable.read { reader -> reader.traceForGroup(position, null) }
+            composition.slotTable.read { reader -> reader.traceForGroup(position, 0) }
         } else {
             emptyList()
         }
@@ -3767,8 +3786,8 @@ internal class ComposerImpl(
                 }
                 endRoot()
                 complete = true
-            } catch (e: Exception) {
-                throw e.attachComposeTrace { currentSourceTrace() }
+            } catch (e: Throwable) {
+                throw e.attachComposeStackTrace { currentStackTrace() }
             } finally {
                 isComposing = false
                 invalidations.clear()

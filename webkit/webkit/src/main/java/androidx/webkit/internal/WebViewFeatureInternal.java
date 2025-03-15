@@ -706,6 +706,22 @@ public class WebViewFeatureInternal {
             new ApiFeature.NoFramework(WebViewFeature.SPECULATIVE_LOADING_CONFIG,
                     Features.SPECULATIVE_LOADING_CONFIG);
 
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers {@link WebViewCompat#saveState}.
+     */
+    public static final ApiFeature.NoFramework SAVE_STATE =
+            new ApiFeature.NoFramework(WebViewFeature.SAVE_STATE,
+                    Features.SAVE_STATE);
+
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers {@link WebViewCompat#setShouldCacheProvider(boolean)}.
+     */
+    public static final ApiFeature.NoFramework CACHE_PROVIDER =
+            new ApiFeature.NoFramework(WebViewFeature.CACHE_PROVIDER,
+                    Features.PROVIDER_WEAKLY_REF_WEBVIEW);
+
     // --- Add new feature constants above this line ---
 
     private WebViewFeatureInternal() {

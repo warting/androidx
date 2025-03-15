@@ -16,29 +16,20 @@
 
 package androidx.compose.material3
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.FocusInteraction
-import androidx.compose.foundation.interaction.HoverInteraction
 import androidx.compose.foundation.interaction.Interaction
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.internal.ProvideContentColorTextStyle
-import androidx.compose.material3.internal.animateElevation
 import androidx.compose.material3.internal.rememberAnimatedShape
 import androidx.compose.material3.tokens.BaselineButtonTokens
 import androidx.compose.material3.tokens.ButtonLargeTokens
@@ -55,20 +46,15 @@ import androidx.compose.material3.tokens.OutlinedButtonTokens
 import androidx.compose.material3.tokens.TextButtonTokens
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.takeOrElse
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -259,7 +245,6 @@ fun Button(
     val containerColor = colors.containerColor(enabled)
     val contentColor = colors.contentColor(enabled)
     val shadowElevation = elevation?.shadowElevation(enabled, interactionSource)?.value ?: 0.dp
-    val layoutDirection = LocalLayoutDirection.current
     val buttonShape = shapeByInteraction(shapes, pressed, defaultAnimationSpec)
 
     Surface(
@@ -281,31 +266,6 @@ fun Button(
                 Modifier.defaultMinSize(
                         minWidth = ButtonDefaults.MinWidth,
                         minHeight = ButtonDefaults.MinHeight
-                    )
-                    .then(
-                        when (buttonShape) {
-                            is ShapeWithHorizontalCenterOptically -> {
-                                Modifier.horizontalCenterOptically(
-                                    shape = buttonShape,
-                                    maxStartOffset =
-                                        contentPadding.calculateStartPadding(layoutDirection),
-                                    maxEndOffset =
-                                        contentPadding.calculateEndPadding(layoutDirection)
-                                )
-                            }
-                            is CornerBasedShape -> {
-                                Modifier.horizontalCenterOptically(
-                                    shape = buttonShape,
-                                    maxStartOffset =
-                                        contentPadding.calculateStartPadding(layoutDirection),
-                                    maxEndOffset =
-                                        contentPadding.calculateEndPadding(layoutDirection)
-                                )
-                            }
-                            else -> {
-                                Modifier
-                            }
-                        }
                     )
                     .padding(contentPadding),
                 horizontalArrangement = Arrangement.Center,
@@ -948,8 +908,8 @@ object ButtonDefaults {
     private val ButtonLeadingSpace = BaselineButtonTokens.LeadingSpace
     private val ButtonTrailingSpace = BaselineButtonTokens.TrailingSpace
     private val ButtonWithIconStartpadding = 16.dp
-    private val SmallButtonStartPadding = ButtonSmallTokens.LeadingSpace
-    private val SmallButtonEndPadding = ButtonSmallTokens.TrailingSpace
+    private val SmallStartPadding = ButtonSmallTokens.LeadingSpace
+    private val SmallEndPadding = ButtonSmallTokens.TrailingSpace
     private val ButtonVerticalPadding = 8.dp
 
     /**
@@ -978,13 +938,25 @@ object ButtonDefaults {
         )
 
     /** The default content padding used for small [Button] */
+    @Deprecated("For binary compatibility", level = DeprecationLevel.HIDDEN)
     @ExperimentalMaterial3ExpressiveApi
     val SmallButtonContentPadding
         get() =
             PaddingValues(
-                start = SmallButtonStartPadding,
+                start = SmallStartPadding,
                 top = ButtonVerticalPadding,
-                end = SmallButtonEndPadding,
+                end = SmallEndPadding,
+                bottom = ButtonVerticalPadding
+            )
+
+    /** The default content padding used for small [Button] */
+    @ExperimentalMaterial3ExpressiveApi
+    val SmallContentPadding
+        get() =
+            PaddingValues(
+                start = SmallStartPadding,
+                top = ButtonVerticalPadding,
+                end = SmallEndPadding,
                 bottom = ButtonVerticalPadding
             )
 
@@ -1454,11 +1426,12 @@ object ButtonDefaults {
         disabledElevation: Dp = FilledButtonTokens.DisabledContainerElevation,
     ): ButtonElevation =
         ButtonElevation(
-            defaultElevation = defaultElevation,
+            elevation = defaultElevation,
             pressedElevation = pressedElevation,
             focusedElevation = focusedElevation,
             hoveredElevation = hoveredElevation,
             disabledElevation = disabledElevation,
+            draggedElevation = pressedElevation,
         )
 
     /**
@@ -1481,11 +1454,12 @@ object ButtonDefaults {
         disabledElevation: Dp = ElevatedButtonTokens.DisabledContainerElevation
     ): ButtonElevation =
         ButtonElevation(
-            defaultElevation = defaultElevation,
+            elevation = defaultElevation,
             pressedElevation = pressedElevation,
             focusedElevation = focusedElevation,
             hoveredElevation = hoveredElevation,
-            disabledElevation = disabledElevation
+            disabledElevation = disabledElevation,
+            draggedElevation = pressedElevation,
         )
 
     /**
@@ -1508,14 +1482,15 @@ object ButtonDefaults {
         pressedElevation: Dp = FilledTonalButtonTokens.PressedContainerElevation,
         focusedElevation: Dp = FilledTonalButtonTokens.FocusContainerElevation,
         hoveredElevation: Dp = FilledTonalButtonTokens.HoverContainerElevation,
-        disabledElevation: Dp = 0.dp
+        disabledElevation: Dp = 0.dp,
     ): ButtonElevation =
         ButtonElevation(
-            defaultElevation = defaultElevation,
+            elevation = defaultElevation,
             pressedElevation = pressedElevation,
             focusedElevation = focusedElevation,
             hoveredElevation = hoveredElevation,
-            disabledElevation = disabledElevation
+            disabledElevation = disabledElevation,
+            draggedElevation = pressedElevation,
         )
 
     /** The default [BorderStroke] used by [OutlinedButton]. */
@@ -1560,126 +1535,21 @@ object ButtonDefaults {
  *   [ElevatedButton].
  */
 @Stable
-class ButtonElevation
-internal constructor(
-    private val defaultElevation: Dp,
-    private val pressedElevation: Dp,
-    private val focusedElevation: Dp,
-    private val hoveredElevation: Dp,
-    private val disabledElevation: Dp,
-) {
-    /**
-     * Represents the shadow elevation used in a button, depending on its [enabled] state and
-     * [interactionSource].
-     *
-     * Shadow elevation is used to apply a shadow around the button to give it higher emphasis.
-     *
-     * @param enabled whether the button is enabled
-     * @param interactionSource the [InteractionSource] for this button
-     */
-    @Composable
-    internal fun shadowElevation(
-        enabled: Boolean,
-        interactionSource: InteractionSource
-    ): State<Dp> {
-        return animateElevation(enabled = enabled, interactionSource = interactionSource)
-    }
-
-    @Composable
-    private fun animateElevation(
-        enabled: Boolean,
-        interactionSource: InteractionSource
-    ): State<Dp> {
-        val interactions = remember { mutableStateListOf<Interaction>() }
-        LaunchedEffect(interactionSource) {
-            interactionSource.interactions.collect { interaction ->
-                when (interaction) {
-                    is HoverInteraction.Enter -> {
-                        interactions.add(interaction)
-                    }
-                    is HoverInteraction.Exit -> {
-                        interactions.remove(interaction.enter)
-                    }
-                    is FocusInteraction.Focus -> {
-                        interactions.add(interaction)
-                    }
-                    is FocusInteraction.Unfocus -> {
-                        interactions.remove(interaction.focus)
-                    }
-                    is PressInteraction.Press -> {
-                        interactions.add(interaction)
-                    }
-                    is PressInteraction.Release -> {
-                        interactions.remove(interaction.press)
-                    }
-                    is PressInteraction.Cancel -> {
-                        interactions.remove(interaction.press)
-                    }
-                }
-            }
-        }
-
-        val interaction = interactions.lastOrNull()
-
-        val target =
-            if (!enabled) {
-                disabledElevation
-            } else {
-                when (interaction) {
-                    is PressInteraction.Press -> pressedElevation
-                    is HoverInteraction.Enter -> hoveredElevation
-                    is FocusInteraction.Focus -> focusedElevation
-                    else -> defaultElevation
-                }
-            }
-
-        val animatable = remember { Animatable(target, Dp.VectorConverter) }
-
-        LaunchedEffect(target) {
-            if (animatable.targetValue != target) {
-                if (!enabled) {
-                    // No transition when moving to a disabled state
-                    animatable.snapTo(target)
-                } else {
-                    val lastInteraction =
-                        when (animatable.targetValue) {
-                            pressedElevation -> PressInteraction.Press(Offset.Zero)
-                            hoveredElevation -> HoverInteraction.Enter()
-                            focusedElevation -> FocusInteraction.Focus()
-                            else -> null
-                        }
-                    animatable.animateElevation(
-                        from = lastInteraction,
-                        to = interaction,
-                        target = target
-                    )
-                }
-            }
-        }
-
-        return animatable.asState()
-    }
+class ButtonElevation(
+    override val elevation: Dp,
+    override val pressedElevation: Dp,
+    override val focusedElevation: Dp,
+    override val hoveredElevation: Dp,
+    override val draggedElevation: Dp,
+    override val disabledElevation: Dp
+) : ComponentElevation {
 
     override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other == null || other !is ButtonElevation) return false
-
-        if (defaultElevation != other.defaultElevation) return false
-        if (pressedElevation != other.pressedElevation) return false
-        if (focusedElevation != other.focusedElevation) return false
-        if (hoveredElevation != other.hoveredElevation) return false
-        if (disabledElevation != other.disabledElevation) return false
-
-        return true
+        return ComponentElevation.equals(this, other)
     }
 
     override fun hashCode(): Int {
-        var result = defaultElevation.hashCode()
-        result = 31 * result + pressedElevation.hashCode()
-        result = 31 * result + focusedElevation.hashCode()
-        result = 31 * result + hoveredElevation.hashCode()
-        result = 31 * result + disabledElevation.hashCode()
-        return result
+        return ComponentElevation.hashCode(this)
     }
 }
 
@@ -1696,8 +1566,7 @@ internal constructor(
  * - See [ButtonDefaults.textButtonColors] for the default colors used in a [TextButton].
  */
 @Immutable
-class ButtonColors
-constructor(
+class ButtonColors(
     val containerColor: Color,
     val contentColor: Color,
     val disabledContainerColor: Color,

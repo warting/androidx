@@ -64,6 +64,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyChild
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isNotDisplayed
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -75,6 +76,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.FlakyTest
 import androidx.test.filters.MediumTest
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import androidx.test.uiautomator.UiDevice
@@ -131,6 +133,7 @@ class DialogTest {
         interaction.assertIsDisplayed()
     }
 
+    @FlakyTest(bugId = 402738067)
     @Test
     fun dialogTest_isDismissed_whenSpecified() {
         setupDialogTest()
@@ -138,9 +141,22 @@ class DialogTest {
         textInteraction.assertIsDisplayed()
 
         clickOutsideDialog()
+        rule.waitForIdle()
+
+        // Wait for the dialog to disappear AND events to fully propagate. The cancel event to
+        // pointer input will wait until any other events (clicks) are finished before executing.
+        rule.mainClock.autoAdvance = false
+        rule.mainClock.advanceTimeBy(1000)
+
+        // Wait for the ui to disappear AND events to fully propagate through the non-standard
+        // input system used in this test. We can't rely on waitForIdle() or other methods related
+        // to the ui, because the input events aren't going through that standard input system..
+        rule.waitUntil(timeoutMillis = 2000) { textInteraction.isNotDisplayed() }
+
         textInteraction.assertDoesNotExist()
     }
 
+    @FlakyTest(bugId = 402738067)
     @Test
     fun dialogTest_isDismissed_whenSpecified_decorFitsFalse() {
         setupDialogTest(dialogProperties = DialogProperties(decorFitsSystemWindows = false))
@@ -148,6 +164,18 @@ class DialogTest {
         textInteraction.assertIsDisplayed()
 
         clickOutsideDialog()
+        rule.waitForIdle()
+
+        // Wait for the dialog to disappear AND events to fully propagate. The cancel event to
+        // pointer input will wait until any other events (clicks) are finished before executing.
+        rule.mainClock.autoAdvance = false
+        rule.mainClock.advanceTimeBy(1000)
+
+        // Wait for the ui to disappear AND events to fully propagate through the non-standard
+        // input system used in this test. We can't rely on waitForIdle() or other methods related
+        // to the ui, because the input events aren't going through that standard input system.
+        rule.waitUntil(timeoutMillis = 2000) { textInteraction.isNotDisplayed() }
+
         textInteraction.assertDoesNotExist()
     }
 

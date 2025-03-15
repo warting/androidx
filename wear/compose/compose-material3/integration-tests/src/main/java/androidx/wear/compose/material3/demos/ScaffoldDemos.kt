@@ -25,8 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.pager.HorizontalPager
+import androidx.wear.compose.foundation.pager.VerticalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.wear.compose.integration.demos.common.ComposableDemo
+import androidx.wear.compose.material3.AnimatedPage
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.HorizontalPagerScaffold
@@ -44,9 +47,11 @@ val ScaffoldDemos =
     listOf(
         ComposableDemo("Scaffold Sample") { ScaffoldSample() },
         ComposableDemo("Screen Scaffold") { ScaffoldWithEdgeButtonSample() },
-        ComposableDemo("Horizontal Pager Scaffold") { HorizontalPagerScaffoldSample() },
+        ComposableDemo("Horizontal Pager Scaffold") {
+            HorizontalPagerScaffoldSample(it.navigateBack)
+        },
         ComposableDemo("Horizontal Pager Scaffold (Fade Out Indicator)") {
-            HorizontalPagerScaffoldFadeOutIndicatorDemo()
+            HorizontalPagerScaffoldFadeOutIndicatorDemo(it.navigateBack)
         },
         ComposableDemo("Vertical Pager Scaffold") { VerticalPagerScaffoldSample() },
         ComposableDemo("Vertical Pager Scaffold (Fade Out Indicator)") {
@@ -81,23 +86,35 @@ fun RandomComponent(page: Int) {
 }
 
 @Composable
-fun HorizontalPagerScaffoldFadeOutIndicatorDemo() {
+fun HorizontalPagerScaffoldFadeOutIndicatorDemo(navigateBack: () -> Unit) {
     AppScaffold {
         val pagerState = rememberPagerState(pageCount = { 10 })
 
         HorizontalPagerScaffold(
             pagerState = pagerState,
-            pageIndicatorAnimationSpec = PagerScaffoldDefaults.FadeOutAnimation
-        ) { page ->
-            ScreenScaffold {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Page $page")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    RandomComponent(page)
+            pageIndicatorAnimationSpec = PagerScaffoldDefaults.FadeOutAnimationSpec
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                flingBehavior =
+                    PagerScaffoldDefaults.snapWithSpringFlingBehavior(state = pagerState)
+            ) { page ->
+                AnimatedPage(pageIndex = page, pagerState = pagerState) {
+                    ScreenScaffold {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Page $page")
+                            Spacer(modifier = Modifier.height(16.dp))
+                            if (page == 0) {
+                                Button(onClick = navigateBack) { Text("Exit") }
+                            } else {
+                                RandomComponent(page)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -111,17 +128,25 @@ fun VerticalPagerScaffoldFadeOutIndicatorDemo() {
 
         VerticalPagerScaffold(
             pagerState = pagerState,
-            pageIndicatorAnimationSpec = PagerScaffoldDefaults.FadeOutAnimation
-        ) { page ->
-            ScreenScaffold {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Page $page")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    RandomComponent(page)
+            pageIndicatorAnimationSpec = PagerScaffoldDefaults.FadeOutAnimationSpec
+        ) {
+            VerticalPager(
+                state = pagerState,
+                flingBehavior =
+                    PagerScaffoldDefaults.snapWithSpringFlingBehavior(state = pagerState)
+            ) { page ->
+                AnimatedPage(pageIndex = page, pagerState = pagerState) {
+                    ScreenScaffold {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Page $page")
+                            Spacer(modifier = Modifier.height(16.dp))
+                            RandomComponent(page)
+                        }
+                    }
                 }
             }
         }

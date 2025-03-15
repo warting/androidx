@@ -33,7 +33,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.privacysandbox.ui.client.view.SandboxedSdkView
 import androidx.privacysandbox.ui.core.BackwardCompatUtil
 import androidx.privacysandbox.ui.core.SandboxedUiAdapter
-import androidx.privacysandbox.ui.core.SessionConstants
+import androidx.privacysandbox.ui.core.SandboxedUiAdapterSignalOptions
+import androidx.privacysandbox.ui.core.SessionData
 import androidx.privacysandbox.ui.integration.testingutils.TestEventListener
 import androidx.privacysandbox.ui.provider.AbstractSandboxedUiAdapter
 import androidx.test.ext.junit.rules.ActivityScenarioRule
@@ -70,6 +71,7 @@ class SandboxedSdkViewTest {
     private lateinit var linearLayout: LinearLayout
     private var mainLayoutWidth = -1
     private var mainLayoutHeight = -1
+    private var signalOptions = setOf(SandboxedUiAdapterSignalOptions.GEOMETRY)
     @get:Rule var activityScenarioRule = ActivityScenarioRule(UiLibActivity::class.java)
 
     @Before
@@ -85,7 +87,7 @@ class SandboxedSdkViewTest {
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             view.layoutParams = layoutParams
-            testSandboxedUiAdapter = TestSandboxedUiAdapter()
+            testSandboxedUiAdapter = TestSandboxedUiAdapter(signalOptions)
             view.setAdapter(testSandboxedUiAdapter)
         }
         uiDevice = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
@@ -273,7 +275,7 @@ class SandboxedSdkViewTest {
         class CustomUiAdapter : AbstractSandboxedUiAdapter() {
             override fun openSession(
                 context: Context,
-                sessionConstants: SessionConstants,
+                sessionData: SessionData,
                 initialWidth: Int,
                 initialHeight: Int,
                 isZOrderOnTop: Boolean,
@@ -310,7 +312,7 @@ class SandboxedSdkViewTest {
         class CustomUiAdapter : AbstractSandboxedUiAdapter() {
             override fun openSession(
                 context: Context,
-                sessionConstants: SessionConstants,
+                sessionData: SessionData,
                 initialWidth: Int,
                 initialHeight: Int,
                 isZOrderOnTop: Boolean,
@@ -476,7 +478,7 @@ class SandboxedSdkViewTest {
         // Verify that the UI adapter receives the same host token object when opening a session.
         addViewToLayout()
         testSandboxedUiAdapter.assertSessionOpened()
-        assertThat(testSandboxedUiAdapter.sessionConstants?.windowInputToken).isEqualTo(token)
+        assertThat(testSandboxedUiAdapter.sessionData?.windowInputToken).isEqualTo(token)
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -486,8 +488,8 @@ class SandboxedSdkViewTest {
         assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM)
         addViewToLayoutAndWaitToBeActive()
         val inputTransferToken = view.rootSurfaceControl?.inputTransferToken
-        assertThat(testSandboxedUiAdapter.sessionConstants?.inputTransferToken).isNotNull()
-        assertThat(testSandboxedUiAdapter.sessionConstants?.inputTransferToken)
+        assertThat(testSandboxedUiAdapter.sessionData?.inputTransferToken).isNotNull()
+        assertThat(testSandboxedUiAdapter.sessionData?.inputTransferToken)
             .isEqualTo(inputTransferToken)
     }
 
@@ -532,7 +534,6 @@ class SandboxedSdkViewTest {
         )
     }
 
-    @Ignore // b/356742276
     @Test
     fun signalsOnlyCollectedWhenSignalOptionsNonEmpty() {
         addViewToLayoutAndWaitToBeActive()
@@ -693,6 +694,29 @@ class SandboxedSdkViewTest {
     }
 
     @Test
+    fun signalsSentWhenVisibilityChanges() {
+        // onVisibilityAggregated is only available on N+
+        assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+        addViewToLayoutAndWaitToBeActive()
+        val session = testSandboxedUiAdapter.testSession!!
+        // Catch initial UI change so that we can ensure the subsequent event is caught.
+        session.runAndRetrieveNextUiChange {}
+        // If no viewability event occurs, this will throw an exception.
+        session.runAndRetrieveNextUiChange {
+            activityScenarioRule.withActivity { view.visibility = View.INVISIBLE }
+        }
+    }
+
+    @Test
+    fun supportedSignalOptionsSentWhenUiDisplayed() {
+        addViewToLayoutAndWaitToBeActive()
+        val session = testSandboxedUiAdapter.testSession!!
+        assertThat(session.sessionOpenedLatch.await(TIMEOUT, TimeUnit.MILLISECONDS)).isTrue()
+        assertThat(session.supportedSignalOptions)
+            .containsExactly(SandboxedUiAdapterSignalOptions.GEOMETRY)
+    }
+
+    @Test
     fun addChildViewToSandboxedSdkView_throwsException() {
         addViewToLayout()
         val exception =
@@ -722,16 +746,22 @@ class SandboxedSdkViewTest {
         }
     }
 
-    private fun addViewToLayout(waitToBeActive: Boolean = false, viewToAdd: View = view) {
+    private fun addViewToLayout(
+        waitToBeActive: Boolean = false,
+        viewToAdd: SandboxedSdkView = view
+    ) {
         activityScenarioRule.withActivity {
             linearLayout = findViewById(R.id.mainlayout)
+            if (viewToAdd != view) {
+                linearLayout.removeView(view)
+            }
             mainLayoutWidth = linearLayout.width
             mainLayoutHeight = linearLayout.height
             linearLayout.addView(viewToAdd)
         }
         if (waitToBeActive) {
             val eventListener = TestEventListener()
-            view.setEventListener(eventListener)
+            viewToAdd.setEventListener(eventListener)
             assertThat(eventListener.uiDisplayedLatch.await(TIMEOUT, TimeUnit.MILLISECONDS))
                 .isTrue()
         }
@@ -744,7 +774,7 @@ class SandboxedSdkViewTest {
         }
     }
 
-    private fun addViewToLayoutAndWaitToBeActive(viewToAdd: View = view) {
+    private fun addViewToLayoutAndWaitToBeActive(viewToAdd: SandboxedSdkView = view) {
         addViewToLayout(true, viewToAdd)
     }
 

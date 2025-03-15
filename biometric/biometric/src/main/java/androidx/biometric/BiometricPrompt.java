@@ -168,6 +168,12 @@ public class BiometricPrompt {
     public static final int ERROR_SECURITY_UPDATE_REQUIRED = 15;
 
     /**
+     * The privacy setting has been enabled and will block use of the sensor.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    public static final int ERROR_SENSOR_PRIVACY_ENABLED = 18;
+
+    /**
      * Identity Check is currently not active.
      *
      * This device either doesn't have this feature enabled, or it's not considered in a
@@ -177,7 +183,10 @@ public class BiometricPrompt {
     public static final int ERROR_IDENTITY_CHECK_NOT_ACTIVE = 20;
 
     /**
-     * Biometrics is not allowed to verify the user in apps.
+     * Biometrics is not allowed to verify the user in apps. It's for internal use only. This
+     * error code, introduced in API 35, was previously covered by ERROR_HW_UNAVAILABLE and
+     * doesn't need to be public. Therefore, for backward compatibility, this error will be
+     * converted to ERROR_HW_UNAVAILABLE.
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     public static final int ERROR_NOT_ENABLED_FOR_APPS = 21;
@@ -205,6 +214,8 @@ public class BiometricPrompt {
         ERROR_HW_NOT_PRESENT,
         ERROR_NEGATIVE_BUTTON,
         ERROR_NO_DEVICE_CREDENTIAL,
+        ERROR_SECURITY_UPDATE_REQUIRED,
+        ERROR_SENSOR_PRIVACY_ENABLED,
         ERROR_IDENTITY_CHECK_NOT_ACTIVE,
         ERROR_NOT_ENABLED_FOR_APPS,
         ERROR_CONTENT_VIEW_MORE_OPTIONS_BUTTON
@@ -1191,9 +1202,11 @@ public class BiometricPrompt {
             throw new IllegalArgumentException("CryptoObject cannot be null.");
         }
 
-        // Ensure that all allowed authenticators support crypto auth.
+        // Ensure that all allowed authenticators support crypto auth. |isIdentityCheckAvailable|
+        // is not important for this check.
         @BiometricManager.AuthenticatorTypes final int authenticators =
-                AuthenticatorUtils.getConsolidatedAuthenticators(info, crypto);
+                AuthenticatorUtils.getConsolidatedAuthenticators(info, crypto,
+                        false /*isIdentityCheckAvailable*/);
         if (AuthenticatorUtils.isWeakBiometricAllowed(authenticators)) {
             throw new IllegalArgumentException("Crypto-based authentication is not supported for "
                     + "Class 2 (Weak) biometrics.");

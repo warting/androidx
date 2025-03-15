@@ -19,7 +19,6 @@ package androidx.pdf.view
 import android.graphics.Point
 import android.util.Range
 import androidx.pdf.PdfDocument
-import androidx.test.filters.SmallTest
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,7 +41,6 @@ import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@SmallTest
 class PageLayoutManagerTest {
     private val pdfDocument =
         mock<PdfDocument> {
@@ -65,14 +63,13 @@ class PageLayoutManagerTest {
     fun setup() {
         // Required because loadPageDimensions jumps to the main thread to update PaginationModel
         Dispatchers.setMain(testDispatcher)
-        paginationManager =
-            PageLayoutManager(pdfDocument, testScope, pagePrefetchRadius = PAGE_PREFETCH_RADIUS)
+        paginationManager = PageLayoutManager(pdfDocument, testScope)
     }
 
     @Test
     fun onViewportChanged() = runTest {
         // Start collecting from PaginationManager#visiblePages
-        val visiblePageValues = mutableListOf<Range<Int>>()
+        val visiblePageValues = mutableListOf<PagesInViewport>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             paginationManager.visiblePages.toList(visiblePageValues)
         }
@@ -88,17 +85,17 @@ class PageLayoutManagerTest {
         // We expect to collect 3 values: the default [0, 0] value and two updates based on two
         // viewport changes
         assertThat(visiblePageValues.size).isEqualTo(3)
-        assertThat(visiblePageValues[0]).isEqualTo(Range(0, 0))
+        assertThat(visiblePageValues[0]).isEqualTo(PagesInViewport(Range(0, 0)))
         // These assertions are deliberately coarse so as not to test the implementation details of
         // PaginationModel here
-        assertThat(visiblePageValues[1].upper).isGreaterThan(0)
-        assertThat(visiblePageValues[2].upper).isGreaterThan(visiblePageValues[1].upper)
+        assertThat(visiblePageValues[1].pages.upper).isGreaterThan(0)
+        assertThat(visiblePageValues[2].pages.upper).isGreaterThan(visiblePageValues[1].pages.upper)
     }
 
     @Test
     fun onViewportChanged_noChange() = runTest {
         // Start collecting from PaginationManager#visiblePages
-        val visiblePageValues = mutableListOf<Range<Int>>()
+        val visiblePageValues = mutableListOf<PagesInViewport>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             paginationManager.visiblePages.toList(visiblePageValues)
         }
@@ -114,16 +111,16 @@ class PageLayoutManagerTest {
         // We expect to collect 2 values: the default [0, 0] value and one update based on one
         // viewport change
         assertThat(visiblePageValues.size).isEqualTo(2)
-        assertThat(visiblePageValues[0]).isEqualTo(Range(0, 0))
+        assertThat(visiblePageValues[0]).isEqualTo(PagesInViewport(Range(0, 0)))
         // This assertion is deliberately coarse so as not to test the implementation details of
         // PaginationModel here
-        assertThat(visiblePageValues[1].upper).isGreaterThan(0)
+        assertThat(visiblePageValues[1].pages.upper).isGreaterThan(0)
     }
 
     @Test
     fun onViewportChanged_prefetchPages() = runTest {
         // Start collecting from PaginationManager#visiblePages
-        val visiblePageValues = mutableListOf<Range<Int>>()
+        val visiblePageValues = mutableListOf<PagesInViewport>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             paginationManager.visiblePages.toList(visiblePageValues)
         }
@@ -138,7 +135,7 @@ class PageLayoutManagerTest {
 
         // Make sure we've fetched all currently measured & visible pages + the page prefetch radius
         testScope.testScheduler.runCurrent()
-        assertThat(paginationManager.reach).isEqualTo(5 + PAGE_PREFETCH_RADIUS)
+        assertThat(paginationManager.reach).isEqualTo(5 + PageLayoutManager.DEFAULT_PREFETCH_RADIUS)
     }
 
     @Test
@@ -207,4 +204,3 @@ class PageLayoutManagerTest {
 }
 
 private const val TOTAL_PAGES = 100
-private const val PAGE_PREFETCH_RADIUS = 5

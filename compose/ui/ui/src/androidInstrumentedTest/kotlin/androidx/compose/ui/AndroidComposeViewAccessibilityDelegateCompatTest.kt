@@ -31,7 +31,9 @@ import android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
 import android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -101,6 +103,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_PASTE
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat.RANGE_TYPE_FLOAT
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.FlakyTest
 import androidx.test.filters.MediumTest
 import androidx.test.filters.SdkSuppress
 import com.google.common.truth.Correspondence
@@ -668,6 +671,7 @@ class AndroidComposeViewAccessibilityDelegateCompatTest {
         }
     }
 
+    @FlakyTest(bugId = 403310024)
     @Test
     fun testPopulateAccessibilityNodeInfoProperties_liveRegionUpdate() {
         // Arrange.
@@ -1045,6 +1049,63 @@ class AndroidComposeViewAccessibilityDelegateCompatTest {
 
         // Assert.
         rule.runOnIdle { assertThat(info.childCount).isEqualTo(1) }
+    }
+
+    @SdkSuppress(maxSdkVersion = 33) // b/321824038
+    @Test
+    fun testGetBoundsInScreen_translation() {
+        rule.setContentWithAccessibilityEnabled { Box(Modifier.width(30.toDp()).height(70.toDp())) }
+        rule.runOnUiThread {
+            androidComposeView.translationX = 2f
+            androidComposeView.translationY = 3f
+        }
+
+        val bounds = Rect(-1, -1, -1, -1)
+        rule.runOnIdle {
+            val info = androidComposeView.createAccessibilityNodeInfo()
+            info.getBoundsInScreen(bounds)
+        }
+
+        rule.runOnIdle { assertThat(bounds).isEqualTo(Rect(2, 3, 30 + 2, 70 + 3)) }
+    }
+
+    @SdkSuppress(maxSdkVersion = 33) // b/321824038
+    @Test
+    fun testGetBoundsInScreen_scale() {
+        rule.setContentWithAccessibilityEnabled { Box(Modifier.width(30.toDp()).height(70.toDp())) }
+        rule.runOnUiThread {
+            androidComposeView.scaleX = 2f
+            androidComposeView.scaleY = 3f
+            androidComposeView.pivotX = 0f
+            androidComposeView.pivotY = 0f
+        }
+
+        val bounds = Rect(-1, -1, -1, -1)
+        rule.runOnIdle {
+            val info = androidComposeView.createAccessibilityNodeInfo()
+            info.getBoundsInScreen(bounds)
+        }
+
+        rule.runOnIdle { assertThat(bounds).isEqualTo(Rect(0, 0, 30 * 2, 70 * 3)) }
+    }
+
+    @SdkSuppress(maxSdkVersion = 33) // b/321824038
+    @Test
+    fun testGetBoundsInScreen_rotation() {
+        rule.setContentWithAccessibilityEnabled { Box(Modifier.width(30.toDp()).height(70.toDp())) }
+        rule.runOnUiThread {
+            androidComposeView.rotation = 90f
+            androidComposeView.pivotX = 0f
+            androidComposeView.pivotY = 0f
+        }
+
+        val bounds = Rect(-1, -1, -1, -1)
+        rule.runOnIdle {
+            val info = androidComposeView.createAccessibilityNodeInfo()
+            info.getBoundsInScreen(bounds)
+        }
+
+        rule.runOnIdle { assertThat(bounds).isEqualTo(Rect(-70, 0, 0, 30)) }
     }
 
     @SdkSuppress(maxSdkVersion = 33) // b/321824038

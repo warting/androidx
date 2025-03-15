@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -68,11 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.ButtonDefaults.buttonColors
 import androidx.wear.compose.material3.ButtonDefaults.filledTonalButtonColors
 import androidx.wear.compose.material3.internal.Icons
-import androidx.wear.compose.material3.internal.Strings.Companion.DatePickerDay
-import androidx.wear.compose.material3.internal.Strings.Companion.DatePickerMonth
-import androidx.wear.compose.material3.internal.Strings.Companion.DatePickerYear
-import androidx.wear.compose.material3.internal.Strings.Companion.PickerConfirmButtonContentDescription
-import androidx.wear.compose.material3.internal.Strings.Companion.PickerNextButtonContentDescription
+import androidx.wear.compose.material3.internal.Strings
 import androidx.wear.compose.material3.internal.getString
 import androidx.wear.compose.material3.tokens.DatePickerTokens
 import androidx.wear.compose.materialcore.isLargeScreen
@@ -92,7 +89,7 @@ import java.time.format.DateTimeFormatter
  *
  * @sample androidx.wear.compose.material3.samples.DatePickerYearMonthDaySample
  *
- * Example of a [DatePicker] with a minDate:
+ * Example of a [DatePicker] with a minValidDate:
  *
  * @sample androidx.wear.compose.material3.samples.DatePickerFutureOnlySample
  * @param initialDate The initial value to be displayed in the DatePicker.
@@ -129,20 +126,19 @@ public fun DatePicker(
         LocalTouchExplorationStateProvider.current.touchExplorationState()
 
     /** The current selected [Picker] index. */
-    var selectedIndex by
-        remember(touchExplorationServicesEnabled) {
-            // When the date picker loads, none of the individual pickers are selected in talkback
-            // mode,
-            // otherwise first picker should be focused (depends on the picker ordering given by
-            // datePickerType)
-            val initiallySelectedIndex =
-                if (touchExplorationServicesEnabled) {
-                    null
-                } else {
-                    0
-                }
-            mutableStateOf(initiallySelectedIndex)
-        }
+    var selectedIndex: Int? by remember { mutableStateOf(null) }
+
+    LaunchedEffect(touchExplorationServicesEnabled) {
+        // When the date picker loads, none of the individual pickers are selected in talkback mode,
+        // otherwise first picker should be focused (depends on the picker ordering given by
+        // datePickerType)
+        selectedIndex =
+            if (touchExplorationServicesEnabled) {
+                null
+            } else {
+                0
+            }
+    }
 
     val isLargeScreen = isLargeScreen()
     val labelTextStyle =
@@ -153,17 +149,24 @@ public fun DatePicker(
         }
     val optionTextStyle =
         if (isLargeScreen) {
-            DatePickerTokens.ContentLargeTypography.value
+            DatePickerTokens.ContentLargeTypography.value.copy(
+                textAlign = TextAlign.Center,
+                fontFeatureSettings = "tnum"
+            )
         } else {
-            DatePickerTokens.ContentTypography.value
+            DatePickerTokens.ContentTypography.value.copy(
+                textAlign = TextAlign.Center,
+                fontFeatureSettings = "tnum"
+            )
         }
     val optionHeight = if (isLargeScreen) 48.dp else 36.dp
 
     val focusRequesterConfirmButton = remember { FocusRequester() }
 
-    val yearString = getString(DatePickerYear)
-    val monthString = getString(DatePickerMonth)
-    val dayString = getString(DatePickerDay)
+    val instructionHeadingString = getString(Strings.DatePickerHeading)
+    val yearString = getString(Strings.DatePickerYear)
+    val monthString = getString(Strings.DatePickerMonth)
+    val dayString = getString(Strings.DatePickerDay)
 
     LaunchedEffect(
         datePickerState.isMinYearSelected,
@@ -260,7 +263,12 @@ public fun DatePicker(
                     DatePickerOption.Year -> yearString
                     else -> ""
                 }
-            } ?: ""
+            } ?: if (touchExplorationServicesEnabled) instructionHeadingString else ""
+
+        // Allow more room for the initial instruction heading under TalkBck
+        val maxTextLines = if (selectedIndex == null) 2 else 1
+        val textPaddingPercentage = 24f
+
         val headingAnimationSpec: FiniteAnimationSpec<Float> =
             MaterialTheme.motionScheme.defaultEffectsSpec()
         Column(
@@ -280,12 +288,17 @@ public fun DatePicker(
                 }
             ) { targetText ->
                 Text(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier.padding(
+                                horizontal =
+                                    PaddingDefaults.horizontalContentPadding(textPaddingPercentage)
+                            )
+                            .fillMaxWidth(),
                     text = targetText,
                     color = colors.pickerLabelColor,
                     textAlign = TextAlign.Center,
                     style = labelTextStyle,
-                    maxLines = 1,
+                    maxLines = maxTextLines,
                 )
             }
             Spacer(Modifier.height(if (isLargeScreen) 6.dp else 4.dp))
@@ -348,18 +361,25 @@ public fun DatePicker(
                     val spacing = if (isLargeScreen) 6.dp else 4.dp
                     // Pass a negative value as the selected picker index when none is selected.
                     PickerGroup(
-                        selectedPickerIndex = selectedIndex ?: -1,
-                        onPickerSelected = { selectedIndex = it },
+                        selectedPickerState =
+                            selectedIndex?.let {
+                                when (datePickerOptions.getOrNull(it)) {
+                                    DatePickerOption.Day -> datePickerState.dayState
+                                    DatePickerOption.Month -> datePickerState.monthState
+                                    DatePickerOption.Year -> datePickerState.yearState
+                                    else -> null
+                                }
+                            },
                         autoCenter = true,
-                        separator = { Spacer(Modifier.width(if (isLargeScreen) 12.dp else 8.dp)) },
                     ) {
                         datePickerOptions.forEachIndexed { index, datePickerOption ->
                             when (datePickerOption) {
                                 DatePickerOption.Day ->
-                                    pickerGroupItem(
+                                    PickerGroupItem(
                                         pickerState = datePickerState.dayState,
                                         modifier = Modifier.width(dayWidth).fillMaxHeight(),
                                         onSelected = { onPickerSelected(index, index + 1) },
+                                        selected = index == selectedIndex,
                                         contentDescription = dayContentDescription,
                                         option =
                                             pickerTextOption(
@@ -383,10 +403,11 @@ public fun DatePicker(
                                         verticalSpacing = spacing,
                                     )
                                 DatePickerOption.Month ->
-                                    pickerGroupItem(
+                                    PickerGroupItem(
                                         pickerState = datePickerState.monthState,
                                         modifier = Modifier.width(monthYearWidth).fillMaxHeight(),
                                         onSelected = { onPickerSelected(index, index + 1) },
+                                        selected = index == selectedIndex,
                                         contentDescription = monthContentDescription,
                                         option =
                                             pickerTextOption(
@@ -411,10 +432,11 @@ public fun DatePicker(
                                         verticalSpacing = spacing,
                                     )
                                 DatePickerOption.Year ->
-                                    pickerGroupItem(
+                                    PickerGroupItem(
                                         pickerState = datePickerState.yearState,
                                         modifier = Modifier.width(monthYearWidth).fillMaxHeight(),
                                         onSelected = { onPickerSelected(index, index + 1) },
+                                        selected = index == selectedIndex,
                                         contentDescription = yearContentDescription,
                                         option =
                                             pickerTextOption(
@@ -437,6 +459,9 @@ public fun DatePicker(
                                             ),
                                         verticalSpacing = spacing,
                                     )
+                            }
+                            if (index < datePickerOptions.size - 1) {
+                                Spacer(Modifier.width(if (isLargeScreen) 12.dp else 8.dp))
                             }
                         }
                     }
@@ -479,7 +504,8 @@ public fun DatePicker(
                     if (selectedIndex?.let { it >= 2 } == true) {
                         datePickerState.isSelectedDayValid
                     } else {
-                        true
+                        // Disable the 'next' button under TalkBack until a Picker is selected.
+                        selectedIndex != null
                     },
             ) {
                 // If none is selected (selectedIndex == null) we show 'next' instead of 'confirm'.
@@ -493,10 +519,10 @@ public fun DatePicker(
                         },
                     contentDescription =
                         if (showConfirm) {
-                            getString(PickerConfirmButtonContentDescription)
+                            getString(Strings.PickerConfirmButtonContentDescription)
                         } else {
                             // If none is selected, return the 'next' content description.
-                            getString(PickerNextButtonContentDescription)
+                            getString(Strings.PickerNextButtonContentDescription)
                         },
                     modifier = Modifier.size(24.dp).wrapContentSize(align = Alignment.Center),
                 )
@@ -553,10 +579,10 @@ public object DatePickerDefaults {
     /**
      * Creates a [DatePickerColors] for a [DatePicker].
      *
-     * @param activePickerContentColor The content color of the currently active picker section.
-     * @param inactivePickerContentColor The content color of an inactive picker section.
+     * @param activePickerContentColor The content color of the currently active picker.
+     * @param inactivePickerContentColor The content color of an inactive picker.
      * @param invalidPickerContentColor The content color of invalid picker options. Picker options
-     *   can be invalid when minDate or maxDate are specified for the [DatePicker].
+     *   can be invalid when minValidDate or maxValidDate are specified for the [DatePicker].
      * @param pickerLabelColor The color of the picker label.
      * @param nextButtonContentColor The content color of the next button.
      * @param nextButtonContainerColor The container color of the next button.
@@ -613,11 +639,11 @@ public object DatePickerDefaults {
 /**
  * Colors for [DatePicker].
  *
- * @param activePickerContentColor The content color of the currently active picker section, that
- *   is, the section currently being changed, such as the day, month or year.
- * @param inactivePickerContentColor The content color of an inactive picker section.
+ * @param activePickerContentColor The content color of the currently active picker, that is, the
+ *   picker currently being changed, such as the day, month or year.
+ * @param inactivePickerContentColor The content color of an inactive picker.
  * @param invalidPickerContentColor The content color of invalid picker options. Picker options can
- *   be invalid when minDate or maxDate are specified for the [DatePicker].
+ *   be invalid when minValidDate or maxValidDate are specified for the [DatePicker].
  * @param pickerLabelColor The color of the picker label.
  * @param nextButtonContentColor The content color of the next button.
  * @param nextButtonContainerColor The container color of the next button.
@@ -638,9 +664,9 @@ public class DatePickerColors(
     /**
      * Returns a copy of this DatePickerColors, optionally overriding some of the values.
      *
-     * @param activePickerContentColor The content color of the currently active picker section,
-     *   that is, the section currently being changed, such as the day, month or year.
-     * @param inactivePickerContentColor The content color of an inactive picker section.
+     * @param activePickerContentColor The content color of the currently active picker, that is,
+     *   the picker currently being changed, such as the day, month or year.
+     * @param inactivePickerContentColor The content color of an inactive picker.
      * @param invalidPickerContentColor The content color of invalid picker options.
      * @param pickerLabelColor The color of the picker label.
      * @param nextButtonContentColor The content color of the next button.

@@ -16,9 +16,6 @@
 
 package androidx.appfunctions.metadata
 
-import androidx.annotation.RestrictTo
-import androidx.appsearch.annotation.Document
-
 /**
  * Represents a predefined AppFunction schema.
  *
@@ -61,17 +58,3 @@ public class AppFunctionSchemaMetadata(
         return "AppFunctionSchemaMetadata(category='$category', name='$name', version=$version)"
     }
 }
-
-/** Represents the persistent storage format of [AppFunctionSchemaMetadata]. */
-@Document
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-public data class AppFunctionSchemaMetadataDocument(
-    @Document.Namespace public val namespace: String = APP_FUNCTION_NAMESPACE,
-    @Document.Id public val id: String = APP_FUNCTION_ID_EMPTY,
-    /** The category of the schema, used to group related schemas. */
-    @Document.StringProperty public val schemaCategory: String,
-    /** The unique name of the schema within its category. */
-    @Document.StringProperty public val schemaName: String,
-    /** The version of the schema. This is used to track the changes to the schema over time. */
-    @Document.LongProperty public val schemaVersion: Long
-)

@@ -16,12 +16,15 @@
 
 package androidx.compose.foundation.text
 
+import android.content.res.Resources
 import android.os.Build
 import androidx.compose.foundation.R
 import androidx.compose.foundation.contextmenu.ContextMenuScope
 import androidx.compose.foundation.contextmenu.ContextMenuState
 import androidx.compose.foundation.contextmenu.close
-import androidx.compose.foundation.internal.hasText
+import androidx.compose.foundation.text.contextmenu.builder.TextContextMenuBuilderScope
+import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
+import androidx.compose.foundation.text.contextmenu.data.TextContextMenuSession
 import androidx.compose.foundation.text.input.internal.selection.TextFieldSelectionState
 import androidx.compose.foundation.text.input.internal.selection.contextMenuBuilder
 import androidx.compose.foundation.text.selection.SelectionManager
@@ -33,7 +36,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
@@ -116,20 +118,42 @@ internal actual fun ContextMenuArea(manager: SelectionManager, content: @Composa
  *
  * @param stringId The android [android.R.string] id for the label of this item
  */
-internal enum class TextContextMenuItems(private val stringId: Int) {
-    Cut(android.R.string.cut),
-    Copy(android.R.string.copy),
-    Paste(android.R.string.paste),
-    SelectAll(android.R.string.selectAll),
+internal enum class TextContextMenuItems(val key: Any, val stringId: Int, val drawableId: Int?) {
+    Cut(
+        key = TextContextMenuKeys.CutKey,
+        stringId = android.R.string.cut,
+        drawableId = android.R.attr.actionModeCutDrawable
+    ),
+    Copy(
+        key = TextContextMenuKeys.CopyKey,
+        stringId = android.R.string.copy,
+        drawableId = android.R.attr.actionModeCopyDrawable
+    ),
+    Paste(
+        key = TextContextMenuKeys.PasteKey,
+        stringId = android.R.string.paste,
+        drawableId = android.R.attr.actionModePasteDrawable
+    ),
+    SelectAll(
+        key = TextContextMenuKeys.SelectAllKey,
+        stringId = android.R.string.selectAll,
+        drawableId = android.R.attr.actionModeSelectAllDrawable
+    ),
     Autofill(
-        if (Build.VERSION.SDK_INT <= 26) {
-            R.string.autofill
-        } else {
-            android.R.string.autofill
-        }
+        key = TextContextMenuKeys.AutofillKey,
+        stringId =
+            if (Build.VERSION.SDK_INT <= 26) {
+                R.string.autofill
+            } else {
+                android.R.string.autofill
+            },
+        // Platform also doesn't have an icon for the autofill item.
+        drawableId = null
     );
 
     @ReadOnlyComposable @Composable fun resolvedString(): String = stringResource(stringId)
+
+    fun resolveString(resources: Resources): String = resources.getString(stringId)
 }
 
 internal inline fun ContextMenuScope.TextItem(
@@ -148,26 +172,40 @@ internal inline fun ContextMenuScope.TextItem(
     }
 }
 
-internal suspend fun TextFieldSelectionState.getContextMenuItemsAvailability() =
-    MenuItemsAvailability(
+internal fun TextContextMenuBuilderScope.textItem(
+    resources: Resources,
+    item: TextContextMenuItems,
+    onClick: TextContextMenuSession.() -> Unit
+) {
+    item(
+        key = item.key,
+        label = item.resolveString(resources),
+        leadingIcon = item.drawableId,
+        onClick = onClick
+    )
+}
+
+internal suspend fun TextFieldSelectionState.getContextMenuItemsAvailability():
+    MenuItemsAvailability {
+    updateClipboardEntry()
+    return MenuItemsAvailability(
         canCopy = canCopy(),
         canPaste = canPaste(),
         canCut = canCut(),
         canSelectAll = canSelectAll(),
         canAutofill = canAutofill()
     )
+}
 
 internal suspend fun TextFieldSelectionManager.getContextMenuItemsAvailability():
     MenuItemsAvailability {
-    val isPassword = visualTransformation is PasswordVisualTransformation
-    val hasSelection = !value.selection.collapsed
-
+    updateClipboardEntry()
     return MenuItemsAvailability(
-        canCopy = hasSelection && !isPassword,
-        canPaste = editable && clipboard?.getClipEntry()?.hasText() == true,
-        canCut = hasSelection && editable && !isPassword,
-        canSelectAll = value.selection.length != value.text.length,
-        canAutofill = editable && value.selection.collapsed
+        canCopy = canCopy(),
+        canPaste = canPaste(),
+        canCut = canCut(),
+        canSelectAll = canSelectAll(),
+        canAutofill = canAutofill()
     )
 }
 

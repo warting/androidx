@@ -185,8 +185,6 @@ class RecorderTest(
     private lateinit var cameraProvider: ProcessCameraProvider
     private lateinit var camera: Camera
     private val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-    // TODO(b/278168212): Only SDR is checked by now. Need to extend to HDR dynamic ranges.
-    private val dynamicRange = DynamicRange.SDR
 
     private lateinit var preview: Preview
     private lateinit var surfaceTexturePreview: Preview
@@ -198,6 +196,12 @@ class RecorderTest(
         assumeFalse(
             "Emulator API 30 crashes running this test.",
             Build.VERSION.SDK_INT == 30 && isEmulator()
+        )
+
+        // Skip for b/399704074
+        assumeFalse(
+            "Emulator API 26 crashes running this test.",
+            Build.VERSION.SDK_INT == 26 && isEmulator()
         )
 
         assumeTrue(CameraUtil.hasCameraWithLensFacing(CameraSelector.LENS_FACING_BACK))
@@ -238,22 +242,22 @@ class RecorderTest(
             mutableSetOf<Size>().apply {
                 if (testName.methodName == "setFileSizeLimit") {
                     videoCapabilities
-                        .getProfiles(Quality.FHD, dynamicRange)
+                        .getProfiles(Quality.FHD, DynamicRange.SDR)
                         ?.defaultVideoProfile
-                        ?.let { add(Size(it.width, it.height)) }
+                        ?.let { add(it.resolution) }
                     videoCapabilities
-                        .getProfiles(Quality.HD, dynamicRange)
+                        .getProfiles(Quality.HD, DynamicRange.SDR)
                         ?.defaultVideoProfile
-                        ?.let { add(Size(it.width, it.height)) }
+                        ?.let { add(it.resolution) }
                     videoCapabilities
-                        .getProfiles(Quality.SD, dynamicRange)
+                        .getProfiles(Quality.SD, DynamicRange.SDR)
                         ?.defaultVideoProfile
-                        ?.let { add(Size(it.width, it.height)) }
+                        ?.let { add(it.resolution) }
                 }
                 videoCapabilities
-                    .getProfiles(Quality.LOWEST, dynamicRange)
+                    .getProfiles(Quality.LOWEST, DynamicRange.SDR)
                     ?.defaultVideoProfile
-                    ?.let { add(Size(it.width, it.height)) }
+                    ?.let { add(it.resolution) }
             }
         assumeTrue(candidates.isNotEmpty())
 

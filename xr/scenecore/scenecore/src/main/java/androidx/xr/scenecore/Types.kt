@@ -27,6 +27,7 @@ import androidx.annotation.RestrictTo
  * @param depth Depth.
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+@Suppress("DataClassDefinition")
 public data class Dimensions(
     public val width: Float = 0f,
     public val height: Float = 0f,
@@ -44,6 +45,7 @@ public data class Dimensions(
  * @param height Integer Height.
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+@Suppress("DataClassDefinition")
 public data class PixelDimensions(public val width: Int = 0, public val height: Int = 0) {
     override fun toString(): String {
         return super.toString() + ": w $width x h $height"
@@ -56,12 +58,45 @@ public data class PixelDimensions(public val width: Int = 0, public val height: 
  * settings.
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-public data class Fov(
+public class Fov(
     public val angleLeft: Float,
     public val angleRight: Float,
     public val angleUp: Float,
     public val angleDown: Float,
-)
+) {
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Fov) return false
+
+        return angleLeft == other.angleLeft &&
+            angleRight == other.angleRight &&
+            angleUp == other.angleUp &&
+            angleDown == other.angleDown
+    }
+
+    override fun hashCode(): Int {
+        var result = angleLeft.hashCode()
+        result = 31 * result + angleRight.hashCode()
+        result = 31 * result + angleUp.hashCode()
+        result = 31 * result + angleDown.hashCode()
+        return result
+    }
+
+    override fun toString(): String {
+        return "Fov(angleLeft=$angleLeft, angleRight=$angleRight, angleUp=$angleUp, angleDown=$angleDown)"
+    }
+
+    @JvmOverloads
+    public fun copy(
+        angleLeft: Float = this.angleLeft,
+        angleRight: Float = this.angleRight,
+        angleUp: Float = this.angleUp,
+        angleDown: Float = this.angleDown,
+    ): Fov {
+        return Fov(angleLeft, angleRight, angleUp, angleDown)
+    }
+}
 
 /** Type of plane based on orientation i.e. Horizontal or Vertical. */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)

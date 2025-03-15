@@ -47,7 +47,9 @@ class AppFunctionLegacyIndexXmlProcessor(
 ) : SymbolProcessor {
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        generateLegacyIndexXml(AppFunctionSymbolResolver(resolver).resolveAnnotatedAppFunctions())
+        generateLegacyIndexXml(
+            AppFunctionSymbolResolver(resolver).getAnnotatedAppFunctionsFromAllModules()
+        )
         return emptyList()
     }
 
@@ -64,7 +66,9 @@ class AppFunctionLegacyIndexXmlProcessor(
             return
         }
         val appFunctionMetadataList =
-            appFunctionsByClass.flatMap { it.createAppFunctionMetadataInstances() }
+            appFunctionsByClass.flatMap {
+                it.createAppFunctionMetadataList().map { it.toAppFunctionMetadataDocument() }
+            }
         writeXmlFile(appFunctionMetadataList, appFunctionsByClass)
     }
 
@@ -113,24 +117,26 @@ class AppFunctionLegacyIndexXmlProcessor(
                 createElementWithTextNode(XmlElement.APP_FUNCTION_ID_TAG, appFunctionMetadata.id)
             )
 
-            val schemaDetail = appFunctionMetadata.schema
-            if (schemaDetail != null) {
+            val schemaName = appFunctionMetadata.schemaName
+            val schemaCategory = appFunctionMetadata.schemaCategory
+            val schemaVersion = appFunctionMetadata.schemaVersion
+            if (schemaName != null && schemaCategory != null && schemaVersion != null) {
                 appendChild(
                     createElementWithTextNode(
                         XmlElement.APP_FUNCTION_SCHEMA_CATEGORY_TAG,
-                        schemaDetail.schemaCategory,
+                        schemaCategory,
                     )
                 )
                 appendChild(
                     createElementWithTextNode(
                         XmlElement.APP_FUNCTION_SCHEMA_NAME_TAG,
-                        schemaDetail.schemaName,
+                        schemaName,
                     )
                 )
                 appendChild(
                     createElementWithTextNode(
                         XmlElement.APP_FUNCTION_SCHEMA_VERSION_TAG,
-                        schemaDetail.schemaVersion.toString(),
+                        schemaVersion.toString(),
                     )
                 )
             }

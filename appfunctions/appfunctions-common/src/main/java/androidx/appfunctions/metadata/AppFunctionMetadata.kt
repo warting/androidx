@@ -43,7 +43,70 @@ constructor(
      * AppFunction.
      */
     public val id: String,
+    /** The package name of the Android app called to execute the app function. */
+    public val packageName: String,
+    /** Indicates whether the function is enabled currently or not. */
+    public val isEnabled: Boolean,
+    /**
+     * The predefined schema of the AppFunction. If null, it indicates this function is not
+     * implement a particular predefined schema.
+     */
+    public val schema: AppFunctionSchemaMetadata?,
+    /** The parameters of the AppFunction. */
+    public val parameters: List<AppFunctionParameterMetadata>,
+    /** The response of the AppFunction. */
+    public val response: AppFunctionResponseMetadata,
+    /** Reusable components that could be shared within the function specification. */
+    public val components: AppFunctionComponentsMetadata = AppFunctionComponentsMetadata(),
+) {
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as AppFunctionMetadata
+
+        if (id != other.id) return false
+        if (isEnabled != other.isEnabled) return false
+        if (packageName != other.packageName) return false
+        if (schema != other.schema) return false
+        if (parameters != other.parameters) return false
+        if (response != other.response) return false
+        if (components != other.components) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return Objects.hash(isEnabled, id, packageName, schema, parameters, response, components)
+    }
+
+    override fun toString(): String = buildString {
+        append("AppFunctionMetadata(")
+        append("id='$id', ")
+        append("packageName='$packageName', ")
+        append("isEnabled=$isEnabled, ")
+        append("schema=$schema, ")
+        append("parameters=$parameters, ")
+        append("response=$response, ")
+        append("components=$components")
+        append(")")
+    }
+}
+
+/**
+ * Represents the computed compile-time metadata of an AppFunction.
+ *
+ * This class is used to generate AppFunctionInventory and an intermediate representation to persist
+ * the metadata in AppSearch.
+ */
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+public data class CompileTimeAppFunctionMetadata(
+    /**
+     * The ID used in an [androidx.appfunctions.ExecuteAppFunctionRequest] to refer to this
+     * AppFunction.
+     */
+    public val id: String,
     /**
      * Indicates whether the function is enabled by default.
      *
@@ -56,39 +119,35 @@ constructor(
      * implement a particular predefined schema.
      */
     public val schema: AppFunctionSchemaMetadata?,
-    /** The parameters of the AppFunction. Parameters are stored as properties in the object. */
-    public val parameters: AppFunctionObjectTypeMetadata,
+    /** The parameters of the AppFunction. */
+    public val parameters: List<AppFunctionParameterMetadata>,
     /** The response of the AppFunction. */
-    public val response: AppFunctionDataTypeMetadata,
+    public val response: AppFunctionResponseMetadata,
     /** Reusable components that could be shared within the function specification. */
     public val components: AppFunctionComponentsMetadata = AppFunctionComponentsMetadata(),
 ) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as AppFunctionMetadata
-
-        if (id != other.id) return false
-        if (isEnabledByDefault != other.isEnabledByDefault) return false
-        if (schema != other.schema) return false
-        if (parameters != other.parameters) return false
-        if (response != other.response) return false
-        if (components != other.components) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int =
-        Objects.hash(id, isEnabledByDefault, schema, parameters, response, components)
-
-    override fun toString(): String {
-        return "AppFunctionMetadata(isEnabledByDefault=$isEnabledByDefault, schema=$schema, parameters=$parameters, response=$response, components=$components)"
+    /**
+     * Converts the [CompileTimeAppFunctionMetadata] to an [AppFunctionMetadataDocument].
+     *
+     * This method is used to persist the [CompileTimeAppFunctionMetadata] in a database.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public fun toAppFunctionMetadataDocument(): AppFunctionMetadataDocument {
+        return AppFunctionMetadataDocument(
+            id = id,
+            isEnabledByDefault = isEnabledByDefault,
+            schemaName = schema?.name,
+            schemaCategory = schema?.category,
+            schemaVersion = schema?.version,
+            parameters = parameters.map { it.toAppFunctionParameterMetadataDocument() },
+            response = response.toAppFunctionResponseMetadataDocument(),
+            components = components.toAppFunctionComponentsMetadataDocument()
+        )
     }
 }
 
 /** Represents the persistent storage format of [AppFunctionMetadata]. */
-@Document
+@Document(name = "AppFunctionStaticMetadata")
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public data class AppFunctionMetadataDocument(
     @Document.Namespace public val namespace: String = APP_FUNCTION_NAMESPACE,
@@ -100,13 +159,19 @@ public data class AppFunctionMetadataDocument(
      * This represents the initial configuration and might not represent the current enabled state,
      * as it could be modified at runtime.
      */
-    @Document.BooleanProperty public val isEnabledByDefault: Boolean,
-    /** The predefined schema of the AppFunction. */
-    @Document.DocumentProperty public val schema: AppFunctionSchemaMetadataDocument?,
-    /** The parameters of the AppFunction. Parameters are stored as properties in the object. */
-    @Document.DocumentProperty public val parameters: AppFunctionDataTypeMetadataDocument,
+    @Document.BooleanProperty(name = "enabledByDefault") public val isEnabledByDefault: Boolean,
+    /** The category of the schema, used to group related schemas. */
+    @Document.StringProperty public val schemaCategory: String?,
+    /** The unique name of the schema within its category. */
+    @Document.StringProperty public val schemaName: String?,
+    /** The version of the schema. This is used to track the changes to the schema over time. */
+    @Document.LongProperty public val schemaVersion: Long?,
+    // Below properties are nullable as they won't be populated in the underlying GD created by
+    // legacy AppSearch indexer.
+    /** The parameters of the AppFunction. */
+    @Document.DocumentProperty public val parameters: List<AppFunctionParameterMetadataDocument>?,
     /** The response of the AppFunction. */
-    @Document.DocumentProperty public val response: AppFunctionDataTypeMetadataDocument,
+    @Document.DocumentProperty public val response: AppFunctionResponseMetadataDocument?,
     /** The reusable components for the AppFunction. */
-    @Document.DocumentProperty public val components: AppFunctionComponentsMetadataDocument,
+    @Document.DocumentProperty public val components: AppFunctionComponentsMetadataDocument?,
 )
