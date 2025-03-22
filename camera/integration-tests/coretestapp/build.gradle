@@ -1,3 +1,5 @@
+import androidx.build.ApkCopyHelperKt
+
 /*
  * Copyright (C) 2019 The Android Open Source Project
  *
@@ -65,6 +67,8 @@ dependencies {
     implementation(project(":camera:camera-mlkit-vision"))
     implementation(project(":camera:camera-view"))
     implementation(project(":camera:camera-video"))
+    implementation(project(":camera:camera-extensions"))
+
     // Needed because AGP enforces same version between main and androidTest classpaths
     implementation(project(":concurrent:concurrent-futures"))
 
@@ -136,3 +140,6 @@ dependencies {
     testImplementation(libs.truth)
     testImplementation(project(":internal-testutils-ktx"))
 }
+
+// Publish the APK to dist/apk for testing.
+ApkCopyHelperKt.setupAppApkCopy(project, "release")

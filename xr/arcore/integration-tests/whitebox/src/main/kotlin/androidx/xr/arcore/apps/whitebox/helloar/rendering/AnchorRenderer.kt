@@ -18,6 +18,9 @@ package androidx.xr.arcore.apps.whitebox.helloar.rendering
 
 import android.app.Activity
 import android.util.Log
+import android.widget.Toast
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.xr.arcore.Anchor
 import androidx.xr.arcore.AnchorCreateResourcesExhausted
 import androidx.xr.arcore.AnchorCreateSuccess
@@ -47,7 +50,7 @@ internal class AnchorRenderer(
     val session: Session,
     val renderSession: JxrCoreSession,
     val coroutineScope: CoroutineScope,
-) {
+) : DefaultLifecycleObserver {
 
     private lateinit var gltfAnchorModel: GltfModel
 
@@ -55,7 +58,7 @@ internal class AnchorRenderer(
 
     private lateinit var updateJob: CompletableJob
 
-    internal fun startRendering() {
+    override fun onResume(owner: LifecycleOwner) {
         updateJob =
             SupervisorJob(
                 coroutineScope.launch() {
@@ -66,7 +69,7 @@ internal class AnchorRenderer(
             )
     }
 
-    internal fun stopRendering() {
+    override fun onPause(owner: LifecycleOwner) {
         updateJob.complete()
         clearRenderedAnchors()
     }
@@ -120,6 +123,12 @@ internal class AnchorRenderer(
                                                     activity::class.simpleName,
                                                     "Failed to create anchor: anchor resources exhausted.",
                                                 )
+                                                Toast.makeText(
+                                                        activity,
+                                                        "Anchor limit has been reached.",
+                                                        Toast.LENGTH_LONG,
+                                                    )
+                                                    .show()
                                             }
                                         }
                                     } catch (e: IllegalStateException) {

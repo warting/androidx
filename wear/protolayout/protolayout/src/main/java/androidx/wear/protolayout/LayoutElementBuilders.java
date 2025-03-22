@@ -1060,6 +1060,10 @@ public final class LayoutElementBuilders {
              * with the variable fonts on renderers supporting 1.4, {@link FontSetting#weight} and
              * {@link FontSetting#width} setting will always be available.
              *
+             * <p>Consider providing a fallback values with {@link #setWeight} for devices that
+             * don't support variable fonts. For example, using {@link #FONT_WEIGHT_MEDIUM} for
+             * weight axis with value greater or equal to {@code 500}.
+             *
              * @throws IllegalArgumentException if the number of the given Setting is larger than
              *     10.
              */
@@ -1150,7 +1154,7 @@ public final class LayoutElementBuilders {
          * href="https://fonts.google.com/knowledge/glossary/rond_axis">here</a>.
          *
          * @param value roundness, usually in 0..100, but actual range and availability can depend
-         *  on the font used
+         *     on the font used
          */
         @RequiresSchemaVersion(major = 1, minor = 400)
         static @NonNull FontSetting roundness(int value) {
@@ -5414,9 +5418,9 @@ public final class LayoutElementBuilders {
                 DimensionProto.AngularDimension angularDimensionProto =
                         angularLength.toAngularDimensionProto();
                 if ((angularDimensionProto.hasDegrees()
-                        && angularDimensionProto.getDegrees().hasDynamicValue())
+                                && angularDimensionProto.getDegrees().hasDynamicValue())
                         || (angularDimensionProto.hasDp()
-                        && angularDimensionProto.getDp().hasDynamicValue())) {
+                                && angularDimensionProto.getDp().hasDynamicValue())) {
                     throw new IllegalArgumentException(
                             "ArcSpacer.Builder.setAngularLength doesn't support dynamic values.");
                 }
@@ -6728,7 +6732,7 @@ public final class LayoutElementBuilders {
                 return content.getArc().hasModifiers()
                         && content.getArc().getModifiers().hasTransformation();
             case EXTENSION:
-            // fall through
+                // fall through
             case INNER_NOT_SET:
                 return false;
         }

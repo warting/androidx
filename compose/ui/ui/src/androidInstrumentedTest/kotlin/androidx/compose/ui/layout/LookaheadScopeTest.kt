@@ -18,8 +18,13 @@
 
 package androidx.compose.ui.layout
 
+import android.widget.LinearLayout
+import android.widget.LinearLayout.VERTICAL
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector2D
@@ -63,6 +68,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
@@ -70,6 +76,7 @@ import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Icon
 import androidx.compose.material.Scaffold
@@ -82,7 +89,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collection.MutableVector
 import androidx.compose.runtime.collection.mutableVectorOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -90,6 +99,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -101,6 +111,7 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.LayoutNode
 import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.requireOwner
 import androidx.compose.ui.platform.AndroidOwnerExtraAssertionsRule
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalDensity
@@ -121,6 +132,7 @@ import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastMap
 import androidx.compose.ui.util.fastRoundToInt
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import java.lang.Integer.max
@@ -765,6 +777,66 @@ class LookaheadScopeTest {
             }
         }
         rule.runOnIdle { assertEquals(IntSize(500, 300), defaultIntermediateMeasureSize) }
+    }
+
+    @Test
+    fun testLookaheadPlacementInvalidatedAfterRoot() {
+        var layingOutEntireTree by mutableStateOf(false)
+        val root = node()
+        val delegate = createDelegate(root)
+        val child0 = node {
+            measurePolicy = MeasurePolicy { m, c ->
+                m.single().measure(c).run {
+                    layout(width, height) {
+                        if (layingOutEntireTree) {
+                            // Verify that during measureAndLayout call, lookahead
+                            // invalidation happens strictly after root and other
+                            // nodes outside LookaheadScope are placed.
+                            assertFalse(root.layoutPending)
+                            assertFalse(root.children[0].layoutPending)
+                        }
+                        place(0, 0)
+                    }
+                }
+            }
+            add(node())
+        }
+        val nodeGroup = node {
+            add(child0)
+            add(node())
+        }
+        root.add(
+            node {
+                add(
+                    // This is the LookaheadScope equivalent
+                    LayoutNode(isVirtual = true).apply {
+                        isVirtualLookaheadRoot = true
+                        add(node())
+                        add(nodeGroup)
+                        add(node())
+                    }
+                )
+            }
+        )
+        rule.runOnIdle {
+            delegate.measureOnly()
+            assertTrue(root.layoutPending)
+            // Imitate shallow placement
+            with(nodeGroup.requireOwner().placementScope) {
+                nodeGroup.lookaheadPassDelegate?.place(0, 0)
+            }
+            assertFalse(nodeGroup.lookaheadLayoutPending)
+            // Mark one node as requiring lookahead relayout. This allows us to check whether
+            // this node gets invalidated before root.
+            child0.requestLookaheadRelayout()
+            assertTrue(child0.lookaheadLayoutPending)
+            assertTrue(root.layoutPending)
+
+            layingOutEntireTree = true
+            delegate.measureAndLayout()
+            assertFalse(root.layoutPending)
+            assertFalse(child0.lookaheadLayoutPending)
+        }
     }
 
     @Test
@@ -3289,6 +3361,83 @@ class LookaheadScopeTest {
     }
 
     @Test
+    fun testReorderChildrenInLookaheadScope() {
+        val list = mutableStateListOf(1, 2)
+        data class Stats(
+            var lookaheadMeasurementCount: Int = 0,
+            var measurementCount: Int = 0,
+            var lookaheadPlacementCount: Int = 0,
+            var placementCount: Int = 0,
+        )
+        val boxStats = Stats()
+        val rowStats = Stats()
+        rule.setContent {
+            Row {
+                LookaheadScope {
+                    list.fastForEach {
+                        key(it) {
+                            if (it == 1) {
+                                Box(
+                                    Modifier.size(100.dp).layout { m, c ->
+                                        if (isLookingAhead) boxStats.lookaheadMeasurementCount++
+                                        else boxStats.measurementCount++
+                                        m.measure(c).run {
+                                            layout(width, height) {
+                                                if (isLookingAhead)
+                                                    boxStats.lookaheadPlacementCount++
+                                                else boxStats.placementCount++
+                                                place(0, 0)
+                                            }
+                                        }
+                                    }
+                                )
+                            } else {
+                                Row(
+                                    Modifier.size(200.dp).layout { m, c ->
+                                        if (isLookingAhead) rowStats.lookaheadMeasurementCount++
+                                        else rowStats.measurementCount++
+                                        m.measure(c).run {
+                                            layout(width, height) {
+                                                if (isLookingAhead)
+                                                    rowStats.lookaheadPlacementCount++
+                                                else rowStats.placementCount++
+                                                place(0, 0)
+                                            }
+                                        }
+                                    }
+                                ) {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        rule.runOnIdle {
+            assertEquals(1, boxStats.lookaheadMeasurementCount)
+            assertEquals(1, boxStats.lookaheadPlacementCount)
+            assertEquals(1, boxStats.measurementCount)
+            assertEquals(1, boxStats.placementCount)
+            assertEquals(1, rowStats.lookaheadMeasurementCount)
+            assertEquals(1, rowStats.lookaheadPlacementCount)
+            assertEquals(1, rowStats.measurementCount)
+            assertEquals(1, rowStats.placementCount)
+        }
+        list[0] = 2
+        list[1] = 1
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertEquals(2, boxStats.lookaheadMeasurementCount)
+            assertEquals(2, boxStats.lookaheadPlacementCount)
+            assertEquals(2, boxStats.measurementCount)
+            assertEquals(2, boxStats.placementCount)
+            assertEquals(2, rowStats.lookaheadMeasurementCount)
+            assertEquals(2, rowStats.lookaheadPlacementCount)
+            assertEquals(2, rowStats.measurementCount)
+            assertEquals(2, rowStats.placementCount)
+        }
+    }
+
+    @Test
     fun testSkipPlacementInLookahead() {
         var lookaheadMeasured = false
         var lookaheadPlaced = false
@@ -3302,6 +3451,233 @@ class LookaheadScopeTest {
             assertTrue(lookaheadMeasured)
             assertTrue(lookaheadPlaced)
         }
+    }
+
+    @Test
+    fun lookaheadRecomposesLayoutOnStaticLocalChange() {
+        val local = staticCompositionLocalOf { -1 }
+
+        var current = -1
+        var value by mutableIntStateOf(0)
+
+        val measurePolicy: SubcomposeMeasureScope.(Constraints) -> MeasureResult = { c ->
+            subcompose(Unit) {
+                    current = local.current
+                    Box(Modifier.size(100.dp, 100.dp))
+                }
+                .single()
+                .measure(c)
+            layout(0, 0) {}
+        }
+        rule.setContent {
+            LookaheadScope {
+                CompositionLocalProvider(local provides value) {
+                    SubcomposeLayout(measurePolicy = measurePolicy)
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertEquals(0, current)
+            value = 1
+        }
+
+        rule.runOnIdle { assertEquals(1, current) }
+    }
+
+    @Test
+    fun viewSizeChangeTriggersLookahead() {
+        var initialText = "\n\n\n\n"
+        val texts =
+            mutableStateListOf<String>(
+                initialText,
+                initialText,
+                initialText,
+                initialText,
+                initialText
+            )
+        val controlGroupOffsetY = mutableListOf(0f, 0f, 0f, 0f, 0f)
+        val actualItemOffsetY = mutableListOf(0f, 0f, 0f, 0f, 0f)
+        rule.setContent {
+            Row {
+                Box {
+                    LookaheadScope {
+                        LazyColumn {
+                            items(5) { itemId ->
+                                val text = texts[itemId]
+                                Box(
+                                    Modifier.fillMaxWidth()
+                                        .padding(10.dp)
+                                        .background(Color.Gray)
+                                        .animateItem()
+                                        .onGloballyPositioned {
+                                            actualItemOffsetY[itemId] = it.positionInRoot().y
+                                        }
+                                ) {
+                                    AndroidView({ TextView(it) }) { it.text = text }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Control group below:
+                Box {
+                    LazyColumn {
+                        items(5) { itemId ->
+                            val text = texts[itemId]
+                            Box(
+                                Modifier.fillMaxWidth()
+                                    .padding(10.dp)
+                                    .background(Color.Gray)
+                                    .onGloballyPositioned {
+                                        controlGroupOffsetY[itemId] = it.positionInRoot().y
+                                    }
+                            ) {
+                                AndroidView({ TextView(it) }) { it.text = text }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        repeat(3) {
+            rule.runOnIdle { texts[it + 1] = "" }
+            rule.waitForIdle()
+            repeat(5) { assertEquals(controlGroupOffsetY[it], actualItemOffsetY[it]) }
+        }
+    }
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    @Test
+    fun addMoreViewsTriggerLookahead() {
+        var vg: LinearLayout? = null
+        var vgControl: LinearLayout? = null
+
+        val state = LazyListState(firstVisibleItemIndex = 1)
+        val stateControl = LazyListState(firstVisibleItemIndex = 1)
+
+        rule.setContent {
+            Row {
+                // Create two LazyLists with LinearLayout nested in the items. One LinearLayout is
+                // put in a SharedTransitionLayout, the other not, as a control group.
+                Box(Modifier.weight(1f)) {
+                    SharedTransitionLayout { LazyListWithViewsNestedInItems(state) { vg = it } }
+                }
+                Box(Modifier.weight(1f)) {
+                    LazyListWithViewsNestedInItems(stateControl) { vgControl = it }
+                }
+            }
+        }
+        rule.waitForIdle()
+
+        rule.runOnUiThread {
+            // Add text views to both test group and control group.
+            val context = vg?.context
+            assertNotNull(context)
+            repeat(3) {
+                val textView = TextView(context)
+                textView.text = "Android View"
+                vg!!.addView(textView)
+            }
+
+            val contextControl = vgControl?.context
+            assertNotNull(contextControl)
+            repeat(3) {
+                val textView = TextView(contextControl)
+                textView.text = "Android View"
+                vgControl!!.addView(textView)
+            }
+        }
+        rule.runOnIdle {
+            runBlocking { state.scrollToItem(3) }
+            runBlocking { stateControl.scrollToItem(3) }
+            assertEquals(stateControl.firstVisibleItemIndex, state.firstVisibleItemIndex)
+            assertEquals(
+                stateControl.firstVisibleItemScrollOffset,
+                state.firstVisibleItemScrollOffset
+            )
+        }
+    }
+
+    @Composable
+    private fun LazyListWithViewsNestedInItems(
+        state: LazyListState,
+        onLayoutCreated: (LinearLayout) -> Unit
+    ) {
+        LazyColumn(
+            state = state,
+            modifier = Modifier.background(Color.Blue).fillMaxWidth().height(200.dp)
+        ) {
+            repeat(3) {
+                item {
+                    if (it == 1) {
+                        Column(
+                            modifier =
+                                Modifier.background(Color.Green)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            BasicText(
+                                text = "-------------- (AndroidView) Start (${it}) ---------------"
+                            )
+                            AndroidView(
+                                factory = { context ->
+                                    LinearLayout(context).also { layout ->
+                                        layout.orientation = VERTICAL
+                                        onLayoutCreated(layout)
+                                        repeat(5) {
+                                            val textView = TextView(context)
+                                            textView.text = "Android View"
+                                            layout.addView(textView)
+                                        }
+                                    }
+                                }
+                            )
+                            BasicText(
+                                text = "-------------- (AndroidView) End (${it}) ---------------"
+                            )
+                        }
+                    } else {
+                        Box(Modifier.size(100.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun onlyApproachRecomposesLayoutOnStaticLocalChange() {
+        val local = staticCompositionLocalOf { -1 }
+
+        var current = -1
+        var value by mutableIntStateOf(0)
+
+        rule.setContent {
+            LookaheadScope {
+                CompositionLocalProvider(local provides value) {
+                    SubcomposeLayout { c ->
+                        if (!isLookingAhead) {
+                            // Only run subcompose and emit a layout node in the approach pass,
+                            // to verify invalidation in the approach pass works correctly.
+                            subcompose(Unit) {
+                                    current = local.current
+                                    Box(Modifier.size(100.dp, 100.dp))
+                                }
+                                .single()
+                                .measure(c)
+                        }
+                        layout(0, 0) {}
+                    }
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertEquals(0, current)
+            value = 1
+        }
+
+        rule.runOnIdle { assertEquals(1, current) }
     }
 
     @Composable

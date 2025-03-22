@@ -102,6 +102,7 @@ abstract class BaseRoomConnectionManager {
     private fun configureDatabase(connection: SQLiteConnection) {
         configureJournalMode(connection)
         configureSynchronousFlag(connection)
+        configureBusyTimeout(connection)
         val version =
             connection.prepare("PRAGMA user_version").use { statement ->
                 statement.step()
@@ -221,7 +222,7 @@ abstract class BaseRoomConnectionManager {
                         "Please provide the necessary Migration path via " +
                         "RoomDatabase.Builder.addMigration(...) or allow for " +
                         "destructive migrations via one of the " +
-                        "RoomDatabase.Builder.fallbackToDestructiveMigration* methods."
+                        "RoomDatabase.Builder.fallbackToDestructiveMigration* functions."
                 )
             }
             dropAllTables(connection)

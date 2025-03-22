@@ -16,6 +16,7 @@
 
 package androidx.appfunctions
 
+import android.os.Build
 import android.os.Bundle
 import androidx.annotation.RequiresApi
 import androidx.test.filters.SdkSuppress
@@ -23,15 +24,15 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.AssumptionViolatedException
 import org.junit.Test
 
-@RequiresApi(36)
-@SdkSuppress(minSdkVersion = 31)
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
 class ExecuteAppFunctionResponseTest {
     @Test
-    fun toPlatformClass_success() {
+    fun toPlatformExtensionClass_success() {
         assumeAppFunctionExtensionLibraryAvailable()
         val appFunctionData = AppFunctionData.Builder("").setString("testString", "value").build()
-        val response = ExecuteAppFunctionResponse(appFunctionData)
-        val platformResponse = response.toPlatformClass()
+        val response = ExecuteAppFunctionResponse.Success(appFunctionData)
+        val platformResponse = response.toPlatformExtensionClass()
 
         assertThat(platformResponse.resultDocument).isEqualTo(appFunctionData.genericDocument)
         assertThat(platformResponse.extras.isEmpty()).isTrue()
@@ -40,8 +41,8 @@ class ExecuteAppFunctionResponseTest {
         val bundle = Bundle()
         bundle.putLong("longKey", 123L)
         val appFunctionDataWithExtras = AppFunctionData(appFunctionData.genericDocument, bundle)
-        val responseWithExtras = ExecuteAppFunctionResponse(appFunctionDataWithExtras)
-        val platformResponseWithExtras = responseWithExtras.toPlatformClass()
+        val responseWithExtras = ExecuteAppFunctionResponse.Success(appFunctionDataWithExtras)
+        val platformResponseWithExtras = responseWithExtras.toPlatformExtensionClass()
 
         assertThat(platformResponseWithExtras.resultDocument)
             .isEqualTo(appFunctionData.genericDocument)
@@ -56,10 +57,11 @@ class ExecuteAppFunctionResponseTest {
             com.android.extensions.appfunctions.ExecuteAppFunctionResponse(
                 appFunctionData.genericDocument
             )
-        val response = ExecuteAppFunctionResponse.fromPlatformClass(platformResponse)
+        val response =
+            ExecuteAppFunctionResponse.Success.fromPlatformExtensionClass(platformResponse)
 
-        assertThat(response.result.genericDocument).isEqualTo(appFunctionData.genericDocument)
-        assertThat(response.result.extras.isEmpty).isTrue()
+        assertThat(response.returnValue.genericDocument).isEqualTo(appFunctionData.genericDocument)
+        assertThat(response.returnValue.extras.isEmpty).isTrue()
     }
 
     private fun assumeAppFunctionExtensionLibraryAvailable() {

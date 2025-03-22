@@ -119,6 +119,10 @@ public class WebViewFeature {
             DEFAULT_TRAFFICSTATS_TAGGING,
             DELETE_BROWSING_DATA,
             PRERENDER_WITH_URL,
+            SAVE_STATE,
+            NAVIGATION_CALLBACK_BASIC,
+            CACHE_PROVIDER,
+            PAYMENT_REQUEST,
     })
     @Retention(RetentionPolicy.SOURCE)
     @Target({ElementType.PARAMETER, ElementType.METHOD})
@@ -375,7 +379,7 @@ public class WebViewFeature {
      * Feature for {@link #isFeatureSupported(String)}.
      * This feature covers
      * {@link WebMessagePortCompat#setWebMessageCallback(
-     * WebMessagePortCompat.WebMessageCallbackCompat)}, and
+     *WebMessagePortCompat.WebMessageCallbackCompat)}, and
      * {@link WebMessagePortCompat#setWebMessageCallback(Handler,
      * WebMessagePortCompat.WebMessageCallbackCompat)}.
      */
@@ -632,7 +636,7 @@ public class WebViewFeature {
      * {@link Profile#clearPrefetchAsync(String, Executor, OutcomeReceiverCompat)}
      */
     @Profile.ExperimentalUrlPrefetch
-    public static final String PROFILE_URL_PREFETCH = "PREFETCH_URL_V3";
+    public static final String PROFILE_URL_PREFETCH = "PREFETCH_URL_V4";
 
     /**
      * Feature for {@link #isFeatureSupported(String)}.
@@ -665,7 +669,50 @@ public class WebViewFeature {
      * {@link Profile#setSpeculativeLoadingConfig(SpeculativeLoadingConfig)}
      */
     @Profile.ExperimentalUrlPrefetch
-    public static final String SPECULATIVE_LOADING_CONFIG = "SPECULATIVE_LOADING_CONFIG";
+    public static final String SPECULATIVE_LOADING_CONFIG = "SPECULATIVE_LOADING_CONFIG_V2";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers {@link WebViewCompat#saveState}.
+     */
+    @WebViewCompat.ExperimentalSaveState
+    public static final String SAVE_STATE = "SAVE_STATE";
+
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers {@link WebViewCompat#getWebNavigationClient(WebView)};
+     * This feature covers
+     * {@link WebViewCompat#setWebNavigationClient(WebView, WebNavigationClient)};
+     * This feature covers {@link Navigation#didCommitErrorPage()}.
+     * This feature covers {@link Navigation#getPage()}.
+     * This feature covers {@link Navigation#isBack()}.
+     * This feature covers {@link Navigation#isForward()}.
+     * This feature covers {@link Navigation#isHistory()}.
+     * This feature covers {@link Navigation#isRestore()}.
+     * This feature covers {@link Navigation#isReload()}.
+     * This feature covers {@link Navigation#wasInitiatedByPage()}.
+     * This feature covers {@link Navigation#isSameDocument()}.
+     * This feature covers {@link Navigation#didCommit()}.
+     * This feature covers the initial version of {@link Page}.
+     */
+    public static final String NAVIGATION_CALLBACK_BASIC = "WEB_VIEW_NAVIGATION_CLIENT_BASIC_USAGE";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers {@link WebViewCompat#setShouldCacheProvider(boolean)}.
+     */
+    @WebViewCompat.ExperimentalCacheProvider
+    public static final String CACHE_PROVIDER = "CACHE_PROVIDER";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers
+     * {@link WebSettingsCompat#setPaymentRequestEnabled(WebSettings, boolean)},
+     * {@link WebSettingsCompat#getPaymentRequestEnabled(WebSettings)},
+     * {@link WebSettingsCompat#setHasEnrolledInstrumentEnabled(WebSettings, boolean)}, and
+     * {@link WebSettingsCompat#getHasEnrolledInstrumentEnabled(WebSettings)},
+     */
+    public static final String PAYMENT_REQUEST = "PAYMENT_REQUEST";
 
     /**
      * Return whether a feature is supported at run-time. This will check whether a feature is

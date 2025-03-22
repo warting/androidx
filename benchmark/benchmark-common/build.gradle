@@ -113,10 +113,8 @@ tasks.withType(KotlinCompile).configureEach {
         freeCompilerArgs += [
                 "-opt-in=androidx.benchmark.ExperimentalBenchmarkConfigApi",
                 "-opt-in=androidx.benchmark.perfetto.ExperimentalPerfettoCaptureApi",
+                "-opt-in=androidx.benchmark.traceprocessor.ExperimentalInsightApi",
         ]
     }
 }
 
-ksp {
-    useKsp2 = true
-}

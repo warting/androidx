@@ -15,13 +15,9 @@
          <trust group="com.android.tools" name="desugar_jdk_libs" reason="b/215430394"/>
          <trust group="com.android.tools" name="desugar_jdk_libs_configuration" reason="b/215430394"/>
          <trust group="com.android.tools" name="r8" reason="b/215430394"/>
-         <trust group="com.android.tools.build" name="aapt2" version="7.3.0-8691043" reason="old version, before signing"/>
-         <trust group="com.android.tools.build" name="aapt2" version="8.0.0-9289358" reason="old version, before signing"/>
-         <trust group="com.android.tools.build" name="aapt2" version="8.1.0-10154469" reason="old version, before signing"/>
+         <trust group="com.android.tools.build" name="aapt2" version="8.1.1-10154469" reason="old version, before signing"/>
          <trust group="com.android.tools.build" name="aapt2" version="8.5.0-alpha05-11315950" reason="old version, before signing"/>
-         <trust group="com.android.tools.build" name="aapt2-proto" version="7.3.0-8691043" reason="old version, before signing"/>
-         <trust group="com.android.tools.build" name="aapt2-proto" version="8.0.0-9289358" reason="old version, before signing"/>
-         <trust group="com.android.tools.build" name="aapt2-proto" version="8.1.0-10154469" reason="old version, before signing"/>
+         <trust group="com.android.tools.build" name="aapt2-proto" version="8.1.1-10154469" reason="old version, before signing"/>
          <trust group="com.android.tools.build" name="aapt2-proto" version="8.5.0-alpha05-11315950" reason="old version, before signing"/>
          <trust group="com.android.tools.build" name="bundletool" reason="b/215430394"/>
          <trust group="com.android.tools.build" name="transform-api" reason="b/215430394"/>
@@ -38,8 +34,8 @@
          <trust group="com.google.ar" reason="b/378946732"/>
          <trust group="com.google.devsite" reason="developed by our own team, not signed yet"/>
          <trust group="com.google.firebase" reason="b/223907608"/>
-         <trust group="com.google.guava" reason="b/325084664 https://github.com/gradle/gradle/issues/28862"/>
-         <trust group="com.google.mlkit" reason="b/223907608"/>
+         <trust group="com.google.guava" name="guava" version=".*[-]android" file="guava.*[-]jre[.]jar" regex="true" reason="https://github.com/google/guava/issues/7154"/>
+         <trust group="com.google.guava" name="guava" version=".*[-]jre" file="guava.*[-]android[.]jar" regex="true" reason="https://github.com/google/guava/issues/7154"/>         <trust group="com.google.mlkit" reason="b/223907608"/>
          <trust group="com.google.prefab" reason="https://github.com/google/prefab/issues/157"/>
          <trust group="com.google.testing.platform" reason="b/215430394"/>
          <trust group="gradle" name="gradle"/>
@@ -48,16 +44,9 @@
          <trust file=".*-versionMetadata[.]json" regex="true" reason="We do not sign this metadata"/>
          <trust file=".*[.]asc" regex="true"/>
          <trust group="^androidx\..*" regex="true" reason="jetpad does not yet drop signed artifacts b/320540559"/>
-         <trust group="^com[.]android($|([.].*))" version="30.0.0" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="30.0.4" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="30.3.0" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="31.0.0" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="31.1.0" regex="true" reason="old version, before signing"/>
+         <trust group="^com[.]android($|([.].*))" version="31.1.1" regex="true" reason="old version, before signing"/>
          <trust group="^com[.]android($|([.].*))" version="31.5.0-alpha05" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="7.0.4" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="7.3.0" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="8.0.0" regex="true" reason="old version, before signing"/>
-         <trust group="^com[.]android($|([.].*))" version="8.1.0" regex="true" reason="old version, before signing"/>
+         <trust group="^com[.]android($|([.].*))" version="8.1.1" regex="true" reason="old version, before signing"/>
          <trust group="^com[.]android($|([.].*))" version="8.5.0-alpha05" regex="true" reason="old version, before signing"/>
       </trusted-artifacts>
       <trusted-keys>
@@ -96,6 +85,23 @@
          <trusted-key id="0D5D634755737A19ABBE2930D4DA5EAB3CD7E958" group="com.google.devtools.ksp"/>
          <trusted-key id="0D8F8561AA7A5DD20BAE27043C0A8F4744F37328" group="com.github.ben-manes.caffeine"/>
          <trusted-key id="0EB9D7C468F97E44051D650AD73C68EE4152C255" group="com.google.dagger"/>
+         <trusted-key id="0F06FF86BEEAF4E71866EE5232EE5355A6BC6E42">
+            <trusting group="com.android"/>
+            <trusting group="com.android.databinding"/>
+            <trusting group="com.android.kotlin.multiplatform.library"/>
+            <trusting group="com.android.settings"/>
+            <trusting group="com.android.tools"/>
+            <trusting group="com.android.tools.analytics-library"/>
+            <trusting group="com.android.tools.build"/>
+            <trusting group="com.android.tools.build.jetifier"/>
+            <trusting group="com.android.tools.ddms"/>
+            <trusting group="com.android.tools.emulator"/>
+            <trusting group="com.android.tools.external.com-intellij"/>
+            <trusting group="com.android.tools.external.org-jetbrains"/>
+            <trusting group="com.android.tools.layoutlib"/>
+            <trusting group="com.android.tools.lint"/>
+            <trusting group="com.android.tools.utp"/>
+         </trusted-key>
          <trusted-key id="0F07D1201BDDAB67CFB84EB479752DB6C966F0B8" group="com.google.android"/>
          <trusted-key id="10F3C7A02ECA55E502BADCF3991EFB94DB91127D" group="org.ow2"/>
          <trusted-key id="11B581967F079A30A3E93140D57506CD188FD842" group="com.google.api.grpc"/>
@@ -141,7 +147,9 @@
             <trusting group="com.fasterxml.jackson"/>
             <trusting group="com.fasterxml.jackson.core"/>
             <trusting group="com.fasterxml.jackson.dataformat"/>
+            <trusting group="com.fasterxml.jackson.module"/>
             <trusting group="com.fasterxml.woodstox"/>
+            <trusting group="org.codehaus.woodstox"/>
          </trusted-key>
          <trusted-key id="29BEA2A645F2D6CED7FB12E02B172E3E156466E8">
             <trusting group="org.apache.maven"/>
@@ -170,6 +178,7 @@
          <trusted-key id="313A77FE5D9A16573F433D74E3706F202E9D239F" group="co.touchlab"/>
          <trusted-key id="31BAE2E51D95E0F8AD9B7BCC40A3C4432BD7308C" group="com.googlecode.juniversalchardet"/>
          <trusted-key id="31FAE244A81D64507B47182E1B2718089CE964B8" group="com.thoughtworks.qdox"/>
+         <trusted-key id="32118CF76C9EC5D918E54967CA80D1F0EB6CA4BA" group="org.codehaus.mojo"/>
          <trusted-key id="3288B8BE8512D6C0CA185268C51E6CBC7FF46F0B">
             <trusting group="com.google.auto"/>
             <trusting group="com.google.auto.service"/>
@@ -528,7 +537,10 @@
             <trusting group="com.beust"/>
             <trusting group="org.testng"/>
          </trusted-key>
-         <trusted-key id="DF25D3C4868FEC177182FAD64D176DC503FB4267" group="io.coil-kt"/>
+         <trusted-key id="DF25D3C4868FEC177182FAD64D176DC503FB4267">
+            <trusting group="io.coil-kt"/>
+            <trusting group="io.coil-kt.coil3"/>
+         </trusted-key>
          <trusted-key id="DF3986523A6AD079C46B730BCA183FBA1E476C6E" group="com.squareup.leakcanary"/>
          <trusted-key id="E01ED293981AE484403B65D7DA70BCBA6D76AD03" group="com.charleskorn.kaml"/>
          <trusted-key id="E0D98C5FD55A8AF232290E58DEE12B9896F97E34" group="org.pcollections"/>
@@ -612,68 +624,12 @@
             <sha256 value="795f4793c375eedf4332a0381082981a5ce70b7a0a776221ca24ad9d40cbea1c" origin="Generated by Gradle" reason="Artifact is not signed"/>
          </artifact>
       </component>
-      <component group="com.google.code.findbugs" name="jsr305" version="1.3.9">
-         <artifact name="jsr305-1.3.9.jar">
-            <sha256 value="905721a0eea90a81534abb7ee6ef4ea2e5e645fa1def0a5cd88402df1b46c9ed" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-         <artifact name="jsr305-1.3.9.pom">
-            <sha256 value="feab9191311c3d7aeef2b66d6064afc80d3d1d52d980fb07ae43c78c987ba93a" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-      </component>
-      <component group="com.google.code.findbugs" name="jsr305" version="2.0.1">
-         <artifact name="jsr305-2.0.1.jar">
-            <sha256 value="1e7f53fa5b8b5c807e986ba335665da03f18d660802d8bf061823089d1bee468" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-         <artifact name="jsr305-2.0.1.pom">
-            <sha256 value="02c12c3c2ae12dd475219ff691c82a4d9ea21f44bc594a181295bf6d43dcfbb0" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-      </component>
-      <component group="com.google.guava" name="guava" version="32.1.3-android">
-         <artifact name="guava-32.1.3-jre.jar">
-            <sha256 value="6d4e2b5a118aab62e6e5e29d185a0224eed82c85c40ac3d33cf04a270c3b3744" reason="https://github.com/google/guava/issues/7154"/>
-         </artifact>
-      </component>
-      <component group="com.google.guava" name="guava" version="32.1.3-jre">
-         <artifact name="guava-32.1.3-android.jar">
-            <sha256 value="20e6ac8902ddf49e7806cc70f3054c8d91accb5eefdc10f3207e80e0a336b263" reason="https://github.com/google/guava/issues/7154"/>
-         </artifact>
-      </component>
-      <component group="com.google.guava" name="guava" version="33.0.0-android">
-         <artifact name="guava-33.0.0-jre.jar">
-            <sha256 value="f4d85c3e4d411694337cb873abea09b242b664bb013320be6105327c45991537" origin="Generated by Gradle" reason="https://github.com/google/guava/issues/7154"/>
-         </artifact>
-      </component>
-      <component group="com.google.guava" name="guava" version="33.0.0-jre">
-         <artifact name="guava-33.0.0-android.jar">
-            <sha1 value="cfbbdc54f232feedb85746aeeea0722f5244bb9a" origin="Generated by Gradle" reason="https://github.com/google/guava/issues/7154"/>
-         </artifact>
-      </component>
-      <component group="com.google.guava" name="guava" version="33.2.1-jre">
-         <artifact name="guava-33.2.1-android.jar">
-            <sha256 value="6b55fbe6ffee621454c03df7bea720d189789e136391a524e29506ff40654180" origin="Generated by Gradle" reason="https://github.com/google/guava/issues/7154"/>
-         </artifact>
-      </component>
-      <component group="com.google.guava" name="guava" version="33.3.1-android">
-         <artifact name="guava-33.3.1-jre.jar">
-            <sha256 value="4bf0e2c5af8e4525c96e8fde17a4f7307f97f8478f11c4c8e35a0e3298ae4e90" origin="Generated by Gradle" reason="https://github.com/google/guava/issues/7154"/>
-         </artifact>
-      </component>
-      <component group="com.google.guava" name="guava" version="33.3.1-jre">
-         <artifact name="guava-33.3.1-android.jar">
-            <sha256 value="2c3e41d1b380f2044d257947a3aa82dabf3ae4b978622745254aa18b6cf89ab0" origin="Generated by Gradle" reason="https://github.com/google/guava/issues/7154"/>
-         </artifact>
-      </component>
       <component group="com.googlecode.json-simple" name="json-simple" version="1.1">
          <artifact name="json-simple-1.1.jar">
             <sha256 value="2d9484f4c649f708f47f9a479465fc729770ee65617dca3011836602264f6439" origin="Generated by Gradle" reason="Artifact is not signed"/>
          </artifact>
          <artifact name="json-simple-1.1.pom">
             <sha256 value="47a89be0fa0fedd476db5fd2c83487654d2a119c391f83a142be876667cf7dab" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-      </component>
-      <component group="com.palantir.javapoet" name="javapoet" version="0.6.0">
-         <artifact name="javapoet-0.6.0.pom">
-            <pgp value="BF3A87D91B70BE32CAD64A2645D0CAA6D26B0F7D"/>
          </artifact>
       </component>
       <component group="javax.inject" name="javax.inject" version="1">
@@ -731,35 +687,12 @@
             <sha256 value="8d25d21f7f2aca27dc10638ad417bbb08a189310274bc322aa620aafe7e82c92" origin="Generated by Gradle" reason="Unsigned. Used by media3. b/372529250"/>
          </artifact>
       </component>
-      <component group="org.jetbrains.kotlin" name="kotlin-compose-compiler-plugin-embeddable" version="2.0.10-custom-branch-7">
-         <artifact name="kotlin-compose-compiler-plugin-embeddable-2.0.10-custom-branch-7.jar">
-            <md5 value="fdf7b7b01e609b7eb990e0b16f01cb96" origin="Generated by Gradle"/>
-            <sha256 value="8348f83c0405ce3f4335a2285b63c2821c123192a2ee4da7505432b42d669602" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-         <artifact name="kotlin-compose-compiler-plugin-embeddable-2.0.10-custom-branch-7.pom">
-            <md5 value="e2d4bfd6d1794c4599d7c32d8b7accec" origin="Generated by Gradle"/>
-            <sha256 value="a28b7ecf0ffa35f32482973b9cb04a7a4940e0eec53f066631c899fabe4d0951" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-      </component>
       <component group="org.jetbrains.kotlinx" name="kotlinx-benchmark-plugin" version="0.4.11">
          <artifact name="kotlinx-benchmark-plugin-0.4.11.jar">
             <sha256 value="5c337e082137eb3cdf64b27b11e16b97e5dd0a7905aa9c2d7c8c323601e5c31b" origin="Generated by Gradle" reason="https://github.com/Kotlin/kotlinx-benchmark/issues/115"/>
          </artifact>
          <artifact name="kotlinx-benchmark-plugin-0.4.11.module">
             <sha256 value="af5e8d80674cd6f5bce92451296f3238c6524b880179d56f08187cef3de723ec" origin="Generated by Gradle" reason="https://github.com/Kotlin/kotlinx-benchmark/issues/115"/>
-         </artifact>
-      </component>
-      <component group="org.jetbrains.kotlinx" name="kotlinx-coroutines-core-metadata" version="1.4.1">
-         <artifact name="kotlinx-coroutines-core-metadata-1.4.1-all.jar">
-            <sha256 value="877057d99a7fff9282059ba6631a9039bf3b54795d397b7e69a67363b7d2dcfe" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-      </component>
-      <component group="org.jetbrains.kotlinx" name="kotlinx-serialization-json-metadata" version="1.0.1">
-         <artifact name="kotlinx-serialization-json-metadata-1.0.1-all.jar">
-            <sha256 value="96762495e07d30d42a38692461708e5f8a2dd347be8474d249d7187be94cf187" origin="Generated by Gradle" reason="Artifact is not signed"/>
-         </artifact>
-         <artifact name="kotlinx-serialization-json-metadata-1.0.1.module">
-            <sha256 value="c6c38e1fb8d99d1d41728b0f055e490d5e463c1252f13e7bb6f7015c22c95ab6" origin="Generated by Gradle" reason="Artifact is not signed"/>
          </artifact>
       </component>
       <component group="org.jetbrains.kotlinx.benchmark" name="org.jetbrains.kotlinx.benchmark.gradle.plugin" version="0.4.11">

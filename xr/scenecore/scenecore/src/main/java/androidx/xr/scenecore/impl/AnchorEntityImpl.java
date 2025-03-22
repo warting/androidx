@@ -23,25 +23,27 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
-import androidx.xr.extensions.XrExtensions;
-import androidx.xr.extensions.node.Node;
-import androidx.xr.extensions.node.NodeTransaction;
 import androidx.xr.runtime.math.Pose;
 import androidx.xr.runtime.math.Vector3;
 import androidx.xr.runtime.openxr.ExportableAnchor;
 import androidx.xr.scenecore.JxrPlatformAdapter.ActivitySpace;
 import androidx.xr.scenecore.JxrPlatformAdapter.AnchorEntity;
-import androidx.xr.scenecore.JxrPlatformAdapter.AnchorEntity.OnStateChangedListener;
 import androidx.xr.scenecore.JxrPlatformAdapter.Dimensions;
 import androidx.xr.scenecore.JxrPlatformAdapter.Entity;
 import androidx.xr.scenecore.JxrPlatformAdapter.PlaneSemantic;
 import androidx.xr.scenecore.JxrPlatformAdapter.PlaneType;
+import androidx.xr.scenecore.JxrPlatformAdapter.SpaceValue;
 import androidx.xr.scenecore.impl.perception.Anchor;
 import androidx.xr.scenecore.impl.perception.PerceptionLibrary;
 import androidx.xr.scenecore.impl.perception.Plane;
 import androidx.xr.scenecore.impl.perception.Plane.PlaneData;
+
+import com.android.extensions.xr.XrExtensions;
+import com.android.extensions.xr.node.Node;
+import com.android.extensions.xr.node.NodeTransaction;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -571,18 +573,19 @@ class AnchorEntityImpl extends SystemSpaceEntityImpl implements AnchorEntity {
         return mAnchor.getAnchorId();
     }
 
+    @NonNull
     @Override
-    public Pose getPose() {
+    public Pose getPose(@SpaceValue int relativeTo) {
         throw new UnsupportedOperationException("Cannot get 'pose' on an AnchorEntity.");
     }
 
     @Override
-    public void setPose(Pose pose) {
+    public void setPose(@NonNull Pose pose, @SpaceValue int relativeTo) {
         throw new UnsupportedOperationException("Cannot set 'pose' on an AnchorEntity.");
     }
 
     @Override
-    public void setScale(Vector3 scale) {
+    public void setScale(@NonNull Vector3 scale, @SpaceValue int relativeTo) {
         // TODO(b/349391097): make this behavior consistent with ActivitySpaceImpl
         throw new UnsupportedOperationException("Cannot set 'scale' on an AnchorEntity.");
     }
@@ -609,6 +612,7 @@ class AnchorEntityImpl extends SystemSpaceEntityImpl implements AnchorEntity {
     }
 
     // TODO: b/360168321 Use the OpenXrPosableHelper when retrieving the pose in world space.
+    @NonNull
     @Override
     public Pose getActivitySpacePose() {
         if (mOpenXrActivityPoseHelper == null) {
@@ -618,6 +622,7 @@ class AnchorEntityImpl extends SystemSpaceEntityImpl implements AnchorEntity {
         return mOpenXrActivityPoseHelper.getActivitySpacePose(getPoseInOpenXrReferenceSpace());
     }
 
+    @NonNull
     @Override
     public Vector3 getActivitySpaceScale() {
         return mOpenXrActivityPoseHelper.getActivitySpaceScale(getWorldSpaceScale());
@@ -649,8 +654,7 @@ class AnchorEntityImpl extends SystemSpaceEntityImpl implements AnchorEntity {
         // entity
         // was always null so does not need to be reset.
         try (NodeTransaction transaction = mExtensions.createNodeTransaction()) {
-            transaction.setAnchorId(mNode, null);
-            transaction.setParent(mNode, null).apply();
+            transaction.setAnchorId(mNode, null).setParent(mNode, null).apply();
         }
         super.dispose();
     }

@@ -15,13 +15,14 @@ plugins {
 }
 
 android {
-    compileSdk = 35
+    compileSdk = 36
     namespace = "androidx.activity"
 }
 
 dependencies {
 
     api("androidx.annotation:annotation:1.8.1")
+    api("androidx.core:core-viewtree:1.0.0")
     api("androidx.core:core-ktx:1.13.0")
     api("androidx.lifecycle:lifecycle-common:2.6.1")
     api("androidx.lifecycle:lifecycle-runtime:2.6.1")

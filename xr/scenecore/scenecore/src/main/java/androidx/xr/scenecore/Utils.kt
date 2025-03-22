@@ -27,6 +27,7 @@ import androidx.xr.scenecore.JxrPlatformAdapter.MoveEvent as RtMoveEvent
 import androidx.xr.scenecore.JxrPlatformAdapter.PixelDimensions as RtPixelDimensions
 import androidx.xr.scenecore.JxrPlatformAdapter.ResizeEvent as RtResizeEvent
 import androidx.xr.scenecore.JxrPlatformAdapter.SpatialCapabilities as RtSpatialCapabilities
+import androidx.xr.scenecore.JxrPlatformAdapter.TextureSampler as RtTextureSampler
 import java.util.concurrent.Executor
 
 internal class HandlerExecutor(val handler: Handler) : Executor {
@@ -78,6 +79,16 @@ internal fun Int.toRtPlaneSemantic(): JxrPlatformAdapter.PlaneSemantic {
         PlaneSemantic.TABLE -> JxrPlatformAdapter.PlaneSemantic.TABLE
         PlaneSemantic.ANY -> JxrPlatformAdapter.PlaneSemantic.ANY
         else -> error("Unknown Plane Semantic: $PlaneSemantic")
+    }
+}
+
+/** Extension function that converts [Space] value to [JxrPlatformAdapter.Space] value. */
+internal fun Int.toRtSpace(): Int {
+    return when (this) {
+        Space.PARENT -> JxrPlatformAdapter.Space.PARENT
+        Space.ACTIVITY -> JxrPlatformAdapter.Space.ACTIVITY
+        Space.REAL_WORLD -> JxrPlatformAdapter.Space.REAL_WORLD
+        else -> error("Unknown Space Value: $this")
     }
 }
 
@@ -223,4 +234,18 @@ internal fun Int.toInputEventAction(): Int {
         JxrPlatformAdapter.InputEvent.ACTION_HOVER_EXIT -> InputEvent.ACTION_HOVER_EXIT
         else -> error("Unknown Input Event Action: $this")
     }
+}
+
+/** Extension function that converts a [TextureSampler] to [RtTextureSampler]. */
+internal fun TextureSampler.toRtTextureSampler(): RtTextureSampler {
+    return RtTextureSampler(
+        wrapModeS,
+        wrapModeT,
+        wrapModeR,
+        minFilter,
+        magFilter,
+        compareMode,
+        compareFunc,
+        anisotropyLog2,
+    )
 }

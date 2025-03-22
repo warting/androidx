@@ -18,11 +18,14 @@ package androidx.xr.scenecore.impl;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.xr.extensions.XrExtensions;
-import androidx.xr.extensions.node.NodeTransaction;
 import androidx.xr.scenecore.JxrPlatformAdapter.Entity;
 import androidx.xr.scenecore.JxrPlatformAdapter.GltfEntity;
+import androidx.xr.scenecore.JxrPlatformAdapter.MaterialResource;
+
+import com.android.extensions.xr.XrExtensions;
+import com.android.extensions.xr.node.NodeTransaction;
 
 import com.google.androidxr.splitengine.SplitEngineSubspaceManager;
 import com.google.androidxr.splitengine.SubspaceNode;
@@ -69,7 +72,7 @@ class GltfEntityImplSplitEngine extends AndroidXrEntity implements GltfEntity {
 
         try (NodeTransaction transaction = extensions.createNodeTransaction()) {
             // Make the Entity node a parent of the subspace node.
-            transaction.setParent(mSubspace.subspaceNode, mNode).apply();
+            transaction.setParent(mSubspace.getSubspaceNodeActual(), mNode).apply();
         }
         mModelImpressNode =
                 impressApi.instanceGltfModel(gltfModelResource.getExtensionModelToken());
@@ -132,6 +135,15 @@ class GltfEntityImplSplitEngine extends AndroidXrEntity implements GltfEntity {
     @AnimationState
     public int getAnimationState() {
         return mAnimationState;
+    }
+
+    @Override
+    public void setMaterialOverride(@NonNull MaterialResource material, @NonNull String meshName) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setMaterialOverride(
+                mModelImpressNode, ((MaterialResourceImpl) material).getMaterialToken(), meshName);
     }
 
     @SuppressWarnings("ObjectToString")

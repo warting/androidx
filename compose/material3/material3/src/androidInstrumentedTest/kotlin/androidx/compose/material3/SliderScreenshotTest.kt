@@ -88,6 +88,19 @@ class SliderScreenshotTest {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Test
+    fun sliderTest_withSteps_rtl() {
+        rule.setMaterialContent(lightColorScheme()) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Box(wrap.testTag(wrapperTestTag)) {
+                    Slider(remember { SliderState(value = 0.2f, steps = 4) })
+                }
+            }
+        }
+        assertSliderAgainstGolden("slider_withSteps_rtl")
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
     fun sliderTest_origin_disabled() {
         rule.setMaterialContent(lightColorScheme()) {
             Box(wrap.testTag(wrapperTestTag)) {
@@ -195,6 +208,24 @@ class SliderScreenshotTest {
             Box(wrap.testTag(wrapperTestTag)) { Slider(remember { SliderState(0.5f, steps = 5) }) }
         }
         assertSliderAgainstGolden("slider_middle_steps")
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun sliderTest_first_steps() {
+        rule.setMaterialContent(lightColorScheme()) {
+            Box(wrap.testTag(wrapperTestTag)) { Slider(remember { SliderState(0.1f, steps = 9) }) }
+        }
+        assertSliderAgainstGolden("sliderTest_first_steps")
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun sliderTest_last_steps() {
+        rule.setMaterialContent(lightColorScheme()) {
+            Box(wrap.testTag(wrapperTestTag)) { Slider(remember { SliderState(0.9f, steps = 9) }) }
+        }
+        assertSliderAgainstGolden("sliderTest_last_steps")
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

@@ -26,6 +26,7 @@ import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.collection.mutableVectorOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.util.traceValue
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
@@ -89,6 +90,7 @@ internal class AndroidPrefetchScheduler(private val view: View) :
     private val prefetchRequests = mutableVectorOf<PrefetchRequest>()
     private var prefetchScheduled = false
     private val choreographer = Choreographer.getInstance()
+    private val scope = PrefetchRequestScopeImpl()
 
     /** Is true when LazyList was composed and not yet disposed. */
     private var isActive = false
@@ -125,11 +127,12 @@ internal class AndroidPrefetchScheduler(private val view: View) :
         // not have been a drawing operation. Using the choreographer frame start time will be
         // safe in these cases.
         val viewDrawTimeNanos = TimeUnit.MILLISECONDS.toNanos(view.drawingTime)
-        val nextFrameNs = maxOf(frameStartTimeNanos, viewDrawTimeNanos) + frameIntervalNs
-        val scope = PrefetchRequestScopeImpl(nextFrameNs)
+        scope.nextFrameTimeNs = maxOf(frameStartTimeNanos, viewDrawTimeNanos) + frameIntervalNs
         var scheduleForNextFrame = false
         while (prefetchRequests.isNotEmpty() && !scheduleForNextFrame) {
-            if (scope.availableTimeNanos() > 0) {
+            val availableTimeNanos = scope.availableTimeNanos()
+            traceValue("compose:lazy:prefetch:available_time_nanos", availableTimeNanos)
+            if (availableTimeNanos > 0) {
                 val request = prefetchRequests[0]
                 val hasMoreWorkToDo = with(request) { scope.execute() }
                 if (hasMoreWorkToDo) {
@@ -149,6 +152,7 @@ internal class AndroidPrefetchScheduler(private val view: View) :
         } else {
             prefetchScheduled = false
         }
+        traceValue("compose:lazy:prefetch:available_time_nanos", 0L) // reset counter
     }
 
     /**
@@ -184,9 +188,8 @@ internal class AndroidPrefetchScheduler(private val view: View) :
 
     override fun onAbandoned() {}
 
-    class PrefetchRequestScopeImpl(
-        private val nextFrameTimeNs: Long,
-    ) : PrefetchRequestScope {
+    class PrefetchRequestScopeImpl() : PrefetchRequestScope {
+        var nextFrameTimeNs: Long = 0L
 
         override fun availableTimeNanos() = max(0, nextFrameTimeNs - System.nanoTime())
     }

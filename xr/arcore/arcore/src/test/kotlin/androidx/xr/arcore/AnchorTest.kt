@@ -51,7 +51,7 @@ class AnchorTest {
     @get:Rule
     val grantPermissionRule =
         GrantPermissionRule.grant(
-            "android.permission.SCENE_UNDERSTANDING",
+            "android.permission.SCENE_UNDERSTANDING_COARSE",
             "android.permission.HAND_TRACKING",
         )
 
@@ -85,6 +85,21 @@ class AnchorTest {
         underTest.detach()
 
         assertThat(xrResourcesManager.updatables).isEmpty()
+    }
+
+    @Test
+    fun detach_stopsUpdateAndQueuesAnchorToBeDetached() {
+        val runtimeAnchor = FakeRuntimePlane().createAnchor(Pose()) as FakeRuntimeAnchor
+        check(runtimeAnchor.isAttached)
+        val underTest = Anchor(runtimeAnchor, xrResourcesManager)
+        xrResourcesManager.addUpdatable(underTest)
+        check(xrResourcesManager.updatables.contains(underTest))
+        check(xrResourcesManager.updatables.size == 1)
+
+        underTest.detach()
+
+        assertThat(xrResourcesManager.updatables).isEmpty()
+        assertThat(xrResourcesManager.anchorsToDetachQueue.toList()).containsExactly(underTest)
     }
 
     @Test
@@ -219,17 +234,6 @@ class AnchorTest {
 
             assertThat(Anchor.getPersistedAnchorUuids(session)).doesNotContain(uuid)
         }
-    }
-
-    @Test
-    fun detach_removesRuntimeAnchor() {
-        val runtimeAnchor = FakeRuntimePlane().createAnchor(Pose()) as FakeRuntimeAnchor
-        check(runtimeAnchor.isAttached)
-        val underTest = Anchor(runtimeAnchor, xrResourcesManager)
-
-        underTest.detach()
-
-        assertThat(runtimeAnchor.isAttached).isFalse()
     }
 
     @Test

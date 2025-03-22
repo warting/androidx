@@ -24,6 +24,7 @@ import androidx.wear.protolayout.ActionBuilders.LoadAction
 import androidx.wear.protolayout.ActionBuilders.actionFromProto
 import androidx.wear.protolayout.ModifiersBuilders.Clickable
 import androidx.wear.protolayout.StateBuilders.State
+import androidx.wear.protolayout.expression.DynamicDataMap
 import androidx.wear.protolayout.expression.RequiresSchemaVersion
 import androidx.wear.protolayout.types.dp
 
@@ -94,12 +95,17 @@ fun LayoutModifier.clickable(clickable: Clickable): LayoutModifier =
 /**
  * Creates an action used to load (or reload) the layout contents.
  *
- * @param requestedState is the [State] associated with this action. This state will be passed to
+ * @param requestedStateMap is the state associated with this action. This state will be passed to
  *   the action handler.
  */
-fun loadAction(requestedState: (State.Builder.() -> Unit)? = null): LoadAction =
+@SuppressLint("ProtoLayoutMinSchema")
+fun loadAction(
+    @RequiresSchemaVersion(major = 1, minor = 200) requestedStateMap: DynamicDataMap? = null
+): LoadAction =
     LoadAction.Builder()
-        .apply { requestedState?.let { this.setRequestState(State.Builder().apply(it).build()) } }
+        .apply {
+            requestedStateMap?.let { setRequestState(State.Builder().setStateMap(it).build()) }
+        }
         .build()
 
 /**
@@ -120,10 +126,10 @@ internal class BaseClickableElement(
     val id: String? = null,
     @Dimension(DP) val minClickableWidth: Float = Float.NaN,
     @Dimension(DP) val minClickableHeight: Float = Float.NaN,
-) : LayoutModifier.Element {
+) : BaseProtoLayoutModifiersElement<Clickable.Builder> {
     @SuppressLint("ProtoLayoutMinSchema")
-    fun mergeTo(initial: Clickable.Builder?): Clickable.Builder =
-        (initial ?: Clickable.Builder()).apply {
+    override fun mergeTo(initialBuilder: Clickable.Builder?): Clickable.Builder =
+        (initialBuilder ?: Clickable.Builder()).apply {
             if (!id.isNullOrEmpty()) setId(id)
             action?.let { setOnClick(it) }
             if (!minClickableWidth.isNaN()) setMinimumClickableWidth(minClickableWidth.dp)

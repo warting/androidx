@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:Suppress("UnstableApiUsage")
+@file:Suppress("UnstableApiUsage") // b/393137152
 
 package androidx.build
 
@@ -26,11 +26,13 @@ import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.gradle.api.KotlinMultiplatformAndroidPlugin
 import groovy.lang.Closure
 import java.io.File
+import javax.inject.Inject
 import org.gradle.api.Action
 import org.gradle.api.GradleException
 import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.configuration.BuildFeatures
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.kotlin.dsl.findByType
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
@@ -61,7 +63,9 @@ import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
  * of wrapping is to prevent targets from being added when the platform has not been enabled. e.g.
  * the `macosX64` target is gated on a `project.enableMac` check.
  */
-open class AndroidXMultiplatformExtension(val project: Project) {
+abstract class AndroidXMultiplatformExtension(val project: Project) {
+
+    @get:Inject abstract val buildFeatures: BuildFeatures
 
     var enableBinaryCompatibilityValidator = true
 
@@ -351,7 +355,7 @@ open class AndroidXMultiplatformExtension(val project: Project) {
 
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     @JvmOverloads
-    fun android(block: Action<KotlinAndroidTarget>? = null): KotlinAndroidTarget? {
+    fun androidTarget(block: Action<KotlinAndroidTarget>? = null): KotlinAndroidTarget? {
         supportedPlatforms.add(PlatformIdentifier.ANDROID)
         return if (project.enableJvm()) {
             kotlinExtension.androidTarget {
@@ -638,8 +642,6 @@ open class AndroidXMultiplatformExtension(val project: Project) {
 
     @JvmOverloads
     fun linuxX64Stubs(block: Action<KotlinNativeTarget>? = null): KotlinNativeTarget? {
-        // don't enable binary compatibility validator for stubs
-        enableBinaryCompatibilityValidator = false
         supportedPlatforms.add(PlatformIdentifier.LINUX_X_64_STUBS)
         return if (project.enableLinux()) {
             kotlinExtension.linuxX64("linuxx64Stubs") {
@@ -656,6 +658,7 @@ open class AndroidXMultiplatformExtension(val project: Project) {
 
     @JvmOverloads
     fun js(block: Action<KotlinJsTargetDsl>? = null): KotlinJsTargetDsl? {
+        if (buildFeatures.isIsolatedProjectsEnabled()) return null
         supportedPlatforms.add(PlatformIdentifier.JS)
         return if (project.enableJs()) {
             kotlinExtension.js() {
@@ -673,6 +676,7 @@ open class AndroidXMultiplatformExtension(val project: Project) {
     @OptIn(ExperimentalWasmDsl::class)
     @JvmOverloads
     fun wasmJs(block: Action<KotlinJsTargetDsl>? = null): KotlinWasmTargetDsl? {
+        if (buildFeatures.isIsolatedProjectsEnabled()) return null
         supportedPlatforms.add(PlatformIdentifier.WASM_JS)
         return if (project.enableWasmJs()) {
             kotlinExtension.wasmJs("wasmJs") {
@@ -745,6 +749,7 @@ private fun Project.configureWasm() {
     }
 }
 
+@Suppress("DEPRECATION")
 private fun Project.configureNode() {
     extensions.findByType<NodeJsEnvSpec>()?.let { nodeJs ->
         nodeJs.version.set(getVersionByName("node"))

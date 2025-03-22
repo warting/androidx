@@ -48,11 +48,9 @@ import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design standard icon button</a>.
+ * [Material Design standard icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -113,8 +111,7 @@ fun IconButton(
 }
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design standard icon button</a>.
+ * [Material Design standard icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -178,8 +175,7 @@ fun IconButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design standard icon button</a>.
+ * [Material Design standard icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -261,8 +257,7 @@ private fun IconButtonImpl(
                     interactionSource = interactionSource,
                     indication = ripple()
                 )
-                .childSemantics()
-                .interactionSourceData(interactionSource),
+                .childSemantics(),
         contentAlignment = Alignment.Center
     ) {
         val contentColor = colors.contentColor(enabled)
@@ -271,8 +266,8 @@ private fun IconButtonImpl(
 }
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design standard icon toggle button</a>.
+ * [Material Design standard icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -331,8 +326,8 @@ fun IconToggleButton(
 }
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design standard icon toggle button</a>.
+ * [Material Design standard icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -385,8 +380,8 @@ fun IconToggleButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design standard icon toggle button</a>.
+ * [Material Design standard icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -469,8 +464,7 @@ private fun IconToggleButtonImpl(
                     role = Role.Checkbox,
                     interactionSource = interactionSource,
                     indication = ripple()
-                )
-                .interactionSourceData(interactionSource),
+                ),
         contentAlignment = Alignment.Center
     ) {
         val contentColor = colors.contentColor(enabled, checked).value
@@ -479,8 +473,7 @@ private fun IconToggleButtonImpl(
 }
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled icon button</a>.
+ * [Material Design filled icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -531,8 +524,7 @@ fun FilledIconButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled icon button</a>.
+ * [Material Design filled icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -585,8 +577,7 @@ fun FilledIconButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled icon toggle button</a>.
+ * [Material Design filled icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -640,8 +631,8 @@ fun FilledIconToggleButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled icon toggle button</a>.
+ * [Material Design filled icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -697,8 +688,8 @@ fun FilledIconToggleButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled tonal icon button</a>.
+ * [Material Design filled tonal icon
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -753,8 +744,8 @@ fun FilledTonalIconButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled tonal icon button</a>.
+ * [Material Design filled tonal icon
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -811,8 +802,8 @@ fun FilledTonalIconButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled tonal icon toggle button</a>.
+ * [Material Design filled tonal icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -871,8 +862,8 @@ fun FilledTonalIconToggleButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design filled tonal icon toggle button</a>.
+ * [Material Design filled tonal icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -933,8 +924,7 @@ fun FilledTonalIconToggleButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design outlined icon button</a>.
+ * [Material Design outlined icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -999,8 +989,7 @@ fun OutlinedIconButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design outlined icon button</a>.
+ * [Material Design outlined icon button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -1064,8 +1053,8 @@ fun OutlinedIconButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design outlined icon toggle button</a>.
+ * [Material Design outlined icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -1123,8 +1112,8 @@ fun OutlinedIconToggleButton(
     )
 
 /**
- * <a href="https://m3.material.io/components/icon-button/overview" class="external"
- * target="_blank">Material Design outlined icon toggle button</a>.
+ * [Material Design outlined icon toggle
+ * button](https://m3.material.io/components/icon-button/overview)
  *
  * Icon buttons help people take supplementary actions with a single tap. They’re used when a
  * compact button is required, such as in a toolbar or image list.
@@ -1266,29 +1255,8 @@ private fun SurfaceIconToggleButton(
         Box(
             modifier =
                 Modifier.size(
-                        IconButtonDefaults.smallContainerSize(),
-                    )
-                    .then(
-                        when (shape) {
-                            is ShapeWithHorizontalCenterOptically -> {
-                                Modifier.horizontalCenterOptically(
-                                    shape = shape,
-                                    maxStartOffset = Int.MAX_VALUE.dp,
-                                    maxEndOffset = Int.MAX_VALUE.dp
-                                )
-                            }
-                            is CornerBasedShape -> {
-                                Modifier.horizontalCenterOptically(
-                                    shape = shape,
-                                    maxStartOffset = Int.MAX_VALUE.dp,
-                                    maxEndOffset = Int.MAX_VALUE.dp
-                                )
-                            }
-                            else -> {
-                                Modifier
-                            }
-                        }
-                    ),
+                    IconButtonDefaults.smallContainerSize(),
+                ),
             contentAlignment = Alignment.Center
         ) {
             content()

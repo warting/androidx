@@ -136,6 +136,11 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     }
 
     @Override
+    public int getMaxByteLimitForBatchPut() {
+        return mLimitConfig.getMaxByteLimitForBatchPut();
+    }
+
+    @Override
     public int getPerPackageDocumentCountLimit() {
         return mLimitConfig.getPerPackageDocumentCountLimit();
     }
@@ -168,6 +173,11 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     @Override
     public long getOrphanBlobTimeToLiveMs() {
         return mIcingOptionsConfig.getOrphanBlobTimeToLiveMs();
+    }
+
+    @Override
+    public @NonNull String getIcuDataFileAbsolutePath() {
+        return mIcingOptionsConfig.getIcuDataFileAbsolutePath();
     }
 
     @Override

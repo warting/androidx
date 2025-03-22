@@ -31,6 +31,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.filters.SmallTest
 import com.google.common.truth.Truth.assertThat
 import junit.framework.TestCase.assertFalse
+import junit.framework.TestCase.assertNotNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -51,6 +52,21 @@ class SandboxedPdfDocumentTest {
 
             val expectedHeight = 792
             val expectedWidth = 612
+            assertThat(pageInfo.pageNum == pageNumber).isTrue()
+            assertThat(pageInfo.height == expectedHeight).isTrue()
+            assertThat(pageInfo.width == expectedWidth).isTrue()
+        }
+    }
+
+    @Test
+    fun getPageInfo_validDimension_onCorruptedPage() = runTest {
+        withDocument(PDF_DOCUMENT_PARTIALLY_CORRUPTED_FILE) { document ->
+            val pageNumber = 5
+
+            val pageInfo = document.getPageInfo(pageNumber)
+
+            val expectedHeight = 400
+            val expectedWidth = 400
             assertThat(pageInfo.pageNum == pageNumber).isTrue()
             assertThat(pageInfo.height == expectedHeight).isTrue()
             assertThat(pageInfo.width == expectedWidth).isTrue()
@@ -210,6 +226,24 @@ class SandboxedPdfDocumentTest {
         }
     }
 
+    @RequiresExtension(extension = Build.VERSION_CODES.S, version = 13)
+    @Test
+    fun getSelectAllSelectionBounds() = runTest {
+        withDocument(PDF_DOCUMENT) { document ->
+            val pageNumber = 0
+
+            val selection = document.getSelectAllSelectionBounds(pageNumber)?.selectedTextContents
+            val expectedSelection = document.getPageContent(pageNumber)?.textContents
+
+            assertNotNull(selection)
+            assertNotNull(expectedSelection)
+            assertThat(selection?.size == expectedSelection?.size)
+            for (index: Int in 0..selection!!.size - 1) {
+                assertThat(selection[index].text == expectedSelection!![index].text).isTrue()
+            }
+        }
+    }
+
     @Test
     fun getPageContent_validPageNumber_returnsPageContentWithTextAndImages() = runTest {
         withDocument(PDF_DOCUMENT_WITH_TEXT_AND_IMAGE) { document ->
@@ -287,6 +321,7 @@ class SandboxedPdfDocumentTest {
     companion object {
         private const val PDF_DOCUMENT = "sample.pdf"
         private const val PDF_DOCUMENT_WITH_LINKS = "sample_links.pdf"
+        private const val PDF_DOCUMENT_PARTIALLY_CORRUPTED_FILE = "partially_corrupted.pdf"
         private const val PDF_DOCUMENT_WITH_TEXT_AND_IMAGE = "alt_text.pdf"
 
         private suspend fun withDocument(filename: String, block: suspend (PdfDocument) -> Unit) {

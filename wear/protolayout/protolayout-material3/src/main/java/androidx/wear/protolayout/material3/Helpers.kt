@@ -22,6 +22,7 @@ import androidx.annotation.Dimension
 import androidx.annotation.Dimension.Companion.DP
 import androidx.annotation.Dimension.Companion.SP
 import androidx.annotation.FloatRange
+import androidx.core.graphics.ColorUtils
 import androidx.wear.protolayout.DeviceParametersBuilders.DeviceParameters
 import androidx.wear.protolayout.DimensionBuilders
 import androidx.wear.protolayout.DimensionBuilders.ContainerDimension
@@ -75,6 +76,10 @@ internal fun String.toTagBytes(): ByteArray = toByteArray(StandardCharsets.UTF_8
 /** Returns String representation of tag from Metadata. */
 internal fun ElementMetadata.toTagName(): String = String(tagData, StandardCharsets.UTF_8)
 
+/**
+ * Adds the given [newItem] between each element in this [Iterable], starting after the first and
+ * ending before the last one.
+ */
 internal fun <T> Iterable<T>.addBetween(newItem: T): Sequence<T> = sequence {
     var isFirst = true
     for (element in this@addBetween) {
@@ -88,9 +93,11 @@ internal fun <T> Iterable<T>.addBetween(newItem: T): Sequence<T> = sequence {
 }
 
 @Dimension(unit = SP)
-internal fun Float.dpToSp(fontScale: Float): Float =
-    (if (SDK_INT >= UPSIDE_DOWN_CAKE) FontScaleConverterFactory.forScale(fontScale) else null)
-        ?.convertDpToSp(this) ?: dpToSpLinear(fontScale)
+internal fun Float.dpToSp(fontScale: Float): Float {
+    val converter =
+        if (SDK_INT >= UPSIDE_DOWN_CAKE) FontScaleConverterFactory.forScale(fontScale) else null
+    return converter?.convertDpToSp(this) ?: dpToSpLinear(fontScale)
+}
 
 @Dimension(unit = SP) private fun Float.dpToSpLinear(fontScale: Float): Float = this / fontScale
 
@@ -122,13 +129,10 @@ internal fun wrapWithMinTapTargetDimension(): WrappedDimensionProp =
  * ignored.
  */
 internal fun LayoutColor.withOpacity(@FloatRange(from = 0.0, to = 1.0) ratio: Float): LayoutColor {
-    // From androidx.core.graphics.ColorUtils
-    require(!(ratio < 0 || ratio > 1)) { "setOpacityForColor ratio must be between 0 and 1." }
+    require(ratio in 0.0..1.0) { "withOpacity ratio must be between 0 and 1." }
     val fullyOpaque = 255
-    val alphaMask = 0x00ffffff
     val alpha = (ratio * fullyOpaque).toInt()
-    val alphaPosition = 24
-    return ((this.staticArgb and alphaMask) or (alpha shl alphaPosition)).argb
+    return ColorUtils.setAlphaComponent(this.staticArgb, alpha).argb
 }
 
 /** Returns corresponding text alignment based on the given horizontal alignment. */
@@ -161,9 +165,11 @@ internal fun MaterialScope.componentContainer(
     width: ContainerDimension,
     height: ContainerDimension,
     backgroundContent: (MaterialScope.() -> LayoutElement)?,
+    useOverlayOnBackground: Boolean = true,
     contentPadding: Padding,
     metadataTag: String?,
-    content: (MaterialScope.() -> LayoutElement)?
+    content: (MaterialScope.() -> LayoutElement)?,
+    horizontalAlignment: Int = HORIZONTAL_ALIGN_CENTER
 ): LayoutElement {
     val mod =
         LayoutModifier.semanticsRole(SEMANTICS_ROLE_BUTTON) then
@@ -174,9 +180,11 @@ internal fun MaterialScope.componentContainer(
             }
 
     val container =
-        Box.Builder().setHeight(height).setWidth(width).apply {
-            content?.let { addContent(content()) }
-        }
+        Box.Builder()
+            .setHeight(height)
+            .setHorizontalAlignment(horizontalAlignment)
+            .setWidth(width)
+            .apply { content?.let { addContent(content()) } }
 
     if (backgroundContent == null) {
         container.setModifiers(mod.padding(contentPadding).toProtoLayoutModifiers())
@@ -192,11 +200,19 @@ internal fun MaterialScope.componentContainer(
                         BackgroundImageStyle(
                             width = expand(),
                             height = expand(),
-                            overlayColor = colorScheme.primary.withOpacity(0.6f),
-                            overlayWidth = width,
-                            overlayHeight = height,
+                            overlayColor =
+                                if (useOverlayOnBackground) {
+                                    colorScheme.background.withOpacity(0.6f)
+                                } else {
+                                    null
+                                },
                             shape = protoLayoutModifiers.background?.corner ?: shapes.large,
-                            contentScaleMode = LayoutElementBuilders.CONTENT_SCALE_MODE_FILL_BOUNDS
+                            contentScaleMode =
+                                if (useOverlayOnBackground) {
+                                    LayoutElementBuilders.CONTENT_SCALE_MODE_FILL_BOUNDS
+                                } else {
+                                    LayoutElementBuilders.CONTENT_SCALE_MODE_CROP
+                                },
                         )
                 )
                 .backgroundContent()
@@ -222,12 +238,12 @@ internal fun MaterialScope.componentContainer(
 internal fun MaterialScope.percentagePadding(
     @FloatRange(from = 0.0, to = 1.0) start: Float,
     @FloatRange(from = 0.0, to = 1.0) end: Float,
-    @FloatRange(from = 0.0, to = 1.0) bottom: Float
+    @FloatRange(from = 0.0, to = 1.0) bottom: Float,
 ): Padding =
     padding(
         start = percentageWidthToDp(start),
         end = percentageWidthToDp(end),
-        bottom = percentageHeightToDp(bottom)
+        bottom = percentageHeightToDp(bottom),
     )
 
 /**
@@ -239,7 +255,7 @@ internal fun MaterialScope.percentagePadding(
  */
 internal fun MaterialScope.percentagePadding(
     @FloatRange(from = 0.0, to = 1.0) start: Float,
-    @FloatRange(from = 0.0, to = 1.0) end: Float
+    @FloatRange(from = 0.0, to = 1.0) end: Float,
 ): Padding = padding(start = percentageWidthToDp(start), end = percentageWidthToDp(end))
 
 /**
@@ -278,7 +294,7 @@ internal fun MaterialScope.weightAsExpand(
  */
 internal fun DeviceParameters.weightForContainer(
     @FloatRange(from = 0.0, to = 100.0) weightValue: Float
-): DimensionBuilders.ContainerDimension =
+): ContainerDimension =
     if (rendererSchemaVersion.hasExpandWithWeightSupport()) {
         weight(weightValue)
     } else {

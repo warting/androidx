@@ -70,7 +70,7 @@ public object GraphicDataCardDefaults {
                 { it: LayoutElement? -> verticalElementBuilder.addContent(it!!) },
                 title
             )
-            .addElement(content, horizontalSpacer(style.titleToContentSpaceDp))
+            .addElement(content)
 
         // Side padding - start
         // Smaller padding should be applied to the graph side, and larger to the labels side.
@@ -89,7 +89,7 @@ public object GraphicDataCardDefaults {
         val wrapGraphic =
             Box.Builder()
                 .setWidth(deviceConfiguration.weightForContainer(GRAPHIC_SPACE_PERCENTAGE))
-                .setHeight(height)
+                .setHeight(expand())
                 .addContent(graphic)
                 .build()
 
@@ -156,22 +156,18 @@ public object GraphicDataCardDefaults {
      * @throws IllegalArgumentException When the mainContent has size of [WrappedDimensionProp].
      */
     public fun MaterialScope.constructGraphic(
-        mainContent: (MaterialScope.() -> LayoutElement),
+        mainContent: (MaterialScope.() -> Box),
         iconContent: (MaterialScope.() -> LayoutElement),
         iconSizeRatio: Float = CENTER_ICON_SIZE_RATIO_IN_GRAPHIC
     ): LayoutElement {
-        // Recreate the ColorProp to avoid null fingerprint.
         val contentMain = mainContent()
-        require(contentMain is Box) {
-            "The main content passed to constructGraphic helper requires to be wrapped in a box."
-        }
         val size: ContainerDimension =
             when (val width = contentMain.width) {
                 is DpProp -> width.value.dp
                 is ExpandedDimensionProp ->
                     width.layoutWeight?.let { weightAsExpand(it.value) } ?: expand()
                 is WrappedDimensionProp -> {
-                    throw IllegalArgumentException("main content with wrap size is not supported.")
+                    throw IllegalArgumentException("Main content with wrap size is not supported.")
                 }
                 else -> {
                     throw IllegalArgumentException("Unknown dimension type of ContainerDimension.")
@@ -245,16 +241,12 @@ public object GraphicDataCardDefaults {
 public class GraphicDataCardStyle
 internal constructor(
     internal val innerPadding: Padding,
-    @Dimension(unit = DP) internal val titleToContentSpaceDp: Int,
     @TypographyToken internal val titleTypography: Int,
     @TypographyToken internal val contentTypography: Int,
     @Dimension(unit = DP) internal val graphToTitleSpaceDp: Int,
     internal val sidePaddingWeight: Float,
 ) {
     public companion object {
-        /** The default smaller spacer width or height that should be between different elements. */
-        @Dimension(unit = DP) private const val SMALL_SPACE_DP: Int = 2
-
         private const val DEFAULT_VERTICAL_PADDING_DP = 8f
 
         /**
@@ -268,7 +260,6 @@ internal constructor(
                         top = DEFAULT_VERTICAL_PADDING_DP,
                         bottom = DEFAULT_VERTICAL_PADDING_DP
                     ),
-                titleToContentSpaceDp = SMALL_SPACE_DP,
                 titleTypography = Typography.DISPLAY_SMALL,
                 contentTypography = Typography.LABEL_SMALL,
                 graphToTitleSpaceDp = 6,
@@ -286,7 +277,6 @@ internal constructor(
                         top = DEFAULT_VERTICAL_PADDING_DP,
                         bottom = DEFAULT_VERTICAL_PADDING_DP
                     ),
-                titleToContentSpaceDp = 0,
                 titleTypography = Typography.DISPLAY_MEDIUM,
                 contentTypography = Typography.LABEL_MEDIUM,
                 graphToTitleSpaceDp = 8,
