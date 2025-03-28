@@ -33,6 +33,7 @@ import androidx.annotation.WorkerThread
 import androidx.arch.core.executor.ArchTaskExecutor
 import androidx.room.Room.LOG_TAG
 import androidx.room.concurrent.CloseBarrier
+import androidx.room.coroutines.runBlockingUninterruptible
 import androidx.room.driver.SupportSQLiteConnection
 import androidx.room.migration.AutoMigrationSpec
 import androidx.room.migration.Migration
@@ -497,7 +498,7 @@ actual abstract class RoomDatabase {
     protected fun performClear(hasForeignKeys: Boolean, vararg tableNames: String) {
         assertNotMainThread()
         assertNotSuspendingTransaction()
-        runBlocking {
+        runBlockingUninterruptible {
             connectionManager.useConnection(isReadOnly = false) { connection ->
                 if (!connection.inTransaction()) {
                     invalidationTracker.sync()
@@ -767,7 +768,7 @@ actual abstract class RoomDatabase {
      * @see SupportSQLiteDatabase.inTransaction
      */
     open fun inTransaction(): Boolean {
-        return openHelper.writableDatabase.inTransaction()
+        return isOpenInternal && openHelper.writableDatabase.inTransaction()
     }
 
     /**
@@ -1628,10 +1629,14 @@ actual abstract class RoomDatabase {
                             "SupportOpenHelper.Factory."
                     )
                 }
+            val autoCloseEnabled = autoCloseTimeout > 0
+            val prePackagedCopyEnabled =
+                copyFromAssetPath != null || copyFromFile != null || copyFromInputStream != null
+            val queryCallbackEnabled = queryCallback != null
             val supportOpenHelperFactory =
                 initialFactory
                     ?.let {
-                        if (autoCloseTimeout > 0) {
+                        if (autoCloseEnabled) {
                             requireNotNull(name) {
                                 "Cannot create auto-closing database for an in-memory database."
                             }
@@ -1646,11 +1651,7 @@ actual abstract class RoomDatabase {
                         }
                     }
                     ?.let {
-                        if (
-                            copyFromAssetPath != null ||
-                                copyFromFile != null ||
-                                copyFromInputStream != null
-                        ) {
+                        if (prePackagedCopyEnabled) {
                             requireNotNull(name) {
                                 "Cannot create from asset or file for an in-memory database."
                             }
@@ -1681,7 +1682,7 @@ actual abstract class RoomDatabase {
                         }
                     }
                     ?.let {
-                        if (queryCallback != null) {
+                        if (queryCallbackEnabled) {
                             val queryCallbackContext =
                                 queryCallbackExecutor?.asCoroutineDispatcher()
                                     ?: requireNotNull(queryCallbackCoroutineContext)
@@ -1694,6 +1695,18 @@ actual abstract class RoomDatabase {
                             it
                         }
                     }
+            // No open helper means a driver is to be used.
+            if (supportOpenHelperFactory == null) {
+                require(!autoCloseEnabled) {
+                    "Auto Closing Database is not supported when an SQLiteDriver is configured."
+                }
+                require(!prePackagedCopyEnabled) {
+                    "Pre-Package Database is not supported when an SQLiteDriver is configured."
+                }
+                require(!queryCallbackEnabled) {
+                    "Query Callback is not supported when an SQLiteDriver is configured."
+                }
+            }
             val configuration =
                 DatabaseConfiguration(
                         context = context,

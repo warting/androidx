@@ -27,23 +27,29 @@ import androidx.wear.compose.material3.samples.AnimatedTextSampleButtonResponse
 import androidx.wear.compose.material3.samples.AnimatedTextSampleSharedFontRegistry
 import androidx.wear.compose.material3.samples.ButtonGroupSample
 import androidx.wear.compose.material3.samples.ButtonGroupThreeButtonsSample
+import androidx.wear.compose.material3.samples.ButtonWithImageSample
 import androidx.wear.compose.material3.samples.EdgeButtonListSample
 import androidx.wear.compose.material3.samples.EdgeButtonSample
 import androidx.wear.compose.material3.samples.EdgeSwipeForSwipeToDismiss
+import androidx.wear.compose.material3.samples.FadingExpandingLabelButtonSample
+import androidx.wear.compose.material3.samples.ImageCardSample
+import androidx.wear.compose.material3.samples.ImageCardWithTimeAndTitleSample
+import androidx.wear.compose.material3.samples.LevelIndicatorSample
 import androidx.wear.compose.material3.samples.ListHeaderSample
 import androidx.wear.compose.material3.samples.SimpleSwipeToDismissBox
 import androidx.wear.compose.material3.samples.StatefulSwipeToDismissBox
 import androidx.wear.compose.material3.samples.SwipeToRevealNonAnchoredSample
 import androidx.wear.compose.material3.samples.SwipeToRevealSample
 import androidx.wear.compose.material3.samples.SwipeToRevealSingleActionCardSample
+import androidx.wear.compose.material3.samples.SwipeToRevealWithTransformingLazyColumnSample
 import androidx.wear.compose.material3.samples.TransformingLazyColumnScalingMorphingEffectSample
 import androidx.wear.compose.material3.samples.TransformingLazyColumnScrollingSample
-import androidx.wear.compose.material3.samples.TransformingLazyColumnTargetMorphingHeightSample
 
 val WearMaterial3Demos =
     Material3DemoCategory(
         "Material 3",
         listOf(
+                ComposableDemo("LevelIndicator") { Centralize { LevelIndicatorSample() } },
                 ComposableDemo("Haptics") { Centralize { HapticsDemos() } },
                 ComposableDemo("Performance") { Centralize { PerformanceDemos() } },
                 Material3DemoCategory(
@@ -58,9 +64,17 @@ val WearMaterial3Demos =
                         ComposableDemo("Multiline Button") { MultilineButtonDemo() },
                         ComposableDemo("App Button") { AppButtonDemo() },
                         ComposableDemo("Avatar Button") { AvatarButtonDemo() },
-                        ComposableDemo("Button (Image Background)") { ButtonBackgroundImageDemo() },
+                        ComposableDemo("Image Button") { ButtonBackgroundImageDemo() },
+                        ComposableDemo("Image Button Sample") {
+                            Centralize { ButtonWithImageSample() }
+                        },
+                        ComposableDemo("Image Button builder") { ImageButtonBuilder() },
                         ComposableDemo("Button Stack") { ButtonStackDemo() },
                         ComposableDemo("Button Merge") { ButtonMergeDemo() },
+                        ComposableDemo("Button Update Animation") { ButtonUpdateAnimationDemo() },
+                        ComposableDemo("Fading Expanding Label") {
+                            FadingExpandingLabelButtonSample()
+                        },
                     )
                 ),
                 ComposableDemo("Color Scheme") { ColorSchemeDemos() },
@@ -74,7 +88,6 @@ val WearMaterial3Demos =
                 Material3DemoCategory(title = "Typography", TypographyDemos),
                 ComposableDemo("Compact Button") { CompactButtonDemo() },
                 ComposableDemo("Icon Button") { IconButtonDemo() },
-                ComposableDemo("Image Button") { ImageButtonDemo() },
                 ComposableDemo("Text Button") { TextButtonDemo() },
                 Material3DemoCategory(
                     "Edge Button",
@@ -95,8 +108,8 @@ val WearMaterial3Demos =
                 Material3DemoCategory(
                     "Button Group",
                     listOf(
-                        ComposableDemo("Two buttons") { ButtonGroupSample() },
-                        ComposableDemo("ABC") { ButtonGroupThreeButtonsSample() },
+                        ComposableDemo("Two buttons") { Centralize { ButtonGroupSample() } },
+                        ComposableDemo("ABC") { Centralize { ButtonGroupThreeButtonsSample() } },
                         ComposableDemo("Text And Icon") { ButtonGroupDemo() },
                         ComposableDemo("ToggleButtons") { ButtonGroupToggleButtonsDemo() },
                     )
@@ -107,9 +120,14 @@ val WearMaterial3Demos =
                     "Card",
                     listOf(
                         ComposableDemo("Card") { CardDemo() },
+                        ComposableDemo("Outlined Card") { OutlinedCardDemo() },
                         ComposableDemo("App Card") { AppCardDemo() },
                         ComposableDemo("Title Card") { TitleCardDemo() },
-                        ComposableDemo("Image Card") { ImageCardDemo() },
+                        ComposableDemo("Base Image Card") { Centralize { ImageCardSample() } },
+                        ComposableDemo("Image Card") {
+                            Centralize { ImageCardWithTimeAndTitleSample() }
+                        },
+                        ComposableDemo("Image Card Builder") { ImageCardBuilder() }
                     )
                 ),
                 ComposableDemo("Text Toggle Button") { TextToggleButtonDemo() },
@@ -163,12 +181,20 @@ val WearMaterial3Demos =
                         ComposableDemo("Single action with Card") {
                             ScalingLazyDemo { item { SwipeToRevealSingleActionCardSample() } }
                         },
-                        ComposableDemo("In a list") { SwipeToRevealInList() },
+                        ComposableDemo("In ScalingLazyColumn") {
+                            SwipeToRevealInScalingLazyColumn()
+                        },
+                        ComposableDemo("In TransformingLazyColumn") {
+                            SwipeToRevealWithTransformingLazyColumnSample()
+                        },
                         ComposableDemo("Non-anchoring") {
                             ScalingLazyDemo { item { SwipeToRevealNonAnchoredSample() } }
                         },
                         ComposableDemo("Long labels") { SwipeToRevealWithLongLabels() },
                         ComposableDemo("Custom Icons") { SwipeToRevealWithCustomIcons() },
+                        ComposableDemo("With edgeSwipeToDismiss") { params ->
+                            SwipeToRevealWithEdgeSwipeToDismiss(params.swipeToDismissBoxState)
+                        },
                     )
                 ),
                 Material3DemoCategory(
@@ -199,9 +225,7 @@ val WearMaterial3Demos =
                         ComposableDemo("Scaling Morphing Effect Sample") {
                             TransformingLazyColumnScalingMorphingEffectSample()
                         },
-                        ComposableDemo("Target Morphing Height Sample") {
-                            TransformingLazyColumnTargetMorphingHeightSample()
-                        },
+                        ComposableDemo("Surface Transformation") { SurfaceTransformationDemo() },
                         ComposableDemo("TLC Buttons") { TransformingLazyColumnButtons() },
                         ComposableDemo("TLC Cards") { TransformingLazyColumnCards() },
                         ComposableDemo("Animation Demo") { TransformingLazyColumnScrollingSample() }

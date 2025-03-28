@@ -18,10 +18,11 @@ package androidx.xr.scenecore.impl;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.xr.runtime.internal.CameraViewActivityPose;
 import androidx.xr.runtime.math.Pose;
 import androidx.xr.runtime.math.Vector3;
-import androidx.xr.scenecore.JxrPlatformAdapter.CameraViewActivityPose;
 import androidx.xr.scenecore.common.BaseActivityPose;
 import androidx.xr.scenecore.impl.perception.PerceptionLibrary;
 import androidx.xr.scenecore.impl.perception.Session;
@@ -55,11 +56,13 @@ final class CameraViewActivityPoseImpl extends BaseActivityPose implements Camer
         return mOpenXrActivityPoseHelper.getPoseInActivitySpace(getPoseInOpenXrReferenceSpace());
     }
 
+    @NonNull
     @Override
     public Pose getActivitySpacePose() {
         return mOpenXrActivityPoseHelper.getActivitySpacePose(getPoseInOpenXrReferenceSpace());
     }
 
+    @NonNull
     @Override
     public Vector3 getActivitySpaceScale() {
         // This WorldPose is assumed to always have a scale of 1.0f in the OpenXR reference space.
@@ -78,9 +81,9 @@ final class CameraViewActivityPoseImpl extends BaseActivityPose implements Camer
             Log.e(TAG, "Error retrieving the camera.");
             return null;
         }
-        if (mCameraType == CameraViewActivityPose.CAMERA_TYPE_LEFT_EYE) {
+        if (mCameraType == CameraViewActivityPose.CameraType.CAMERA_TYPE_LEFT_EYE) {
             return perceptionViews.getLeftEye();
-        } else if (mCameraType == CameraViewActivityPose.CAMERA_TYPE_RIGHT_EYE) {
+        } else if (mCameraType == CameraViewActivityPose.CameraType.CAMERA_TYPE_RIGHT_EYE) {
             return perceptionViews.getRightEye();
         } else {
             Log.w(TAG, "Unsupported camera type: " + mCameraType);
@@ -104,6 +107,7 @@ final class CameraViewActivityPoseImpl extends BaseActivityPose implements Camer
         return mCameraType;
     }
 
+    @NonNull
     @Override
     public Fov getFov() {
         ViewProjection viewProjection = getViewProjection();

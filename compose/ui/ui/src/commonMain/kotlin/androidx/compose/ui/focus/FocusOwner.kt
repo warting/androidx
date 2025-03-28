@@ -17,10 +17,14 @@
 package androidx.compose.ui.focus
 
 import androidx.collection.MutableObjectList
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.indirect.IndirectTouchEvent
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.rotary.RotaryScrollEvent
+
+internal const val FocusWarning = "FocusRelatedWarning"
 
 /** The focus owner provides some internal APIs that are not exposed by focus manager. */
 internal interface FocusOwner : FocusManager {
@@ -133,6 +137,13 @@ internal interface FocusOwner : FocusManager {
     /** Dispatches a rotary scroll event through the compose hierarchy. */
     fun dispatchRotaryEvent(
         event: RotaryScrollEvent,
+        onFocusedItem: () -> Boolean = { false }
+    ): Boolean
+
+    /** Dispatches an indirect touch event through the compose hierarchy. */
+    @ExperimentalComposeUiApi
+    fun dispatchIndirectTouchEvent(
+        event: IndirectTouchEvent,
         onFocusedItem: () -> Boolean = { false }
     ): Boolean
 

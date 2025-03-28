@@ -19,6 +19,7 @@ package androidx.xr.compose.testing
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.view.View
 import androidx.annotation.RestrictTo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -26,18 +27,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.xr.compose.platform.LocalHasXrSpatialFeature
 import androidx.xr.compose.platform.LocalSession
-import androidx.xr.scenecore.JxrPlatformAdapter
+import androidx.xr.runtime.internal.ActivitySpace
+import androidx.xr.runtime.internal.Entity
+import androidx.xr.runtime.internal.HeadActivityPose
+import androidx.xr.runtime.internal.JxrPlatformAdapter
+import androidx.xr.runtime.internal.PanelEntity
+import androidx.xr.runtime.internal.PerceptionSpaceActivityPose
+import androidx.xr.runtime.internal.PixelDimensions
+import androidx.xr.runtime.internal.SpatialEnvironment
+import androidx.xr.runtime.math.Pose
 import androidx.xr.scenecore.Session
-import androidx.xr.scenecore.SpatialEnvironment
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 
 /**
- * A Test environment composable wrapper to support testing elevated components locally
+ * A Test environment composable wrapper to support testing elevated components locally.
  *
- * TODO(b/370856223) Update documentation
+ * @param isXrEnabled Whether to enable XR.
+ * @param isFullSpace Whether to enable full space mode.
+ * @param runtime The [JxrPlatformAdapter] to use for the [Session].
+ * @param content The content block containing the compose content to be tested.
  */
 @Composable
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
@@ -74,17 +85,15 @@ private fun createNonXrSession(activity: Activity): Session {
     return Session.create(
         activity,
         mock<JxrPlatformAdapter> {
-            on { spatialEnvironment } doReturn mock<JxrPlatformAdapter.SpatialEnvironment>()
+            on { spatialEnvironment } doReturn mock<SpatialEnvironment>()
             on { activitySpace } doReturn
-                mock<JxrPlatformAdapter.ActivitySpace>(
-                    defaultAnswer = { throw UnsupportedOperationException() }
-                )
-            on { headActivityPose } doReturn mock<JxrPlatformAdapter.HeadActivityPose>()
+                mock<ActivitySpace>(defaultAnswer = { throw UnsupportedOperationException() })
+            on { headActivityPose } doReturn mock<HeadActivityPose>()
             on { perceptionSpaceActivityPose } doReturn
-                mock<JxrPlatformAdapter.PerceptionSpaceActivityPose>(
+                mock<PerceptionSpaceActivityPose>(
                     defaultAnswer = { throw UnsupportedOperationException() }
                 )
-            on { mainPanelEntity } doReturn mock<JxrPlatformAdapter.PanelEntity>()
+            on { mainPanelEntity } doReturn mock<PanelEntity>()
             on { requestHomeSpaceMode() } doAnswer { throw UnsupportedOperationException() }
             on { requestFullSpaceMode() } doAnswer { throw UnsupportedOperationException() }
             on { createActivityPanelEntity(any(), any(), any(), any(), any()) } doAnswer
@@ -103,10 +112,16 @@ private fun createNonXrSession(activity: Activity): Session {
                 {
                     throw UnsupportedOperationException()
                 }
-            on { createPanelEntity(any(), any(), any(), any(), any(), any(), any()) } doAnswer
-                {
-                    throw UnsupportedOperationException()
-                }
+            on {
+                createPanelEntity(
+                    any<Context>(),
+                    any<Pose>(),
+                    any<View>(),
+                    any<PixelDimensions>(),
+                    any<String>(),
+                    any<Entity>(),
+                )
+            } doAnswer { throw UnsupportedOperationException() }
             on { createLoggingEntity(any()) } doAnswer { throw UnsupportedOperationException() }
         },
     )

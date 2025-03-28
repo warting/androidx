@@ -25,8 +25,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
@@ -54,10 +52,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.takeOrElse
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -117,25 +115,22 @@ fun ToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapes(),
+    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight),
     colors: ToggleButtonColors = ToggleButtonDefaults.toggleButtonColors(),
     elevation: ButtonElevation? = ButtonDefaults.buttonElevation(),
     border: BorderStroke? = null,
-    contentPadding: PaddingValues = ToggleButtonDefaults.ContentPadding,
+    contentPadding: PaddingValues = ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight),
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
 ) {
     @Suppress("NAME_SHADOWING")
     val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
     // TODO Load the motionScheme tokens from the component tokens file
-    // MotionSchemeKeyTokens.DefaultEffects is intentional here to prevent
-    // any bounce in this component.
-    val defaultAnimationSpec = MotionSchemeKeyTokens.DefaultEffects.value<Float>()
+    val defaultAnimationSpec = MotionSchemeKeyTokens.FastSpatial.value<Float>()
     val pressed by interactionSource.collectIsPressedAsState()
     val containerColor = colors.containerColor(enabled, checked)
     val contentColor = colors.contentColor(enabled, checked)
     val shadowElevation = elevation?.shadowElevation(enabled, interactionSource)?.value ?: 0.dp
-    val layoutDirection = LocalLayoutDirection.current
     val buttonShape = shapeByInteraction(shapes, pressed, checked, defaultAnimationSpec)
 
     Surface(
@@ -155,32 +150,8 @@ fun ToggleButton(
             textStyle = MaterialTheme.typography.labelLarge
         ) {
             Row(
-                Modifier.defaultMinSize(minHeight = ToggleButtonDefaults.MinHeight)
-                    .then(
-                        when (buttonShape) {
-                            is ShapeWithHorizontalCenterOptically -> {
-                                Modifier.horizontalCenterOptically(
-                                    shape = buttonShape,
-                                    maxStartOffset =
-                                        contentPadding.calculateStartPadding(layoutDirection),
-                                    maxEndOffset =
-                                        contentPadding.calculateEndPadding(layoutDirection)
-                                )
-                            }
-                            is CornerBasedShape -> {
-                                Modifier.horizontalCenterOptically(
-                                    shape = buttonShape,
-                                    maxStartOffset =
-                                        contentPadding.calculateStartPadding(layoutDirection),
-                                    maxEndOffset =
-                                        contentPadding.calculateEndPadding(layoutDirection)
-                                )
-                            }
-                            else -> {
-                                Modifier
-                            }
-                        }
-                    )
+                modifier
+                    .defaultMinSize(minHeight = ToggleButtonDefaults.MinHeight)
                     .padding(contentPadding),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
@@ -238,11 +209,11 @@ fun ElevatedToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapes(),
+    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight),
     colors: ToggleButtonColors = ToggleButtonDefaults.elevatedToggleButtonColors(),
     elevation: ButtonElevation? = ButtonDefaults.elevatedButtonElevation(),
     border: BorderStroke? = null,
-    contentPadding: PaddingValues = ToggleButtonDefaults.ContentPadding,
+    contentPadding: PaddingValues = ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight),
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
 ) =
@@ -311,11 +282,11 @@ fun TonalToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapes(),
+    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight),
     colors: ToggleButtonColors = ToggleButtonDefaults.tonalToggleButtonColors(),
     elevation: ButtonElevation? = ButtonDefaults.filledTonalButtonElevation(),
     border: BorderStroke? = null,
-    contentPadding: PaddingValues = ToggleButtonDefaults.ContentPadding,
+    contentPadding: PaddingValues = ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight),
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
 ) =
@@ -382,11 +353,11 @@ fun OutlinedToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapes(),
+    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight),
     colors: ToggleButtonColors = ToggleButtonDefaults.outlinedToggleButtonColors(),
     elevation: ButtonElevation? = null,
     border: BorderStroke? = if (!checked) ButtonDefaults.outlinedButtonBorder(enabled) else null,
-    contentPadding: PaddingValues = ToggleButtonDefaults.ContentPadding,
+    contentPadding: PaddingValues = ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight),
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit
 ) =
@@ -465,13 +436,12 @@ object ToggleButtonDefaults {
         )
 
     internal val Shapes.defaultToggleButtonShapes: ToggleButtonShapes
-        @Composable
         get() {
             return defaultToggleButtonShapesCached
                 ?: ToggleButtonShapes(
-                        shape = shape,
-                        pressedShape = pressedShape,
-                        checkedShape = checkedShape
+                        shape = fromToken(ButtonSmallTokens.ContainerShapeRound),
+                        pressedShape = RoundedCornerShape(6.dp),
+                        checkedShape = fromToken(ButtonSmallTokens.SelectedContainerShapeSquare)
                     )
                     .also { defaultToggleButtonShapesCached = it }
         }
@@ -497,51 +467,51 @@ object ToggleButtonDefaults {
         @Composable get() = ButtonSmallTokens.SelectedContainerShapeSquare.value
 
     /** The default square shape for a extra small toggle button */
-    val XSmallSquareShape: Shape
+    val extraSmallSquareShape: Shape
         @Composable get() = ButtonXSmallTokens.ContainerShapeSquare.value
 
     /** The default square shape for a medium toggle button */
-    val MediumSquareShape: Shape
+    val mediumSquareShape: Shape
         @Composable get() = ButtonMediumTokens.ContainerShapeSquare.value
 
     /** The default square shape for a large toggle button */
-    val LargeSquareShape: Shape
+    val largeSquareShape: Shape
         @Composable get() = ButtonLargeTokens.ContainerShapeSquare.value
 
     /** The default square shape for a extra large toggle button */
-    val XLargeSquareShape: Shape
+    val extraLargeSquareShape: Shape
         @Composable get() = ButtonXLargeTokens.ContainerShapeSquare.value
 
     /** The default pressed shape for a extra small toggle button */
-    val XSmallPressedShape: Shape
+    val extraSmallPressedShape: Shape
         @Composable get() = ButtonXSmallTokens.PressedContainerShape.value
 
     /** The default pressed shape for a medium toggle button */
-    val MediumPressedShape: Shape
+    val mediumPressedShape: Shape
         @Composable get() = ButtonMediumTokens.PressedContainerShape.value
 
     /** The default pressed shape for a large toggle button */
-    val LargePressedShape: Shape
+    val largePressedShape: Shape
         @Composable get() = ButtonLargeTokens.PressedContainerShape.value
 
     /** The default pressed shape for a extra large toggle button */
-    val XLargePressedShape: Shape
+    val extraLargePressedShape: Shape
         @Composable get() = ButtonXLargeTokens.PressedContainerShape.value
 
     /** The default checked square shape for a extra small toggle button */
-    val XSmallCheckedSquareShape: Shape
+    val extraSmallCheckedSquareShape: Shape
         @Composable get() = ButtonXSmallTokens.ContainerShapeSquare.value
 
     /** The default checked square shape for a medium toggle button */
-    val MediumCheckedSquareShape: Shape
+    val mediumCheckedSquareShape: Shape
         @Composable get() = ButtonMediumTokens.ContainerShapeSquare.value
 
     /** The default checked square shape for a large toggle button */
-    val LargeCheckedSquareShape: Shape
+    val largeCheckedSquareShape: Shape
         @Composable get() = ButtonLargeTokens.ContainerShapeSquare.value
 
     /** The default checked square shape for a extra large toggle button */
-    val XLargeCheckedSquareShape: Shape
+    val extraLargeCheckedSquareShape: Shape
         @Composable get() = ButtonXLargeTokens.ContainerShapeSquare.value
 
     /**
@@ -770,6 +740,47 @@ object ToggleButtonDefaults {
                     )
                     .also { defaultOutlinedToggleButtonColorsCached = it }
         }
+
+    /**
+     * Recommended [ToggleButtonShapes] for a provided toggle button height.
+     *
+     * @param buttonHeight The height of the button
+     */
+    @Composable
+    fun shapesFor(buttonHeight: Dp): ToggleButtonShapes {
+        val xSmallHeight = ButtonDefaults.ExtraSmallContainerHeight
+        val smallHeight = ButtonDefaults.MinHeight
+        val mediumHeight = ButtonDefaults.MediumContainerHeight
+        val largeHeight = ButtonDefaults.LargeContainerHeight
+        val xLargeHeight = ButtonDefaults.ExtraLargeContainerHeight
+        return when {
+            buttonHeight <= (xSmallHeight + smallHeight) / 2 ->
+                shapes(
+                    shape = shape,
+                    pressedShape = extraSmallPressedShape,
+                    checkedShape = extraSmallCheckedSquareShape
+                )
+            buttonHeight <= (smallHeight + mediumHeight) / 2 -> shapes()
+            buttonHeight <= (mediumHeight + largeHeight) / 2 ->
+                shapes(
+                    shape = shape,
+                    pressedShape = mediumPressedShape,
+                    checkedShape = mediumCheckedSquareShape
+                )
+            buttonHeight <= (largeHeight + xLargeHeight) / 2 ->
+                shapes(
+                    shape = shape,
+                    pressedShape = largePressedShape,
+                    checkedShape = largeCheckedSquareShape
+                )
+            else ->
+                shapes(
+                    shape = shape,
+                    pressedShape = extraLargePressedShape,
+                    checkedShape = extraLargeCheckedSquareShape
+                )
+        }
+    }
 }
 
 /**

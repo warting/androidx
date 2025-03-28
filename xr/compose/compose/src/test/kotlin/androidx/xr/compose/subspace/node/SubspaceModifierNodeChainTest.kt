@@ -29,8 +29,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.xr.compose.subspace.SpatialPanel
-import androidx.xr.compose.subspace.layout.CoreEntity
 import androidx.xr.compose.subspace.layout.CoreEntityNode
+import androidx.xr.compose.subspace.layout.CoreEntityScope
 import androidx.xr.compose.subspace.layout.SubspaceModifier
 import androidx.xr.compose.testing.SubspaceTestingActivity
 import androidx.xr.compose.testing.setSubspaceContent
@@ -64,12 +64,8 @@ class SubspaceModifierNodeChainTest {
             }
         }
 
-        // There should be a single initial composition.
-        assertThat(nodeCount).isEqualTo(1)
-
-        // Trigger one recomposition.
-        composeTestRule.onNodeWithTag("button").performClick()
-        composeTestRule.waitForIdle()
+        // There should be two initial compositions (the initial measure pass and a single relayout
+        // pass triggered by the state observer).
         assertThat(nodeCount).isEqualTo(2)
 
         // Trigger one recomposition.
@@ -77,18 +73,23 @@ class SubspaceModifierNodeChainTest {
         composeTestRule.waitForIdle()
         assertThat(nodeCount).isEqualTo(3)
 
+        // Trigger one recomposition.
+        composeTestRule.onNodeWithTag("button").performClick()
+        composeTestRule.waitForIdle()
+        assertThat(nodeCount).isEqualTo(4)
+
         // Trigger two recompositions.
         composeTestRule.onNodeWithTag("button").performClick()
         composeTestRule.onNodeWithTag("button").performClick()
         composeTestRule.waitForIdle()
-        assertThat(nodeCount).isEqualTo(5)
+        assertThat(nodeCount).isEqualTo(6)
     }
 
     private fun SubspaceModifier.count(count: Int): SubspaceModifier =
         this.then(CountElement(count))
 
     private inner class CountElement(private val count: Int) :
-        SubspaceModifierElement<CountNode>() {
+        SubspaceModifierNodeElement<CountNode>() {
 
         override fun create(): CountNode = CountNode(count)
 
@@ -112,7 +113,7 @@ class SubspaceModifierNodeChainTest {
         // This is used to track the number of times the node is reused.
         private var internalCount = 0
 
-        override fun modifyCoreEntity(coreEntity: CoreEntity) {
+        override fun CoreEntityScope.modifyCoreEntity() {
             nodeCount = ++internalCount
         }
     }

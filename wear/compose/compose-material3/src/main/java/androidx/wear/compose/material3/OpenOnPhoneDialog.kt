@@ -21,13 +21,14 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,12 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -85,7 +88,8 @@ import kotlinx.coroutines.launch
  * @sample androidx.wear.compose.material3.samples.OpenOnPhoneDialogSample
  * @param visible A boolean indicating whether the dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed - either by
- *   swiping right or when the [durationMillis] has passed.
+ *   swiping right or when the [durationMillis] has passed. Implementation of this lambda must
+ *   remove the dialog from the composition hierarchy e.g. by setting [visible] to false.
  * @param curvedText A slot for displaying curved text content which will be shown along the bottom
  *   edge of the dialog. We recommend using [openOnPhoneDialogCurvedText] for this parameter, which
  *   will give the default sweep angle and padding, and [OpenOnPhoneDialogDefaults.curvedTextStyle]
@@ -229,7 +233,7 @@ public fun OpenOnPhoneDialogContent(
                 Modifier.padding(top = topPadding.dp).size(size.dp).align(Alignment.TopCenter),
             contentAlignment = Alignment.Center
         ) {
-            iconContainer(
+            iconAndProgressContainer(
                 iconContainerColor = iconContainerColor.value,
                 progressIndicatorColors =
                     ProgressIndicatorDefaults.colors(
@@ -280,7 +284,7 @@ public object OpenOnPhoneDialogDefaults {
 
     /** The default style for curved text content. */
     public val curvedTextStyle: CurvedTextStyle
-        @Composable get() = CurvedTextStyle(MaterialTheme.typography.titleLarge)
+        @Composable get() = MaterialTheme.typography.arcLarge
 
     /** The default message for an [OpenOnPhoneDialog]. */
     public val text: String
@@ -293,7 +297,6 @@ public object OpenOnPhoneDialogDefaults {
      * @param modifier Modifier to be applied to the icon.
      * @param contentDescription The content description for the icon.
      */
-    @OptIn(ExperimentalAnimationGraphicsApi::class)
     @Composable
     public fun Icon(
         modifier: Modifier = Modifier,
@@ -353,7 +356,7 @@ public object OpenOnPhoneDialogDefaults {
         )
 
     /** Default timeout for the [OpenOnPhoneDialog] dialog, in milliseconds. */
-    public const val DurationMillis: Long = 4000L
+    public val DurationMillis: Long = 4000L
 
     private val ColorScheme.defaultOpenOnPhoneDialogColors: OpenOnPhoneDialogColors
         get() {
@@ -436,7 +439,7 @@ public class OpenOnPhoneDialogColors(
     }
 }
 
-private fun iconContainer(
+private fun iconAndProgressContainer(
     iconContainerColor: Color,
     progressIndicatorColors: ProgressIndicatorColors,
     sizeAnimationFraction: State<Float>,
@@ -461,11 +464,32 @@ private fun iconContainer(
             .align(Alignment.Center)
     )
 
-    CircularProgressIndicatorStatic(
-        modifier = Modifier.graphicsLayer { alpha = progressAlphaAnimationFraction.value },
+    IconContainerProgressIndicator(
         progress = progress,
+        progressAlpha = progressAlphaAnimationFraction.value,
         strokeWidth = strokeWidth,
         colors = progressIndicatorColors
+    )
+}
+
+@Composable
+private fun IconContainerProgressIndicator(
+    progress: () -> Float,
+    progressAlpha: Float,
+    colors: ProgressIndicatorColors,
+    strokeWidth: Dp,
+) {
+    Spacer(
+        Modifier.fillMaxSize()
+            .focusable()
+            .graphicsLayer { alpha = progressAlpha }
+            .drawBehind {
+                drawCircularProgressIndicator(
+                    progress = progress(),
+                    strokeWidth = strokeWidth,
+                    colors = colors,
+                )
+            }
     )
 }
 

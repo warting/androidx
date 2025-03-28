@@ -20,15 +20,15 @@ import android.media.AudioTrack;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.xr.extensions.media.AudioTrackExtensions;
-import androidx.xr.scenecore.JxrPlatformAdapter.AudioTrackExtensionsWrapper;
-import androidx.xr.scenecore.JxrPlatformAdapter.Entity;
-import androidx.xr.scenecore.JxrPlatformAdapter.PointSourceAttributes;
-import androidx.xr.scenecore.JxrPlatformAdapter.SoundFieldAttributes;
+import androidx.xr.runtime.internal.AudioTrackExtensionsWrapper;
+import androidx.xr.runtime.internal.Entity;
+import androidx.xr.runtime.internal.PointSourceParams;
+import androidx.xr.runtime.internal.SoundFieldAttributes;
+
+import com.android.extensions.xr.media.AudioTrackExtensions;
 
 /** Implementation of the {@link AudioTrackExtensionsWrapper} */
 final class AudioTrackExtensionsWrapperImpl implements AudioTrackExtensionsWrapper {
-
     private final AudioTrackExtensions mExtensions;
 
     private final EntityManager mEntityManager;
@@ -40,27 +40,27 @@ final class AudioTrackExtensionsWrapperImpl implements AudioTrackExtensionsWrapp
 
     @Nullable
     @Override
-    public PointSourceAttributes getPointSourceAttributes(@NonNull AudioTrack audioTrack) {
-        androidx.xr.extensions.media.PointSourceAttributes extAttributes =
-                mExtensions.getPointSourceAttributes(audioTrack);
+    public PointSourceParams getPointSourceParams(@NonNull AudioTrack audioTrack) {
+        com.android.extensions.xr.media.PointSourceParams extParams =
+                mExtensions.getPointSourceParams(audioTrack);
 
-        if (extAttributes == null) {
+        if (extParams == null) {
             return null;
         }
 
-        Entity entity = mEntityManager.getEntityForNode(extAttributes.getNode());
+        Entity entity = mEntityManager.getEntityForNode(extParams.getNode());
 
         if (entity == null) {
             return null;
         }
 
-        return new PointSourceAttributes(entity);
+        return new PointSourceParams(entity);
     }
 
     @Nullable
     @Override
     public SoundFieldAttributes getSoundFieldAttributes(@NonNull AudioTrack audioTrack) {
-        androidx.xr.extensions.media.SoundFieldAttributes extAttributes =
+        com.android.extensions.xr.media.SoundFieldAttributes extAttributes =
                 mExtensions.getSoundFieldAttributes(audioTrack);
 
         if (extAttributes == null) {
@@ -77,20 +77,28 @@ final class AudioTrackExtensionsWrapperImpl implements AudioTrackExtensionsWrapp
     }
 
     @Override
-    @NonNull
-    public AudioTrack.Builder setPointSourceAttributes(
-            @NonNull AudioTrack.Builder builder, @NonNull PointSourceAttributes attributes) {
-        androidx.xr.extensions.media.PointSourceAttributes extAttributes =
-                MediaUtils.convertPointSourceAttributesToExtensions(attributes);
+    public void setPointSourceParams(@NonNull AudioTrack track, @NonNull PointSourceParams params) {
+        com.android.extensions.xr.media.PointSourceParams extParams =
+                MediaUtils.convertPointSourceParamsToExtensions(params);
 
-        return mExtensions.setPointSourceAttributes(builder, extAttributes);
+        mExtensions.setPointSourceParams(track, extParams);
+    }
+
+    @Override
+    @NonNull
+    public AudioTrack.Builder setPointSourceParams(
+            @NonNull AudioTrack.Builder builder, @NonNull PointSourceParams params) {
+        com.android.extensions.xr.media.PointSourceParams extParams =
+                MediaUtils.convertPointSourceParamsToExtensions(params);
+
+        return mExtensions.setPointSourceParams(builder, extParams);
     }
 
     @Override
     @NonNull
     public AudioTrack.Builder setSoundFieldAttributes(
             @NonNull AudioTrack.Builder builder, @NonNull SoundFieldAttributes attributes) {
-        androidx.xr.extensions.media.SoundFieldAttributes extAttributes =
+        com.android.extensions.xr.media.SoundFieldAttributes extAttributes =
                 MediaUtils.convertSoundFieldAttributesToExtensions(attributes);
 
         return mExtensions.setSoundFieldAttributes(builder, extAttributes);

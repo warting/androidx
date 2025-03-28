@@ -29,7 +29,6 @@ plugins {
     id("AndroidXPlugin")
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-android")
 }
 
 dependencies {
@@ -38,9 +37,11 @@ dependencies {
     api(libs.kotlinStdlib)
     api(libs.kotlinCoroutinesCore)
     api("androidx.annotation:annotation:1.8.1")
+    api("androidx.lifecycle:lifecycle-common:2.8.7")
 
     implementation(libs.kotlinCoroutinesGuava)
     implementation("androidx.core:core:1.1.0")
+    implementation("androidx.lifecycle:lifecycle-runtime:2.8.7")
 
     testImplementation(libs.kotlinCoroutinesTest)
     testImplementation(libs.junit)

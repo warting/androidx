@@ -239,8 +239,8 @@ package androidx.core.app {
     ctor @RequiresApi(26) public MultiWindowModeChangedInfo(boolean isInMultiWindowMode, android.content.res.Configuration newConfig);
     method @RequiresApi(26) public android.content.res.Configuration getNewConfig();
     method public boolean isInMultiWindowMode();
-    property public final boolean isInMultiWindowMode;
-    property @RequiresApi(26) public final android.content.res.Configuration newConfig;
+    property public boolean isInMultiWindowMode;
+    property @RequiresApi(26) public android.content.res.Configuration newConfig;
   }
 
   public final class NavUtils {
@@ -1034,8 +1034,8 @@ package androidx.core.app {
     ctor @RequiresApi(26) public PictureInPictureModeChangedInfo(boolean isInPictureInPictureMode, android.content.res.Configuration newConfig);
     method @RequiresApi(26) public android.content.res.Configuration getNewConfig();
     method public boolean isInPictureInPictureMode();
-    property public final boolean isInPictureInPictureMode;
-    property @RequiresApi(26) public final android.content.res.Configuration newConfig;
+    property public boolean isInPictureInPictureMode;
+    property @RequiresApi(26) public android.content.res.Configuration newConfig;
   }
 
   @androidx.versionedparcelable.VersionedParcelize(jetifyAs="android.support.v4.app.RemoteActionCompat") public final class RemoteActionCompat implements androidx.versionedparcelable.VersionedParcelable {
@@ -2258,8 +2258,8 @@ package androidx.core.os {
   }
 
   public static final class BufferFillPolicy.Companion {
-    property public final androidx.core.os.BufferFillPolicy DISCARD;
-    property public final androidx.core.os.BufferFillPolicy RING_BUFFER;
+    property public androidx.core.os.BufferFillPolicy DISCARD;
+    property public androidx.core.os.BufferFillPolicy RING_BUFFER;
   }
 
   public final class BuildCompat {
@@ -2276,10 +2276,10 @@ package androidx.core.os {
     method @Deprecated @ChecksSdkIntAtLeast(api=33, codename="Tiramisu") public static boolean isAtLeastT();
     method @Deprecated @ChecksSdkIntAtLeast(api=34, codename="UpsideDownCake") public static boolean isAtLeastU();
     method @Deprecated @ChecksSdkIntAtLeast(api=35, codename="VanillaIceCream") public static boolean isAtLeastV();
-    property @ChecksSdkIntAtLeast(extension=android.os.ext.SdkExtensions.AD_SERVICES) public final int AD_SERVICES_EXTENSION_INT;
-    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.R) public final int R_EXTENSION_INT;
-    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.S) public final int S_EXTENSION_INT;
-    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.TIRAMISU) public final int T_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.ext.SdkExtensions.AD_SERVICES) public int AD_SERVICES_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.R) public int R_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.S) public int S_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.TIRAMISU) public int T_EXTENSION_INT;
     field @ChecksSdkIntAtLeast(extension=android.os.ext.SdkExtensions.AD_SERVICES) public static final int AD_SERVICES_EXTENSION_INT;
     field public static final androidx.core.os.BuildCompat INSTANCE;
     field @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.R) public static final int R_EXTENSION_INT;
@@ -2428,10 +2428,10 @@ package androidx.core.os {
     method public android.os.Bundle getParams();
     method public int getProfilingType();
     method public String? getTag();
-    property public final android.os.CancellationSignal? cancellationSignal;
-    property public final android.os.Bundle params;
-    property public final int profilingType;
-    property public final String? tag;
+    property public android.os.CancellationSignal? cancellationSignal;
+    property public android.os.Bundle params;
+    property public int profilingType;
+    property public String? tag;
   }
 
   @RequiresApi(api=35) public abstract class ProfilingRequestBuilder<T extends androidx.core.os.ProfilingRequestBuilder<T>> {
@@ -4142,6 +4142,7 @@ package androidx.core.view.accessibility {
     method public CharSequence! getContentDescription();
     method public int getDrawingOrder();
     method public CharSequence! getError();
+    method public int getExpandedState();
     method public android.view.accessibility.AccessibilityNodeInfo.ExtraRenderingInfo? getExtraRenderingInfo();
     method public android.os.Bundle! getExtras();
     method public CharSequence? getHintText();
@@ -4160,6 +4161,7 @@ package androidx.core.view.accessibility {
     method public androidx.core.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat! getRangeInfo();
     method public CharSequence? getRoleDescription();
     method public CharSequence? getStateDescription();
+    method public CharSequence? getSupplementalDescription();
     method public CharSequence! getText();
     method public int getTextSelectionEnd();
     method public int getTextSelectionStart();
@@ -4231,6 +4233,7 @@ package androidx.core.view.accessibility {
     method public void setEditable(boolean);
     method public void setEnabled(boolean);
     method public void setError(CharSequence!);
+    method public void setExpandedState(int);
     method public void setFieldRequired(boolean);
     method public void setFocusable(boolean);
     method public void setFocused(boolean);
@@ -4265,6 +4268,7 @@ package androidx.core.view.accessibility {
     method public void setSource(android.view.View!);
     method public void setSource(android.view.View!, int);
     method public void setStateDescription(CharSequence?);
+    method public void setSupplementalDescription(CharSequence?);
     method public void setText(CharSequence!);
     method public void setTextEntryKey(boolean);
     method public void setTextSelectable(boolean);
@@ -4691,17 +4695,26 @@ package androidx.core.view.inputmethod {
 
 }
 
-package androidx.core.view.insetscontrast {
+package androidx.core.view.insets {
 
-  public class ColorProtection extends androidx.core.view.insetscontrast.ContrastProtection {
+  public class ColorProtection extends androidx.core.view.insets.Protection {
     ctor public ColorProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
     ctor public ColorProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int, @ColorInt int);
     method @ColorInt public int getColor();
     method public void setColor(@ColorInt int);
   }
 
-  public abstract class ContrastProtection {
-    ctor public ContrastProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
+  public class GradientProtection extends androidx.core.view.insets.Protection {
+    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
+    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int, @ColorInt int);
+    method @ColorInt public int getColor();
+    method public float getScale();
+    method public void setColor(@ColorInt int);
+    method public void setScale(float);
+  }
+
+  public abstract class Protection {
+    ctor public Protection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
     method public void animateAlpha(float);
     method public void animateInsetsAmount(float);
     method @FloatRange(from=0.0, to=1.0) public float getAlpha();
@@ -4711,23 +4724,13 @@ package androidx.core.view.insetscontrast {
     method public void setInsetAmount(@FloatRange(from=0.0, to=1.0) float);
   }
 
-  public class GradientProtection extends androidx.core.view.insetscontrast.ContrastProtection {
-    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
-    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int, @ColorInt int);
-    method @ColorInt public int getColor();
-    method public float getScale();
-    method public void setColor(@ColorInt int);
-    method public void setScale(float);
-  }
-
-  public class ProtectionView extends android.widget.FrameLayout {
-    ctor public ProtectionView(android.content.Context, androidx.core.view.insetscontrast.SystemBarStateMonitor, java.util.List<androidx.core.view.insetscontrast.ContrastProtection!>);
-    method public void dispose();
-  }
-
-  public class SystemBarStateMonitor {
-    ctor public SystemBarStateMonitor(android.view.Window);
-    method public void dispose();
+  public class ProtectionLayout extends android.widget.FrameLayout {
+    ctor public ProtectionLayout(android.content.Context);
+    ctor public ProtectionLayout(android.content.Context, android.util.AttributeSet?);
+    ctor public ProtectionLayout(android.content.Context, android.util.AttributeSet?, @AttrRes int);
+    ctor public ProtectionLayout(android.content.Context, android.util.AttributeSet?, @AttrRes int, @StyleRes int);
+    ctor public ProtectionLayout(android.content.Context, java.util.List<androidx.core.view.insets.Protection!>);
+    method public void setProtections(java.util.List<androidx.core.view.insets.Protection!>);
   }
 
 }

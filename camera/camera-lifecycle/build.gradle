@@ -26,7 +26,7 @@ import androidx.build.SoftwareType
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
 }
 
 dependencies {
@@ -58,6 +58,21 @@ dependencies {
     androidTestImplementation("androidx.concurrent:concurrent-futures-ktx:1.1.0")
     androidTestImplementation(project(":internal-testutils-truth"))
     androidTestImplementation("org.jetbrains.kotlinx:atomicfu:0.13.1")
+    androidTestImplementation(project(":camera:camera-camera2"))
+    androidTestImplementation(project(":camera:camera-camera2-pipe-integration"))
+
+    testImplementation(libs.kotlinCoroutinesTest)
+    testImplementation(libs.kotlinStdlib)
+    testImplementation(libs.testCore)
+    testImplementation(libs.testRunner)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.truth)
+    testImplementation("org.jetbrains.kotlinx:atomicfu:0.13.1")
+    testImplementation(project(":internal-testutils-truth"))
+    testImplementation(project(":camera:camera-testing")) {
+        // Ensure camera-testing does not pull in androidx.test dependencies
+        exclude(group:"androidx.test")
+    }
 }
 
 android {
@@ -79,5 +94,4 @@ androidx {
     description = "Lifecycle components for the Jetpack Camera Library, a library providing a " +
             "consistent and reliable camera foundation that enables great camera driven " +
             "experiences across all of Android."
-    samples(project(":camera:camera-lifecycle:camera-lifecycle-samples"))
 }

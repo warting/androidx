@@ -28,7 +28,7 @@ import androidx.build.SoftwareType
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id("dagger.hilt.android.plugin")
 }
@@ -74,6 +74,3 @@ androidx {
     kotlinTarget = KotlinTarget.KOTLIN_2_0
 }
 
-ksp {
-    useKsp2 = true
-}

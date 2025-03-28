@@ -16,6 +16,7 @@
 
 package androidx.camera.video;
 
+import static androidx.camera.core.impl.SessionConfig.SESSION_TYPE_HIGH_SPEED;
 import static androidx.camera.video.AudioStats.AUDIO_AMPLITUDE_NONE;
 import static androidx.camera.video.VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED;
 import static androidx.camera.video.VideoRecordEvent.Finalize.ERROR_ENCODING_FAILED;
@@ -32,6 +33,9 @@ import static androidx.camera.video.internal.DebugUtils.readableUs;
 import static androidx.camera.video.internal.config.AudioConfigUtil.resolveAudioEncoderConfig;
 import static androidx.camera.video.internal.config.AudioConfigUtil.resolveAudioMimeInfo;
 import static androidx.camera.video.internal.config.AudioConfigUtil.resolveAudioSettings;
+import static androidx.camera.video.internal.config.VideoConfigUtil.resolveVideoEncoderConfig;
+import static androidx.camera.video.internal.config.VideoConfigUtil.resolveVideoMimeInfo;
+import static androidx.camera.video.internal.config.VideoConfigUtil.workaroundDataSpaceIfRequired;
 import static androidx.camera.video.internal.utils.StorageUtil.formatSize;
 import static androidx.camera.video.internal.utils.StorageUtil.isStorageFullException;
 import static androidx.core.util.Preconditions.checkArgument;
@@ -54,6 +58,7 @@ import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.util.Pair;
 import android.util.Range;
+import android.util.Rational;
 import android.util.Size;
 import android.view.Surface;
 
@@ -93,6 +98,7 @@ import androidx.camera.video.internal.compat.quirk.DeactivateEncoderSurfaceBefor
 import androidx.camera.video.internal.compat.quirk.DeviceQuirks;
 import androidx.camera.video.internal.compat.quirk.EncoderNotUsePersistentInputSurfaceQuirk;
 import androidx.camera.video.internal.config.AudioMimeInfo;
+import androidx.camera.video.internal.config.VideoMimeInfo;
 import androidx.camera.video.internal.encoder.AudioEncoderConfig;
 import androidx.camera.video.internal.encoder.BufferCopiedEncodedData;
 import androidx.camera.video.internal.encoder.EncodeException;
@@ -103,6 +109,7 @@ import androidx.camera.video.internal.encoder.EncoderFactory;
 import androidx.camera.video.internal.encoder.EncoderImpl;
 import androidx.camera.video.internal.encoder.InvalidConfigException;
 import androidx.camera.video.internal.encoder.OutputConfig;
+import androidx.camera.video.internal.encoder.VideoEncoderConfig;
 import androidx.camera.video.internal.encoder.VideoEncoderInfo;
 import androidx.camera.video.internal.encoder.VideoEncoderInfoImpl;
 import androidx.camera.video.internal.utils.OutputUtil;
@@ -212,6 +219,18 @@ public final class Recorder implements VideoOutput {
     @IntDef({VIDEO_CAPABILITIES_SOURCE_CAMCORDER_PROFILE,
             VIDEO_CAPABILITIES_SOURCE_CODEC_CAPABILITIES})
     @interface VideoCapabilitiesSource {
+    }
+
+    /** Regular type video recording. */
+    static final int VIDEO_RECORDING_TYPE_REGULAR = 1;
+
+    /** High-speed type video recording. */
+    static final int VIDEO_RECORDING_TYPE_HIGH_SPEED = 2;
+
+    @Retention(SOURCE)
+    @IntDef({VIDEO_RECORDING_TYPE_REGULAR,
+            VIDEO_RECORDING_TYPE_HIGH_SPEED})
+    @interface VideoRecordingType {
     }
 
     enum State {
@@ -502,6 +521,7 @@ public final class Recorder implements VideoOutput {
     private boolean mNeedsResetBeforeNextStart = false;
     @SuppressWarnings("WeakerAccess") /* synthetic accessor */
     @NonNull VideoEncoderSession mVideoEncoderSession;
+    private @Nullable VideoEncoderConfig mVideoEncoderConfig = null;
     @SuppressWarnings("WeakerAccess") /* synthetic accessor */
     @Nullable VideoEncoderSession mVideoEncoderSessionToRelease = null;
     double mAudioAmplitude = 0;
@@ -509,6 +529,7 @@ public final class Recorder implements VideoOutput {
     private @Nullable SetupVideoTask mSetupVideoTask = null;
     private @Nullable OutputStorage mOutputStorage = null;
     private long mAvailableBytesAboveRequired = Long.MAX_VALUE;
+    private boolean mHasGlProcessing = false;
     //--------------------------------------------------------------------------------------------//
 
     Recorder(@Nullable Executor executor, @NonNull MediaSpec mediaSpec,
@@ -539,12 +560,13 @@ public final class Recorder implements VideoOutput {
 
     @Override
     public void onSurfaceRequested(@NonNull SurfaceRequest request) {
-        onSurfaceRequested(request, Timebase.UPTIME);
+        onSurfaceRequested(request, Timebase.UPTIME, false);
     }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     @Override
-    public void onSurfaceRequested(@NonNull SurfaceRequest request, @NonNull Timebase timebase) {
+    public void onSurfaceRequested(@NonNull SurfaceRequest request, @NonNull Timebase timebase,
+            boolean hasGlProcessing) {
         synchronized (mLock) {
             Logger.d(TAG, "Surface is requested in state: " + mState + ", Current surface: "
                     + mStreamId);
@@ -552,7 +574,8 @@ public final class Recorder implements VideoOutput {
                 setState(State.CONFIGURING);
             }
         }
-        mSequentialExecutor.execute(() -> onSurfaceRequestedInternal(request, timebase));
+        mSequentialExecutor.execute(
+                () -> onSurfaceRequestedInternal(request, timebase, hasGlProcessing));
     }
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
@@ -581,8 +604,11 @@ public final class Recorder implements VideoOutput {
 
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     @Override
-    public @NonNull VideoCapabilities getMediaCapabilities(@NonNull CameraInfo cameraInfo) {
-        return getVideoCapabilities(cameraInfo, mVideoCapabilitiesSource);
+    public @NonNull VideoCapabilities getMediaCapabilities(@NonNull CameraInfo cameraInfo,
+            int sessionType) {
+        int videoCaptureType = sessionType == SESSION_TYPE_HIGH_SPEED
+                ? VIDEO_RECORDING_TYPE_HIGH_SPEED : VIDEO_RECORDING_TYPE_REGULAR;
+        return getVideoCapabilitiesInternal(videoCaptureType, cameraInfo, mVideoCapabilitiesSource);
     }
 
     /**
@@ -1056,10 +1082,11 @@ public final class Recorder implements VideoOutput {
 
     @ExecutedBy("mSequentialExecutor")
     private void onSurfaceRequestedInternal(@NonNull SurfaceRequest request,
-            @NonNull Timebase timebase) {
+            @NonNull Timebase timebase, boolean hasGlProcessing) {
         if (mLatestSurfaceRequest != null && !mLatestSurfaceRequest.isServiced()) {
             mLatestSurfaceRequest.willNotProvideSurface();
         }
+        mHasGlProcessing = hasGlProcessing;
         configureInternal(mLatestSurfaceRequest = request, mVideoSourceTimebase = timebase, true);
     }
 
@@ -1190,8 +1217,9 @@ public final class Recorder implements VideoOutput {
         Size surfaceSize = surfaceRequest.getResolution();
         // Fetch and cache nearest encoder profiles, if one exists.
         DynamicRange dynamicRange = surfaceRequest.getDynamicRange();
-        VideoCapabilities capabilities = getVideoCapabilities(
-                surfaceRequest.getCamera().getCameraInfo());
+        VideoCapabilities capabilities = getMediaCapabilities(
+                surfaceRequest.getCamera().getCameraInfo(),
+                surfaceRequest.getSessionType());
         Quality highestSupportedQuality = capabilities.findNearestHigherSupportedQualityFor(
                 surfaceSize, dynamicRange);
         Logger.d(TAG, "Using supported quality of " + highestSupportedQuality
@@ -1204,10 +1232,12 @@ public final class Recorder implements VideoOutput {
                         + "produce EncoderProfiles  for advertised quality.");
             }
         }
+        Logger.d(TAG, "mResolvedEncoderProfiles = " + mResolvedEncoderProfiles);
+
         if (mSetupVideoTask != null) {
             mSetupVideoTask.cancelFailedRetry();
         }
-        mSetupVideoTask = new SetupVideoTask(surfaceRequest, videoSourceTimebase,
+        mSetupVideoTask = new SetupVideoTask(surfaceRequest, videoSourceTimebase, mHasGlProcessing,
                 enableRetrySetupVideo ? sRetrySetupVideoMaxCount : 0);
         mSetupVideoTask.start();
     }
@@ -1223,9 +1253,10 @@ public final class Recorder implements VideoOutput {
         private @Nullable ScheduledFuture<?> mRetryFuture = null;
 
         SetupVideoTask(@NonNull SurfaceRequest surfaceRequest, @NonNull Timebase timebase,
-                int maxRetryCount) {
+                boolean hasGlProcessing, int maxRetryCount) {
             mSurfaceRequest = surfaceRequest;
             mTimebase = timebase;
+            mHasGlProcessing = hasGlProcessing;
             mMaxRetryCount = maxRetryCount;
         }
 
@@ -1265,9 +1296,25 @@ public final class Recorder implements VideoOutput {
                         new VideoEncoderSession(mVideoEncoderFactory, mSequentialExecutor,
                                 mExecutor);
                 MediaSpec mediaSpec = getObservableData(mMediaSpec);
-                ListenableFuture<Encoder> configureFuture =
-                        videoEncoderSession.configure(request, timebase, mediaSpec,
-                                mResolvedEncoderProfiles);
+                DynamicRange dynamicRange = request.getDynamicRange();
+                VideoMimeInfo videoMimeInfo = resolveVideoMimeInfo(mediaSpec, dynamicRange,
+                        mResolvedEncoderProfiles);
+                // The VideoSpec from mediaSpec only contains settings requested by the recorder,
+                // but the actual settings may need to differ depending on the FPS chosen by the
+                // camera. The expected frame rate from the camera is passed on here from the
+                // SurfaceRequest.
+                VideoEncoderConfig config = resolveVideoEncoderConfig(
+                        videoMimeInfo,
+                        timebase,
+                        mediaSpec.getVideoSpec(),
+                        request.getResolution(),
+                        dynamicRange,
+                        request.getExpectedFrameRate());
+                config = workaroundDataSpaceIfRequired(config, mHasGlProcessing);
+                mVideoEncoderConfig = config;
+
+                ListenableFuture<Encoder> configureFuture = videoEncoderSession.configure(request,
+                        config);
                 mVideoEncoderSession = videoEncoderSession;
                 Futures.addCallback(configureFuture, new FutureCallback<Encoder>() {
                     @Override
@@ -1471,9 +1518,20 @@ public final class Recorder implements VideoOutput {
         AudioMimeInfo audioMimeInfo = resolveAudioMimeInfo(mediaSpec, mResolvedEncoderProfiles);
         Timebase audioSourceTimebase = Timebase.UPTIME;
 
+        // Gets the expected sample rate ratio for slow-motion effect.
+        VideoEncoderConfig videoEncoderConfig = checkNotNull(mVideoEncoderConfig);
+        Rational expectedSampleRateRatio;
+        if (videoEncoderConfig.getCaptureFrameRate() != videoEncoderConfig.getEncodeFrameRate()) {
+            expectedSampleRateRatio = new Rational(videoEncoderConfig.getCaptureFrameRate(),
+                    videoEncoderConfig.getEncodeFrameRate());
+        } else {
+            expectedSampleRateRatio = null;
+        }
+
         // Select and create the audio source
         AudioSettings audioSettings =
-                resolveAudioSettings(audioMimeInfo, mediaSpec.getAudioSpec());
+                resolveAudioSettings(audioMimeInfo, mediaSpec.getAudioSpec(),
+                expectedSampleRateRatio);
         if (mAudioSource != null) {
             releaseCurrentAudioSource();
         }
@@ -1485,7 +1543,8 @@ public final class Recorder implements VideoOutput {
         // Select and create the audio encoder
         AudioEncoderConfig audioEncoderConfig = resolveAudioEncoderConfig(audioMimeInfo,
                 audioSourceTimebase, audioSettings, mediaSpec.getAudioSpec());
-        mAudioEncoder = mAudioEncoderFactory.createEncoder(mExecutor, audioEncoderConfig);
+        mAudioEncoder = mAudioEncoderFactory.createEncoder(mExecutor, audioEncoderConfig,
+                checkNotNull(mLatestSurfaceRequest).getSessionType());
 
         // Connect the audio source to the audio encoder
         Encoder.EncoderInput bufferProvider = mAudioEncoder.getInput();
@@ -2982,7 +3041,8 @@ public final class Recorder implements VideoOutput {
      * @return VideoCapabilities with respect to the input camera info.
      */
     public static @NonNull VideoCapabilities getVideoCapabilities(@NonNull CameraInfo cameraInfo) {
-        return getVideoCapabilities(cameraInfo, VIDEO_CAPABILITIES_SOURCE_CAMCORDER_PROFILE);
+        return getVideoCapabilitiesInternal(VIDEO_RECORDING_TYPE_REGULAR, cameraInfo,
+                VIDEO_CAPABILITIES_SOURCE_CAMCORDER_PROFILE);
     }
 
     /**
@@ -3004,8 +3064,49 @@ public final class Recorder implements VideoOutput {
      */
     public static @NonNull VideoCapabilities getVideoCapabilities(@NonNull CameraInfo cameraInfo,
             @VideoCapabilitiesSource int videoCapabilitiesSource) {
+        return getVideoCapabilitiesInternal(VIDEO_RECORDING_TYPE_REGULAR, cameraInfo,
+                videoCapabilitiesSource);
+    }
+
+    /**
+     * Returns the high-speed {@link VideoCapabilities} of Recorder with respect to input camera
+     * information.
+     *
+     * @param cameraInfo info about the camera.
+     * @return high-speed VideoCapabilities with respect to the input camera info, or null if
+     * high-speed recording is not supported.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY) // TODO(b/404096374): High-speed public API
+    public static @Nullable VideoCapabilities getHighSpeedVideoCapabilities(
+            @NonNull CameraInfo cameraInfo) {
+        return getHighSpeedVideoCapabilities(cameraInfo,
+                VIDEO_CAPABILITIES_SOURCE_CAMCORDER_PROFILE);
+    }
+
+    /**
+     * Returns the high-speed {@link VideoCapabilities} of Recorder with respect to input camera
+     * information and video capabilities source.
+     *
+     * @param cameraInfo              info about the camera.
+     * @param videoCapabilitiesSource the video capabilities source.
+     * @return high-speed VideoCapabilities with respect to the input camera info and video
+     * capabilities source, or null if high-speed recording is not supported.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY) // TODO(b/404096374): High-speed public API
+    public static @Nullable VideoCapabilities getHighSpeedVideoCapabilities(
+            @NonNull CameraInfo cameraInfo,
+            @VideoCapabilitiesSource int videoCapabilitiesSource) {
+        VideoCapabilities videoCapabilities = getVideoCapabilitiesInternal(
+                VIDEO_RECORDING_TYPE_HIGH_SPEED, cameraInfo, videoCapabilitiesSource);
+        return videoCapabilities.getSupportedDynamicRanges().isEmpty() ? null : videoCapabilities;
+    }
+
+    private static @NonNull VideoCapabilities getVideoCapabilitiesInternal(
+            @VideoRecordingType int videoRecordingType,
+            @NonNull CameraInfo cameraInfo,
+            @VideoCapabilitiesSource int videoCapabilitiesSource) {
         return new RecorderVideoCapabilities(videoCapabilitiesSource,
-                (CameraInfoInternal) cameraInfo, VideoEncoderInfoImpl.FINDER);
+                (CameraInfoInternal) cameraInfo, videoRecordingType, VideoEncoderInfoImpl.FINDER);
     }
 
     @AutoValue

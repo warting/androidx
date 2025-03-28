@@ -21,17 +21,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.core.os.ConfigurationCompat
 import java.util.Locale
 
 @Composable
 @ReadOnlyComposable
 internal actual fun getString(string: Strings): String {
-    // Do a no-op reading so when LocalConfiguration changes, this function will be recomposed.
-    LocalConfiguration.current
-    val resources = LocalContext.current.resources
-    return resources.getString(string.value)
+    return LocalResources.current.getString(string.value)
 }
 
 @Composable
@@ -50,6 +47,10 @@ internal actual value class Strings(@StringRes val value: Int) {
         actual inline val defaultPaneExpansionDragHandleContentDescription
             get() =
                 Strings(R.string.m3_adaptive_default_pane_expansion_drag_handle_content_description)
+
+        actual inline val defaultPaneExpansionDragHandleStateDescription
+            get() =
+                Strings(R.string.m3_adaptive_default_pane_expansion_drag_handle_state_description)
 
         actual inline val defaultPaneExpansionDragHandleActionDescription
             get() =

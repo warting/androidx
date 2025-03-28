@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
+import androidx.build.KotlinTarget
+
 plugins {
     id("AndroidXPlugin")
     id("com.android.test")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -48,4 +50,8 @@ dependencies {
     implementation(libs.testRunner)
     implementation(libs.testUiautomator)
     implementation(project(":wear:compose:compose-material"))
+}
+
+androidx {
+    kotlinTarget = KotlinTarget.KOTLIN_2_0
 }

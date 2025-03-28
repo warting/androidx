@@ -36,8 +36,6 @@ import androidx.biometric.BiometricManager.Authenticators;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
-import androidx.lifecycle.DefaultLifecycleObserver;
-import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.lifecycle.ViewModelStoreOwner;
 
@@ -46,7 +44,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.lang.ref.WeakReference;
 import java.security.Signature;
 import java.util.concurrent.Executor;
 
@@ -67,6 +64,13 @@ import javax.crypto.Mac;
  * ongoing authentication session's callbacks to be received by the new fragment/activity instance.
  * Note that {@code cancelAuthentication()} should not be called, and {@code authenticate()} does
  * not need to be invoked during activity/fragment creation.
+ *
+ * <p>Note that if multiple instances of {@code BiometricPrompt} are created within a single
+ * Fragment or Activity, only the callback registered with the last created instance will be
+ * saved and receive authentication results. This behavior can lead to unexpected results if
+ * multiple independent biometric authentication flows are attempted within the same Fragment or
+ * Activity. It is highly recommended to avoid creating multiple BiometricPrompt instances in
+ * this scenario.
  */
 public class BiometricPrompt {
     private static final String TAG = "BiometricPromptCompat";
@@ -168,6 +172,12 @@ public class BiometricPrompt {
     public static final int ERROR_SECURITY_UPDATE_REQUIRED = 15;
 
     /**
+     * The privacy setting has been enabled and will block use of the sensor.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    public static final int ERROR_SENSOR_PRIVACY_ENABLED = 18;
+
+    /**
      * Identity Check is currently not active.
      *
      * This device either doesn't have this feature enabled, or it's not considered in a
@@ -177,7 +187,10 @@ public class BiometricPrompt {
     public static final int ERROR_IDENTITY_CHECK_NOT_ACTIVE = 20;
 
     /**
-     * Biometrics is not allowed to verify the user in apps.
+     * Biometrics is not allowed to verify the user in apps. It's for internal use only. This
+     * error code, introduced in API 35, was previously covered by ERROR_HW_UNAVAILABLE and
+     * doesn't need to be public. Therefore, for backward compatibility, this error will be
+     * converted to ERROR_HW_UNAVAILABLE.
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     public static final int ERROR_NOT_ENABLED_FOR_APPS = 21;
@@ -205,6 +218,8 @@ public class BiometricPrompt {
         ERROR_HW_NOT_PRESENT,
         ERROR_NEGATIVE_BUTTON,
         ERROR_NO_DEVICE_CREDENTIAL,
+        ERROR_SECURITY_UPDATE_REQUIRED,
+        ERROR_SENSOR_PRIVACY_ENABLED,
         ERROR_IDENTITY_CHECK_NOT_ACTIVE,
         ERROR_NOT_ENABLED_FOR_APPS,
         ERROR_CONTENT_VIEW_MORE_OPTIONS_BUTTON
@@ -963,29 +978,11 @@ public class BiometricPrompt {
     }
 
     /**
-     * A lifecycle observer that clears the client callback reference held by a
-     * {@link BiometricViewModel} when the lifecycle owner is destroyed.
-     */
-    private static class ResetCallbackObserver implements DefaultLifecycleObserver {
-        private final @NonNull WeakReference<BiometricViewModel> mViewModelRef;
-
-        ResetCallbackObserver(@NonNull BiometricViewModel viewModel) {
-            mViewModelRef = new WeakReference<>(viewModel);
-        }
-
-        @Override
-        public void onDestroy(@NonNull LifecycleOwner owner) {
-            if (mViewModelRef.get() != null) {
-                mViewModelRef.get().resetClientCallback();
-            }
-        }
-    }
-
-    /**
      * The fragment manager that will be used to attach the prompt to the client activity.
      */
     private @Nullable FragmentManager mClientFragmentManager;
     private boolean mHostedInActivity;
+    private AuthenticationCallback mAuthenticationCallback;
 
     /**
      * Constructs a {@link BiometricPrompt}, which can be used to prompt the user to authenticate
@@ -1052,7 +1049,6 @@ public class BiometricPrompt {
         final FragmentManager fragmentManager = fragment.getChildFragmentManager();
         final BiometricViewModel viewModel =
                 new ViewModelProvider(fragment).get(BiometricViewModel.class);
-        addObservers(fragment, viewModel);
         init(false /* hostedInActivity */, fragmentManager, viewModel, null /* executor */,
                 callback);
     }
@@ -1136,7 +1132,6 @@ public class BiometricPrompt {
         final FragmentManager fragmentManager = fragment.getChildFragmentManager();
         final BiometricViewModel viewModel =
                 new ViewModelProvider(fragment).get(BiometricViewModel.class);
-        addObservers(fragment, viewModel);
         init(false /* hostedInActivity */, fragmentManager, viewModel, executor, callback);
     }
 
@@ -1161,7 +1156,14 @@ public class BiometricPrompt {
         if (executor != null) {
             viewModel.setClientExecutor(executor);
         }
-        viewModel.setClientCallback(callback);
+        mAuthenticationCallback = callback;
+
+        // Reset callbacks if biometricFragment has been created. This is mainly for
+        // configuration changes.
+        final BiometricFragment biometricFragment = findBiometricFragment(mClientFragmentManager);
+        if (biometricFragment != null) {
+            biometricFragment.setClientCallback(mAuthenticationCallback);
+        }
     }
 
     /**
@@ -1191,9 +1193,11 @@ public class BiometricPrompt {
             throw new IllegalArgumentException("CryptoObject cannot be null.");
         }
 
-        // Ensure that all allowed authenticators support crypto auth.
+        // Ensure that all allowed authenticators support crypto auth. |isIdentityCheckAvailable|
+        // is not important for this check.
         @BiometricManager.AuthenticatorTypes final int authenticators =
-                AuthenticatorUtils.getConsolidatedAuthenticators(info, crypto);
+                AuthenticatorUtils.getConsolidatedAuthenticators(info, crypto,
+                        false /*isIdentityCheckAvailable*/);
         if (AuthenticatorUtils.isWeakBiometricAllowed(authenticators)) {
             throw new IllegalArgumentException("Crypto-based authentication is not supported for "
                     + "Class 2 (Weak) biometrics.");
@@ -1287,18 +1291,6 @@ public class BiometricPrompt {
     }
 
     /**
-     * Adds the necessary lifecycle observers to the given fragment host.
-     *
-     * @param fragment  The fragment of the client application that will host the prompt.
-     * @param viewModel A biometric view model tied to the lifecycle of the client activity.
-     */
-    private static void addObservers(
-            @NonNull Fragment fragment, @NonNull BiometricViewModel viewModel) {
-        // Ensure that the callback is reset to avoid leaking fragment instances (b/167014923).
-        fragment.getLifecycle().addObserver(new ResetCallbackObserver(viewModel));
-    }
-
-    /**
      * Searches for a {@link BiometricFragment} instance that has been added to an activity or
      * fragment.
      *
@@ -1323,7 +1315,8 @@ public class BiometricPrompt {
 
         // If the fragment hasn't been added before, add it.
         if (biometricFragment == null) {
-            biometricFragment = BiometricFragment.newInstance(mHostedInActivity);
+            biometricFragment = BiometricFragment.newInstance(mHostedInActivity,
+                    mAuthenticationCallback);
             mClientFragmentManager.beginTransaction()
                     .add(biometricFragment, BiometricPrompt.BIOMETRIC_FRAGMENT_TAG)
                     .commitAllowingStateLoss();

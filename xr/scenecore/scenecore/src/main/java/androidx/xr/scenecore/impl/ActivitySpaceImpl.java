@@ -16,18 +16,27 @@
 
 package androidx.xr.scenecore.impl;
 
+import android.app.Activity;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.xr.extensions.XrExtensions;
-import androidx.xr.extensions.node.Node;
-import androidx.xr.extensions.space.Bounds;
-import androidx.xr.extensions.space.SpatialState;
+import androidx.concurrent.futures.ResolvableFuture;
+import androidx.xr.runtime.internal.ActivityPose.HitTestRangeValue;
+import androidx.xr.runtime.internal.ActivitySpace;
+import androidx.xr.runtime.internal.Dimensions;
+import androidx.xr.runtime.internal.Entity;
+import androidx.xr.runtime.internal.HitTestResult;
+import androidx.xr.runtime.internal.SpaceValue;
 import androidx.xr.runtime.math.Pose;
 import androidx.xr.runtime.math.Vector3;
-import androidx.xr.scenecore.JxrPlatformAdapter.ActivitySpace;
-import androidx.xr.scenecore.JxrPlatformAdapter.Dimensions;
-import androidx.xr.scenecore.JxrPlatformAdapter.Entity;
+
+import com.android.extensions.xr.XrExtensions;
+import com.android.extensions.xr.node.Node;
+import com.android.extensions.xr.node.Vec3;
+import com.android.extensions.xr.space.Bounds;
+import com.android.extensions.xr.space.SpatialState;
+
+import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -41,7 +50,7 @@ import java.util.function.Supplier;
  *
  * <p>This is used to create an entity that contains the task node.
  */
-@SuppressWarnings({"deprecation", "UnnecessarilyFullyQualified"}) // TODO(b/373435470): Remove
+@SuppressWarnings({"UnnecessarilyFullyQualified"})
 final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivitySpace {
 
     private static final String TAG = "ActivitySpaceImpl";
@@ -49,17 +58,19 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
     private final Set<OnBoundsChangedListener> mBoundsListeners =
             Collections.synchronizedSet(new HashSet<>());
 
+    private final Activity mActivity;
     private final Supplier<SpatialState> mSpatialStateProvider;
     private final AtomicReference<Dimensions> mBounds = new AtomicReference<>();
 
     ActivitySpaceImpl(
             Node taskNode,
+            Activity activity,
             XrExtensions extensions,
             EntityManager entityManager,
             Supplier<SpatialState> spatialStateProvider,
             ScheduledExecutorService executor) {
         super(taskNode, extensions, entityManager, executor);
-
+        mActivity = activity;
         mSpatialStateProvider = spatialStateProvider;
     }
 
@@ -70,12 +81,14 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
     }
 
     /** Returns the identity pose since we assume the activity space is the world space root. */
+    @NonNull
     @Override
     public Pose getActivitySpacePose() {
 
         return new Pose();
     }
 
+    @NonNull
     @Override
     public Vector3 getActivitySpaceScale() {
         return new Vector3(1.0f, 1.0f, 1.0f);
@@ -87,7 +100,7 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
     }
 
     @Override
-    public void setScale(Vector3 scale) {
+    public void setScale(@NonNull Vector3 scale, @SpaceValue int relativeTo) {
         // TODO(b/349391097): make this behavior consistent with AnchorEntityImpl
         Log.e(TAG, "Cannot set scale for the ActivitySpace.");
     }
@@ -99,6 +112,7 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
         super.dispose();
     }
 
+    @NonNull
     @Override
     public Dimensions getBounds() {
         // The bounds are kept in sync with the Extensions in the onBoundsChangedEvent callback. We
@@ -108,7 +122,8 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
                 oldBounds -> {
                     if (oldBounds == null) {
                         Bounds bounds = mSpatialStateProvider.get().getBounds();
-                        return new Dimensions(bounds.width, bounds.height, bounds.depth);
+                        return new Dimensions(
+                                bounds.getWidth(), bounds.getHeight(), bounds.getDepth());
                     }
                     return oldBounds;
                 });
@@ -135,9 +150,47 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
         Dimensions newDimensions =
                 mBounds.updateAndGet(
                         oldBounds ->
-                                new Dimensions(newBounds.width, newBounds.height, newBounds.depth));
+                                new Dimensions(
+                                        newBounds.getWidth(),
+                                        newBounds.getHeight(),
+                                        newBounds.getDepth()));
         for (OnBoundsChangedListener listener : mBoundsListeners) {
             listener.onBoundsChanged(newDimensions);
         }
+    }
+
+    @SuppressWarnings("RestrictTo")
+    static class HitTestResultConsumer
+            implements com.android.extensions.xr.function.Consumer<
+                    com.android.extensions.xr.space.HitTestResult> {
+        ResolvableFuture<HitTestResult> mFuture;
+
+        HitTestResultConsumer(ResolvableFuture<HitTestResult> future) {
+            mFuture = future;
+        }
+
+        @Override
+        @SuppressWarnings("RestrictTo")
+        public void accept(com.android.extensions.xr.space.HitTestResult hitTestResultExt) {
+            mFuture.set(RuntimeUtils.getHitTestResult(hitTestResultExt));
+        }
+    }
+
+    @Override
+    @SuppressWarnings("RestrictTo")
+    public ListenableFuture<HitTestResult> hitTest(
+            @NonNull Vector3 origin,
+            @NonNull Vector3 direction,
+            @HitTestRangeValue int hitTestRange) {
+        ResolvableFuture<HitTestResult> hitTestFuture = ResolvableFuture.create();
+        HitTestResultConsumer hitTestConsumer = new HitTestResultConsumer(hitTestFuture);
+
+        mExtensions.hitTest(
+                mActivity, // mSession.getActivity(),
+                new Vec3(origin.getX(), origin.getY(), origin.getZ()),
+                new Vec3(direction.getX(), direction.getY(), direction.getZ()),
+                hitTestConsumer,
+                mExecutor);
+        return hitTestFuture;
     }
 }

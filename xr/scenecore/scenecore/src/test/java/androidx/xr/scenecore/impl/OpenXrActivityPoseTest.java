@@ -22,27 +22,36 @@ import static androidx.xr.runtime.testing.math.MathAssertions.assertVector3;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import android.app.Activity;
+
+import androidx.xr.runtime.internal.CameraViewActivityPose;
 import androidx.xr.runtime.math.Matrix4;
 import androidx.xr.runtime.math.Pose;
 import androidx.xr.runtime.math.Quaternion;
 import androidx.xr.runtime.math.Vector3;
-import androidx.xr.scenecore.JxrPlatformAdapter.CameraViewActivityPose;
 import androidx.xr.scenecore.common.BaseActivityPose;
+import androidx.xr.scenecore.impl.extensions.XrExtensionsProvider;
 import androidx.xr.scenecore.impl.perception.Fov;
 import androidx.xr.scenecore.impl.perception.PerceptionLibrary;
 import androidx.xr.scenecore.impl.perception.Session;
 import androidx.xr.scenecore.impl.perception.ViewProjection;
 import androidx.xr.scenecore.impl.perception.ViewProjections;
+import androidx.xr.scenecore.testing.FakeImpressApi;
 import androidx.xr.scenecore.testing.FakeScheduledExecutorService;
-import androidx.xr.scenecore.testing.FakeXrExtensions;
-import androidx.xr.scenecore.testing.FakeXrExtensions.FakeGltfModelToken;
+
+import com.android.extensions.xr.XrExtensions;
+
+import com.google.androidxr.splitengine.SplitEngineSubspaceManager;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mockito;
 import org.robolectric.ParameterizedRobolectricTestRunner;
 import org.robolectric.ParameterizedRobolectricTestRunner.Parameter;
 import org.robolectric.ParameterizedRobolectricTestRunner.Parameters;
+import org.robolectric.Robolectric;
 
 import java.util.Arrays;
 import java.util.List;
@@ -51,18 +60,24 @@ import java.util.List;
 @RunWith(ParameterizedRobolectricTestRunner.class)
 public final class OpenXrActivityPoseTest {
     private final AndroidXrEntity mActivitySpaceRoot = mock(AndroidXrEntity.class);
-    private final FakeXrExtensions mFakeExtensions = new FakeXrExtensions();
+    private final XrExtensions mXrExtensions = XrExtensionsProvider.getXrExtensions();
     private final PerceptionLibrary mPerceptionLibrary = mock(PerceptionLibrary.class);
     private final Session mSession = mock(Session.class);
     private final FakeScheduledExecutorService mExecutor = new FakeScheduledExecutorService();
     private final EntityManager mEntityManager = new EntityManager();
+    private final Activity mActivity =
+            Robolectric.buildActivity(Activity.class).create().start().get();
     private final ActivitySpaceImpl mActivitySpace =
             new ActivitySpaceImpl(
-                    mFakeExtensions.createNode(),
-                    mFakeExtensions,
+                    mXrExtensions.createNode(),
+                    mActivity,
+                    mXrExtensions,
                     mEntityManager,
-                    () -> mFakeExtensions.fakeSpatialState,
+                    () -> mXrExtensions.getSpatialState(mActivity),
                     mExecutor);
+    private final FakeImpressApi mFakeImpressApi = new FakeImpressApi();
+    private final SplitEngineSubspaceManager mSplitEngineSubspaceManager =
+            Mockito.mock(SplitEngineSubspaceManager.class);
 
     enum OpenXrActivityPoseType {
         HEAD_ACTIVITY_POSE,
@@ -102,7 +117,7 @@ public final class OpenXrActivityPoseTest {
     private CameraViewActivityPoseImpl createCameraViewActivityPose(
             ActivitySpaceImpl activitySpace, AndroidXrEntity activitySpaceRoot) {
         return new CameraViewActivityPoseImpl(
-                CameraViewActivityPose.CAMERA_TYPE_LEFT_EYE,
+                CameraViewActivityPose.CameraType.CAMERA_TYPE_LEFT_EYE,
                 activitySpace,
                 activitySpaceRoot,
                 mPerceptionLibrary);
@@ -150,10 +165,28 @@ public final class OpenXrActivityPoseTest {
 
     /** Creates a generic glTF entity. */
     private GltfEntityImpl createGltfEntity() {
-        FakeGltfModelToken modelToken = new FakeGltfModelToken("model");
+        long modelToken = -1;
+        try {
+            ListenableFuture<Long> modelTokenFuture =
+                    mFakeImpressApi.loadGltfAsset("FakeGltfAsset.glb");
+            // This resolves the transformation of the Future from a SplitEngine token to the JXR
+            // GltfModelResource.  This is a hidden detail from the API surface's perspective.
+            mExecutor.runAll();
+            modelToken = modelTokenFuture.get();
+        } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+        }
         GltfModelResourceImpl model = new GltfModelResourceImpl(modelToken);
         return new GltfEntityImpl(
-                model, mActivitySpace, mFakeExtensions, mEntityManager, mExecutor);
+                model,
+                mActivitySpace,
+                mFakeImpressApi,
+                mSplitEngineSubspaceManager,
+                mXrExtensions,
+                mEntityManager,
+                mExecutor);
     }
 
     @Test

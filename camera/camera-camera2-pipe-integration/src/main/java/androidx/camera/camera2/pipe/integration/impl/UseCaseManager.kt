@@ -34,10 +34,12 @@ import androidx.camera.camera2.pipe.CameraGraph.OperatingMode
 import androidx.camera.camera2.pipe.CameraGraph.RepeatingRequestRequirementsBeforeCapture.CompletionBehavior.AT_LEAST
 import androidx.camera.camera2.pipe.CameraId
 import androidx.camera.camera2.pipe.CameraMetadata
+import androidx.camera.camera2.pipe.CameraMetadata.Companion.supportsLowLightBoost
 import androidx.camera.camera2.pipe.CameraPipe
 import androidx.camera.camera2.pipe.CameraStream
 import androidx.camera.camera2.pipe.InputStream
 import androidx.camera.camera2.pipe.OutputStream
+import androidx.camera.camera2.pipe.OutputStream.DynamicRangeProfile
 import androidx.camera.camera2.pipe.RequestTemplate
 import androidx.camera.camera2.pipe.StreamFormat
 import androidx.camera.camera2.pipe.compat.CameraPipeKeys
@@ -46,6 +48,7 @@ import androidx.camera.camera2.pipe.integration.adapter.CameraStateAdapter
 import androidx.camera.camera2.pipe.integration.adapter.SessionConfigAdapter
 import androidx.camera.camera2.pipe.integration.adapter.SupportedSurfaceCombination
 import androidx.camera.camera2.pipe.integration.adapter.ZslControl
+import androidx.camera.camera2.pipe.integration.compat.DynamicRangeProfilesCompat
 import androidx.camera.camera2.pipe.integration.compat.quirk.CameraQuirks
 import androidx.camera.camera2.pipe.integration.compat.quirk.CaptureSessionStuckQuirk
 import androidx.camera.camera2.pipe.integration.compat.quirk.CloseCameraDeviceOnCameraGraphCloseQuirk
@@ -62,6 +65,7 @@ import androidx.camera.camera2.pipe.integration.config.CameraScope
 import androidx.camera.camera2.pipe.integration.config.UseCaseCameraComponent
 import androidx.camera.camera2.pipe.integration.config.UseCaseCameraConfig
 import androidx.camera.camera2.pipe.integration.config.UseCaseGraphConfig
+import androidx.camera.camera2.pipe.integration.internal.DynamicRangeConversions.dynamicRangeToFirstSupportedProfile
 import androidx.camera.camera2.pipe.integration.internal.DynamicRangeResolver
 import androidx.camera.camera2.pipe.integration.interop.Camera2CameraControl
 import androidx.camera.camera2.pipe.integration.interop.ExperimentalCamera2Interop
@@ -83,6 +87,7 @@ import androidx.camera.core.impl.SessionConfig
 import androidx.camera.core.impl.SessionConfig.OutputConfig.SURFACE_GROUP_ID_NONE
 import androidx.camera.core.impl.SessionConfig.ValidatingBuilder
 import androidx.camera.core.impl.SessionProcessor
+import androidx.camera.core.impl.StreamSpec.FRAME_RATE_RANGE_UNSPECIFIED
 import androidx.camera.core.impl.SurfaceConfig
 import androidx.camera.core.impl.stabilization.StabilizationMode
 import androidx.camera.core.streamsharing.StreamSharing
@@ -134,6 +139,7 @@ constructor(
     private val cameraConfig: CameraConfig,
     private val builder: UseCaseCameraComponent.Builder,
     private val zslControl: ZslControl,
+    private val lowLightBoostControl: LowLightBoostControl,
     @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN") // Java version required for Dagger
     private val controls: java.util.Set<UseCaseCameraControl>,
     private val camera2CameraControl: Camera2CameraControl,
@@ -144,8 +150,8 @@ constructor(
     private val cameraInfoInternal: Provider<CameraInfoInternal>,
     private val templateParamsOverride: TemplateParamsOverride,
     private val encoderProfilesProvider: EncoderProfilesProvider,
+    private val cameraProperties: CameraProperties,
     context: Context,
-    cameraProperties: CameraProperties,
     displayInfoManager: DisplayInfoManager,
 ) {
     private val lock = Any()
@@ -234,6 +240,7 @@ constructor(
             if (attachedUseCases.addAll(useCases)) {
                 if (!addOrRemoveRepeatingUseCase(getRunningUseCases())) {
                     updateZslDisabledByUseCaseConfigStatus()
+                    updateLowLightBoostDisabledByUseCaseSessionConfigStatus()
                     refreshAttachedUseCases(attachedUseCases)
                 }
             }
@@ -284,8 +291,10 @@ constructor(
 
                 if (attachedUseCases.isEmpty()) {
                     zslControl.setZslDisabledByUserCaseConfig(false)
+                    lowLightBoostControl.setLowLightBoostDisabledByUseCaseSessionConfig(false)
                 } else {
                     updateZslDisabledByUseCaseConfigStatus()
+                    updateLowLightBoostDisabledByUseCaseSessionConfigStatus()
                 }
                 refreshAttachedUseCases(attachedUseCases)
             }
@@ -777,7 +786,12 @@ constructor(
                         streamSpec.dynamicRange,
                         useCase.getCaptureTypes(),
                         streamSpec.implementationOptions ?: MutableOptionsBundle.create(),
-                        useCase.currentConfig.getTargetFrameRate(null)
+                        useCase.currentConfig.getTargetFrameRate(null),
+                        checkNotNull(
+                            useCase.currentConfig.getTargetHighSpeedFrameRate(
+                                FRAME_RATE_RANGE_UNSPECIFIED
+                            )
+                        ),
                     )
                 )
             }
@@ -855,6 +869,35 @@ constructor(
         val disableZsl = attachedUseCases.any { it.currentConfig.isZslDisabled(false) }
         zslControl.setZslDisabledByUserCaseConfig(disableZsl)
     }
+
+    private fun updateLowLightBoostDisabledByUseCaseSessionConfigStatus() {
+        if (!cameraProperties.metadata.supportsLowLightBoost) {
+            return
+        }
+
+        // Low-light boost should be disabled when expected frame rate range exceeds 30.
+        if (attachedUseCases.getSessionConfig().expectedFrameRateRange.upper > 30) {
+            lowLightBoostControl.setLowLightBoostDisabledByUseCaseSessionConfig(true)
+            return
+        }
+
+        // HDR 10-bit can be supported since API level 33
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return
+        }
+
+        // Low-light boost should be disabled when dynamic range setting is not 8-bit.
+        val attachedSurfaceInfoList = attachedUseCases.getAttachedSurfaceInfoList()
+        if (getRequiredMaxBitDepth(attachedSurfaceInfoList) != DynamicRange.BIT_DEPTH_8_BIT) {
+            lowLightBoostControl.setLowLightBoostDisabledByUseCaseSessionConfig(true)
+            return
+        }
+
+        lowLightBoostControl.setLowLightBoostDisabledByUseCaseSessionConfig(false)
+    }
+
+    private fun Collection<UseCase>.getSessionConfig(): SessionConfig =
+        ValidatingBuilder().apply { forEach { useCase -> add(useCase.sessionConfig) } }.build()
 
     /**
      * This interface defines a listener that is notified when the set of running UseCases changes.
@@ -945,9 +988,12 @@ constructor(
                     val deferrableSurface = outputConfig.surface
                     val physicalCameraId =
                         physicalCameraIdForAllStreams ?: outputConfig.physicalCameraId
+                    val dynamicRange = outputConfig.dynamicRange
                     val mirrorMode = outputConfig.mirrorMode
                     val outputStreamConfig =
                         OutputStream.Config.create(
+                            dynamicRangeProfile =
+                                dynamicRange.toDynamicRangeProfiles(cameraMetadata),
                             size = deferrableSurface.prescribedSize,
                             format = StreamFormat(deferrableSurface.prescribedStreamFormat),
                             camera =
@@ -1165,6 +1211,37 @@ constructor(
                 finalizeSessionOnCloseBehavior = shouldFinalizeSessionOnCloseBehavior,
                 enableRestartDelays = true,
             )
+        }
+
+        private fun DynamicRange.toDynamicRangeProfiles(
+            cameraMetadata: CameraMetadata?
+        ): DynamicRangeProfile? {
+            var dynamicRangeProfile: DynamicRangeProfile? = null
+
+            if (Build.VERSION.SDK_INT >= 33) {
+                dynamicRangeProfile = DynamicRangeProfile.STANDARD
+
+                val dynamicRangeProfilesCompat =
+                    cameraMetadata?.let { metadata ->
+                        DynamicRangeProfilesCompat.fromCameraMetaData(metadata)
+                    }
+                val supportedProfiles = dynamicRangeProfilesCompat?.toDynamicRangeProfiles()
+
+                if (supportedProfiles != null) {
+                    val firstSupportedProfile =
+                        dynamicRangeToFirstSupportedProfile(this, supportedProfiles)
+                    if (firstSupportedProfile != null) {
+                        dynamicRangeProfile = DynamicRangeProfile(firstSupportedProfile)
+                    } else {
+                        Log.error {
+                            "Requested dynamic range is not supported. Defaulting to STANDARD" +
+                                " dynamic range profile.\nRequested dynamic range:\n $this"
+                        }
+                    }
+                }
+            }
+
+            return dynamicRangeProfile
         }
     }
 }

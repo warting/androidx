@@ -20,6 +20,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.util.AttributeSet
+import android.util.Log
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
@@ -33,7 +34,8 @@ import androidx.customview.poolingcontainer.isWithinPoolingContainer
 import androidx.customview.poolingcontainer.removePoolingContainerListener
 import androidx.privacysandbox.ui.core.SandboxedUiAdapter
 import androidx.privacysandbox.ui.core.SandboxedUiAdapter.SessionClient
-import androidx.privacysandbox.ui.core.SessionConstants
+import androidx.privacysandbox.ui.core.SandboxedUiAdapterSignalOptions
+import androidx.privacysandbox.ui.core.SessionData
 import kotlin.math.min
 
 /** A listener for events relating to the SandboxedSdkView UI presentation. */
@@ -67,14 +69,17 @@ internal interface RefreshableSessionClient : SessionClient {
 
 class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     ViewGroup(context, attrs) {
+    private companion object {
+        private const val TAG = "SandboxedSdkView"
+    }
 
     private val scrollChangedListener =
-        ViewTreeObserver.OnScrollChangedListener { signalMeasurer?.maybeSendSignals() }
+        ViewTreeObserver.OnScrollChangedListener { signalMeasurer?.requestUpdatedSignals() }
 
     private var adapter: SandboxedUiAdapter? = null
     private var client: Client? = null
     private var clientSecondary: Client? = null
-    private var isZOrderOnTop = true
+    private var isZOrderOnTop = false
     private var contentView: View? = null
     private var refreshCallback: Consumer<Boolean>? = null
     private var requestedWidth = -1
@@ -82,11 +87,11 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
     private var isTransitionGroupSet = false
     private var previousChildWidth = -1
     private var previousChildHeight = -1
-    private var sessionConstants: SessionConstants? = null
+    private var sessionData: SessionData? = null
     private var viewContainingPoolingContainerListener: View? = null
     private var poolingContainerListener = PoolingContainerListener {}
     private var eventListener: SandboxedSdkViewEventListener? = null
-    private val frameCommitCallback = Runnable { eventListener?.onUiDisplayed() }
+    private val frameCommitCallback = Runnable { sendUiDisplayedEvents() }
     internal var signalMeasurer: SandboxedSdkViewSignalMeasurer? = null
     internal var isInComposeNode = false
 
@@ -114,9 +119,9 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
      * Sets the Z-ordering of the [SandboxedSdkView]'s surface, relative to its window.
      *
      * When [providerUiOnTop] is true, every [android.view.MotionEvent] on the [SandboxedSdkView]
-     * will be sent to the UI provider. When [providerUiOnTop] is false, every
-     * [android.view.MotionEvent] will be sent to the client. By default, motion events are sent to
-     * the UI provider.
+     * area will be sent to the UI provider. When [providerUiOnTop] is false, every
+     * [android.view.MotionEvent] will be sent to the client and will also be transferred to the UI
+     * provider. By default, [providerUiOnTop] is false.
      *
      * When [providerUiOnTop] is true, the UI provider's surface will be placed above the client's
      * window. In this case, none of the contents of the client's window beneath the provider's
@@ -129,6 +134,10 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
         checkClientOpenSession()
     }
 
+    internal fun isProviderUiAboveClientUi(): Boolean {
+        return isZOrderOnTop
+    }
+
     private fun checkClientOpenSession(
         isSecondary: Boolean = false,
         callback: Consumer<Boolean>? = null
@@ -136,7 +145,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
         val adapter = adapter
         if (
             adapter != null &&
-                sessionConstants != null &&
+                sessionData != null &&
                 width > 0 &&
                 height > 0 &&
                 windowVisibility == View.VISIBLE
@@ -145,7 +154,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
                 client = Client(this)
                 adapter.openSession(
                     context,
-                    sessionConstants!!,
+                    sessionData!!,
                     width,
                     height,
                     isZOrderOnTop,
@@ -157,7 +166,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
                 this.refreshCallback = callback
                 adapter.openSession(
                     context,
-                    sessionConstants!!,
+                    sessionData!!,
                     width,
                     height,
                     isZOrderOnTop,
@@ -210,7 +219,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
 
     internal fun onClientClosedSession(error: Throwable? = null) {
         removeContentView()
-        signalMeasurer?.dropPendingUpdates()
+        signalMeasurer?.stopMeasuring()
         signalMeasurer = null
         if (error != null) {
             eventListener?.onUiError(error)
@@ -291,7 +300,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
             previousChildWidth = childWidth
         }
         checkClientOpenSession()
-        signalMeasurer?.maybeSendSignals()
+        signalMeasurer?.requestUpdatedSignals(onLayoutEventOccurred = true)
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
@@ -299,18 +308,23 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
         if (visibility == VISIBLE) {
             checkClientOpenSession()
         }
-        signalMeasurer?.maybeSendSignals()
+        signalMeasurer?.requestUpdatedSignals()
+    }
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        signalMeasurer?.requestUpdatedSignals()
     }
 
     override fun setAlpha(alpha: Float) {
         super.setAlpha(alpha)
-        signalMeasurer?.maybeSendSignals()
+        signalMeasurer?.requestUpdatedSignals()
     }
 
     internal fun closeClient() {
         client?.close()
         client = null
-        sessionConstants = null
+        sessionData = null
     }
 
     private fun attachPoolingContainerListener() {
@@ -351,12 +365,14 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
         if (client == null) {
             CompatImpl.deriveInputTokenAndOpenSession(context, this)
         }
+        signalMeasurer?.resumeMeasuringIfNecessary()
     }
 
     override fun onDetachedFromWindow() {
         if (!this.isInComposeNode && !this.isWithinPoolingContainer) {
             closeClient()
         }
+        signalMeasurer?.stopMeasuring()
         removeCallbacksOnWindowDetachment()
         super.onDetachedFromWindow()
     }
@@ -480,8 +496,8 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
                 view.switchClient()
                 view.refreshCallback?.accept(true)
             }
-            view.setContentView(session.view)
             this.session = session
+            view.setContentView(session.view)
             val width = pendingWidth
             val height = pendingHeight
             if ((width != null) && (height != null) && (width >= 0) && (height >= 0)) {
@@ -491,7 +507,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
             pendingConfiguration = null
             pendingZOrderOnTop?.let { session.notifyZOrderChanged(it) }
             pendingZOrderOnTop = null
-            if (session.signalOptions.isNotEmpty()) {
+            if (session.signalOptions.contains(SandboxedUiAdapterSignalOptions.GEOMETRY)) {
                 view.signalMeasurer = SandboxedSdkViewSignalMeasurer(view, session)
             }
         }
@@ -500,6 +516,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
             sandboxedSdkView?.let { view ->
                 if (this == view.clientSecondary) {
                     view.clientSecondary = null
+                    Log.w(TAG, "Secondary client session error: $throwable")
                     view.refreshCallback?.accept(false)
                 } else {
                     view.onClientClosedSession(throwable)
@@ -514,6 +531,10 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
         override fun onSessionRefreshRequested(callback: Consumer<Boolean>) {
             sandboxedSdkView?.checkClientOpenSession(true, callback)
         }
+
+        fun notifySessionRendered() {
+            session?.notifySessionRendered(setOf(SandboxedUiAdapterSignalOptions.GEOMETRY))
+        }
     }
 
     private fun switchClient() {
@@ -523,6 +544,12 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
         // close session with primary client
         this.client?.close()
         this.client = this.clientSecondary
+    }
+
+    // Called when the first frame is displayed after a new session is opened.
+    private fun sendUiDisplayedEvents() {
+        eventListener?.onUiDisplayed()
+        this.client?.notifySessionRendered()
     }
 
     /**
@@ -539,7 +566,7 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 Api34PlusImpl.attachTemporarySurfaceViewAndOpenSession(context, sandboxedSdkView)
             } else {
-                sandboxedSdkView.sessionConstants = SessionConstants()
+                sandboxedSdkView.sessionData = SessionData()
                 sandboxedSdkView.checkClientOpenSession()
             }
         }
@@ -562,8 +589,8 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
         private object Api35PlusImpl {
             @JvmStatic
             fun setInputTransferTokenAndOpenSession(sandboxedSdkView: SandboxedSdkView) {
-                sandboxedSdkView.sessionConstants =
-                    SessionConstants(
+                sandboxedSdkView.sessionData =
+                    SessionData(
                         windowInputToken = null,
                         inputTransferToken = sandboxedSdkView.rootSurfaceControl?.inputTransferToken
                     )
@@ -586,11 +613,8 @@ class SandboxedSdkView @JvmOverloads constructor(context: Context, attrs: Attrib
                             view.removeOnAttachStateChangeListener(this)
                             @Suppress("DEPRECATION")
                             surfaceView.hostToken?.let {
-                                sandboxedSdkView.sessionConstants =
-                                    SessionConstants(
-                                        windowInputToken = it,
-                                        inputTransferToken = null
-                                    )
+                                sandboxedSdkView.sessionData =
+                                    SessionData(windowInputToken = it, inputTransferToken = null)
                             }
                             sandboxedSdkView.removeTemporarySurfaceView(surfaceView)
                             sandboxedSdkView.checkClientOpenSession()

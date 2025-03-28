@@ -22,6 +22,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
@@ -32,10 +33,12 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import androidx.annotation.AnyThread;
+import androidx.annotation.IntRange;
 import androidx.annotation.RequiresFeature;
 import androidx.annotation.RequiresOptIn;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.UiThread;
+import androidx.annotation.VisibleForTesting;
 import androidx.webkit.internal.ApiFeature;
 import androidx.webkit.internal.ApiHelperForM;
 import androidx.webkit.internal.ApiHelperForO;
@@ -65,6 +68,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
 
 /**
@@ -73,6 +77,10 @@ import java.util.concurrent.Executor;
 public class WebViewCompat {
     private static final Uri WILDCARD_URI = Uri.parse("*");
     private static final Uri EMPTY_URI = Uri.parse("");
+
+    private static boolean sShouldCacheProvider = true;
+    private static final WeakHashMap<WebView, WebViewProviderAdapter> sProviderAdapterCache =
+            new WeakHashMap<>();
 
     private WebViewCompat() {
     } // Don't allow instances of this class to be constructed.
@@ -441,6 +449,15 @@ public class WebViewCompat {
     }
 
     private static WebViewProviderAdapter getProvider(WebView webview) {
+        ApiFeature.NoFramework feature = WebViewFeatureInternal.CACHE_PROVIDER;
+        if (feature.isSupportedByWebView() && sShouldCacheProvider) {
+            WebViewProviderAdapter adapter = sProviderAdapterCache.get(webview);
+            if (adapter == null) {
+                adapter = new WebViewProviderAdapter(createProvider(webview));
+                sProviderAdapterCache.put(webview, adapter);
+            }
+            return adapter;
+        }
         return new WebViewProviderAdapter(createProvider(webview));
     }
 
@@ -1425,6 +1442,126 @@ public class WebViewCompat {
         }
     }
 
+    /**
+     * Denotes that the WebViewCompat#saveState API surface is experimental.
+     * <p>
+     * It may change without warning and should not be relied upon for non-experimental purposes.
+     */
+    @Retention(RetentionPolicy.CLASS)
+    @Target({ElementType.METHOD, ElementType.TYPE, ElementType.FIELD})
+    @RequiresOptIn(level = RequiresOptIn.Level.ERROR)
+    public @interface ExperimentalSaveState {
+    }
+
+    /**
+     * Saves the state of the provided WebView, such as for use with
+     * {@link android.app.Activity#onSaveInstanceState}. This is an extension of
+     * {@link WebView#saveState(Bundle)} and the returned state can be restored through
+     * {@link WebView#restoreState(Bundle)}.
+     *
+     * @param webView             the {@link WebView} whose state is to be saved.
+     * @param outState            the {@link Bundle} to store the state in.
+     * @param maxSizeBytes        the maximum size (in bytes) that the returned state can be. If the
+     *                            WebView contains more state, history entries further back will
+     *                            not be
+     *                            saved.
+     * @param includeForwardState whether to include entries that can only be reached through going
+     *                            forward in history (such as through {@link WebView#goForward()}.
+     *                            Some apps don't give the user a way to go forward, so won't need
+     *                            to save the forward history.
+     */
+    @RequiresFeature(name = WebViewFeature.SAVE_STATE,
+            enforcement = "androidx.webkit.WebViewFeature#isFeatureSupported")
+    @UiThread
+    @ExperimentalSaveState
+    public static void saveState(@NonNull WebView webView,
+            @NonNull Bundle outState,
+            @IntRange(from = 1) int maxSizeBytes,
+            boolean includeForwardState) {
+        ApiFeature.NoFramework feature = WebViewFeatureInternal.SAVE_STATE;
+        if (feature.isSupportedByWebView()) {
+            getProvider(webView).saveState(outState, maxSizeBytes, includeForwardState);
+        } else {
+            throw WebViewFeatureInternal.getUnsupportedOperationException();
+        }
+    }
+
+    /**
+     * Denotes that the WebViewCompat#setShouldCacheProvider API surface is experimental.
+     * <p>
+     * It may change without warning and should not be relied upon for non-experimental purposes.
+     */
+    @Retention(RetentionPolicy.CLASS)
+    @Target({ElementType.METHOD, ElementType.TYPE, ElementType.FIELD})
+    @RequiresOptIn(level = RequiresOptIn.Level.ERROR)
+    public @interface ExperimentalCacheProvider {
+    }
+
+    /**
+     * Enables or disables caching of WebView provider objects (objects internal to the
+     * androidx.webkit library). Caching should have no effect on behavior but will improve
+     * performance.
+     *
+     * @param shouldCacheProvider whether to enable caching of WebView provider objects.
+     */
+    @RequiresFeature(name = WebViewFeature.CACHE_PROVIDER,
+            enforcement = "androidx.webkit.WebViewFeature#isFeatureSupported")
+    @AnyThread
+    @ExperimentalCacheProvider
+    public static void setShouldCacheProvider(boolean shouldCacheProvider) {
+        ApiFeature.NoFramework feature = WebViewFeatureInternal.CACHE_PROVIDER;
+        if (feature.isSupportedByWebView()) {
+            sShouldCacheProvider = shouldCacheProvider;
+        } else {
+            throw WebViewFeatureInternal.getUnsupportedOperationException();
+        }
+    }
+
+    /**
+     * Sets the {@link WebNavigationClient} for the given {@link WebView}.
+     *
+     * @param webView The {@link WebView} to set the client for.
+     * @param client  The {@link WebNavigationClient} to set.
+     * @throws UnsupportedOperationException if the
+     *                                       {@link WebViewFeature#NAVIGATION_CALLBACK_BASIC}
+     *                                       feature is not supported.
+     */
+    @RequiresFeature(name = WebViewFeature.NAVIGATION_CALLBACK_BASIC,
+            enforcement = "androidx.webkit.WebViewFeature#isFeatureSupported")
+    @UiThread
+    @WebNavigationClient.ExperimentalNavigationCallback
+    public static void setWebNavigationClient(@NonNull WebView webView,
+            @NonNull WebNavigationClient client) {
+        ApiFeature.NoFramework feature = WebViewFeatureInternal.NAVIGATION_CALLBACK_BASIC;
+        if (feature.isSupportedByWebView()) {
+            getProvider(webView).setWebNavigationClient(client);
+        } else {
+            throw WebViewFeatureInternal.getUnsupportedOperationException();
+        }
+    }
+
+    /**
+     * Gets the {@link WebNavigationClient} currently set for the given {@link WebView}.
+     *
+     * @param webView The {@link WebView} to get the client from.
+     * @return The {@link WebNavigationClient} currently set, or {@code null} if none is set.
+     * @throws UnsupportedOperationException if the
+     *                                       {@link WebViewFeature#NAVIGATION_CALLBACK_BASIC}
+     *                                       feature is not supported.
+     */
+    @RequiresFeature(name = WebViewFeature.NAVIGATION_CALLBACK_BASIC,
+            enforcement = "androidx.webkit.WebViewFeature#isFeatureSupported")
+    @UiThread
+    @WebNavigationClient.ExperimentalNavigationCallback
+    public static @NonNull WebNavigationClient getWebNavigationClient(@NonNull WebView webView) {
+        ApiFeature.NoFramework feature = WebViewFeatureInternal.NAVIGATION_CALLBACK_BASIC;
+        if (feature.isSupportedByWebView()) {
+            return getProvider(webView).getWebNavigationClient();
+        } else {
+            throw WebViewFeatureInternal.getUnsupportedOperationException();
+        }
+    }
+
     private static WebViewProviderFactory getFactory() {
         return WebViewGlueCommunicator.getFactory();
     }
@@ -1456,5 +1593,11 @@ public class WebViewCompat {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    @VisibleForTesting
+    /*package*/ static WeakHashMap<WebView, WebViewProviderAdapter>
+            getProviderAdapterCacheForTesting() {
+        return sProviderAdapterCache;
     }
 }

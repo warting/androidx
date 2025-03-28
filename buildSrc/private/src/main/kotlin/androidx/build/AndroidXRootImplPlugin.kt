@@ -49,7 +49,7 @@ import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmInstallTask
 
 abstract class AndroidXRootImplPlugin : Plugin<Project> {
     @get:Inject abstract val registry: BuildEventsListenerRegistry
-    @Suppress("UnstableApiUsage") @get:Inject abstract val buildFeatures: BuildFeatures
+    @get:Inject abstract val buildFeatures: BuildFeatures
 
     override fun apply(project: Project) {
         if (!project.isRoot) {
@@ -63,6 +63,7 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
         tasks.register("listAndroidXProperties", ListAndroidXPropertiesTask::class.java)
         configureKtfmtCheckFile()
         maybeRegisterFilterableTask()
+        registerListAffectedProjectsTask()
 
         // If we're running inside Studio, validate the Android Gradle Plugin version.
         val expectedAgpVersion = System.getenv("EXPECTED_AGP_VERSION")
@@ -148,7 +149,7 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
          * Add dependency analysis plugin and add buildHealth task to buildOnServer when
          * maxDepVersions is not enabled
          */
-        if (!project.usingMaxDepVersions()) {
+        if (!project.usingMaxDepVersions().get()) {
             project.plugins.apply("com.autonomousapps.dependency-analysis")
 
             // Ignore advice regarding ktx dependencies

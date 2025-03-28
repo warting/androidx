@@ -16,42 +16,60 @@
 
 package androidx.appfunctions
 
+import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.annotation.RestrictTo
 
-/**
- * Represents a response of an execution of an app function.
- *
- * @property result The return value of the executed function. An empty result indicates that the
- *   function does not produce a return value.
- */
-public class ExecuteAppFunctionResponse(public val result: AppFunctionData) {
+/** Represents a response of an execution of an app function. */
+public sealed interface ExecuteAppFunctionResponse {
 
-    @RequiresApi(36)
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-    public fun toPlatformClass(): com.android.extensions.appfunctions.ExecuteAppFunctionResponse {
-        return com.android.extensions.appfunctions.ExecuteAppFunctionResponse(
-            result.genericDocument,
-            result.extras,
-        )
+    /** Represents a successful execution of an app function. */
+    public class Success(
+        /**
+         * The return value of the executed function. An [AppFunctionData.EMPTY] indicates that the
+         * function does not produce a return value.
+         */
+        public val returnValue: AppFunctionData,
+    ) : ExecuteAppFunctionResponse {
+        @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+        public fun toPlatformExtensionClass():
+            com.android.extensions.appfunctions.ExecuteAppFunctionResponse {
+            return com.android.extensions.appfunctions.ExecuteAppFunctionResponse(
+                returnValue.genericDocument,
+                returnValue.extras,
+            )
+        }
+
+        @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+        public fun copy(returnValue: AppFunctionData = this.returnValue): Success =
+            Success(returnValue)
+
+        public companion object {
+            /**
+             * The key name of the property that stores the function return value within `result`.
+             *
+             * See [AppFunctionData] documentation on retrieving expected fields.
+             */
+            public const val PROPERTY_RETURN_VALUE: String =
+                com.android.extensions.appfunctions.ExecuteAppFunctionResponse.PROPERTY_RETURN_VALUE
+
+            @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+            @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+            public fun fromPlatformExtensionClass(
+                response: com.android.extensions.appfunctions.ExecuteAppFunctionResponse
+            ): Success {
+                return Success(AppFunctionData(response.resultDocument, response.extras))
+            }
+        }
     }
 
-    public companion object {
-        /**
-         * The key name of the property that stores the function return value within `result`.
-         *
-         * See [AppFunctionData] documentation on retrieving expected fields.
-         */
-        public const val PROPERTY_RETURN_VALUE: String = "androidAppfunctionsReturnValue"
-
-        @RequiresApi(36)
-        @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-        public fun fromPlatformClass(
-            response: com.android.extensions.appfunctions.ExecuteAppFunctionResponse
-        ): ExecuteAppFunctionResponse {
-            return ExecuteAppFunctionResponse(
-                AppFunctionData(response.resultDocument, response.extras)
-            )
+    /** Represents a failed execution of an app function. */
+    public class Error(
+        /** The [AppFunctionException] when the function execution failed. */
+        public val error: AppFunctionException,
+    ) : ExecuteAppFunctionResponse {
+        override fun toString(): String {
+            return "AppFunctionResponse.Error(error=$error)"
         }
     }
 }

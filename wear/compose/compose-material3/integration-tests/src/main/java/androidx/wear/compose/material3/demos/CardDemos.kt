@@ -30,10 +30,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.FixedScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -45,13 +51,20 @@ import androidx.wear.compose.material3.AppCard
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.ImageCard
 import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.ListSubHeader
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.OutlinedCard
+import androidx.wear.compose.material3.RadioButton
+import androidx.wear.compose.material3.Slider
+import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TitleCard
 import androidx.wear.compose.material3.samples.AppCardSample
 import androidx.wear.compose.material3.samples.AppCardWithIconSample
 import androidx.wear.compose.material3.samples.AppCardWithImageSample
+import androidx.wear.compose.material3.samples.CardFillContentSample
 import androidx.wear.compose.material3.samples.CardSample
 import androidx.wear.compose.material3.samples.CardWithOnLongClickSample
 import androidx.wear.compose.material3.samples.OutlinedAppCardSample
@@ -59,7 +72,6 @@ import androidx.wear.compose.material3.samples.OutlinedCardSample
 import androidx.wear.compose.material3.samples.OutlinedTitleCardSample
 import androidx.wear.compose.material3.samples.R
 import androidx.wear.compose.material3.samples.TitleCardSample
-import androidx.wear.compose.material3.samples.TitleCardWithImageBackgroundSample
 import androidx.wear.compose.material3.samples.TitleCardWithMultipleImagesSample
 import androidx.wear.compose.material3.samples.TitleCardWithSubtitleAndTimeSample
 
@@ -70,10 +82,23 @@ fun CardDemo() {
         item { ListHeader { Text("Card") } }
         item { CardSample() }
         item { CardWithOnLongClickSample { showOnLongClickToast(context) } }
-        item { CardWithImageDemo() }
+        item { CardWithNestedImageDemo() }
         item { CardWithMultipleImagesDemo() }
-        item { OutlinedCardSample() }
         item { VerticallyCenteredBaseCard() }
+        item { CardFillContentSample() }
+    }
+}
+
+@Composable
+fun OutlinedCardDemo() {
+    ScalingLazyDemo {
+        item { ListHeader { Text("Outlined Card") } }
+        item { OutlinedCardSample() }
+        item {
+            OutlinedCard(onClick = { /* Do something */ }, enabled = false) {
+                Text("Disabled Outlined")
+            }
+        }
     }
 }
 
@@ -106,14 +131,6 @@ fun TitleCardDemo() {
 }
 
 @Composable
-fun ImageCardDemo() {
-    ScalingLazyDemo {
-        item { ListHeader { Text("Image card") } }
-        item { TitleCardWithImageBackgroundSample() }
-    }
-}
-
-@Composable
 fun VerticallyCenteredBaseCard() {
     // Provide a demo of a base Card with vertically centered content
     Card(
@@ -131,7 +148,7 @@ fun VerticallyCenteredBaseCard() {
 }
 
 @Composable
-fun CardWithImageDemo() {
+fun CardWithNestedImageDemo() {
     Card(
         onClick = { /* Do something */ },
     ) {
@@ -169,6 +186,112 @@ fun AppCardWithMultipleImagesDemo() {
     ) {
         Spacer(Modifier.height(4.dp))
         MultipleImagesContent()
+    }
+}
+
+@Composable
+fun ImageCardBuilder() {
+    var alignment by remember { mutableStateOf(Alignment.Center) }
+    var contentScale by remember { mutableStateOf(ContentScale.Fit) }
+    var alpha by remember { mutableFloatStateOf(1f) }
+    var sizeToIntrinsics by remember { mutableStateOf(false) }
+
+    ScalingLazyDemo {
+        item { ListHeader { Text("Image Card") } }
+
+        item { ListSubHeader { Text("Alignment") } }
+        val alignments =
+            listOf(
+                "Top Start" to Alignment.TopStart,
+                "Top Center" to Alignment.TopCenter,
+                "Center Start" to Alignment.CenterStart,
+                "Center" to Alignment.Center,
+                "CenterEnd" to Alignment.CenterEnd,
+                "Bottom Center" to Alignment.BottomCenter,
+                "Bottom End" to Alignment.BottomEnd,
+            )
+        items(alignments.size) {
+            val (label, alignmentValue) = alignments[it]
+            RadioButton(
+                modifier = Modifier.fillMaxWidth(),
+                selected = alignment == alignmentValue,
+                onSelect = { alignment = alignmentValue },
+                label = { Text(label) }
+            )
+        }
+
+        item { ListSubHeader { Text("Content Scale") } }
+        val contentScales =
+            listOf(
+                "Crop" to ContentScale.Crop,
+                "Fit" to ContentScale.Fit,
+                "Inside" to ContentScale.Inside,
+                "None" to ContentScale.None,
+                "Fill Bounds" to ContentScale.FillBounds,
+                "Fill Height" to ContentScale.FillHeight,
+                "Fill Width" to ContentScale.FillWidth,
+                "Fixed X2" to FixedScale(2f),
+            )
+        items(contentScales.size) {
+            val (label, contentScaleValue) = contentScales[it]
+            RadioButton(
+                modifier = Modifier.fillMaxWidth(),
+                selected = contentScale == contentScaleValue,
+                onSelect = { contentScale = contentScaleValue },
+                label = { Text(label) }
+            )
+        }
+
+        item { ListSubHeader { Text("Alpha=$alpha") } }
+        item {
+            Slider(
+                value = alpha,
+                onValueChange = { alpha = it },
+                valueRange = 0f..1f,
+                steps = 99,
+                segmented = false
+            )
+        }
+
+        item { ListSubHeader { Text("Intrinsic size") } }
+        item {
+            SwitchButton(
+                modifier = Modifier.fillMaxWidth(),
+                checked = sizeToIntrinsics,
+                onCheckedChange = { sizeToIntrinsics = it },
+                label = { Text("Used") }
+            )
+        }
+
+        item { ListHeader { Text("Image Card") } }
+        item {
+            val painter =
+                painterResource(
+                    androidx.wear.compose.material3.demos.R.drawable.backgroundsplitimage
+                )
+
+            ImageCard(
+                onClick = { /* Do something */ },
+                title = { Text("Title") },
+                subtitle = { Text("Secondary label") },
+                containerPainter =
+                    CardDefaults.containerPainter(
+                        image =
+                            painterResource(
+                                androidx.wear.compose.material3.demos.R.drawable
+                                    .backgroundsplitimage
+                            ),
+                        sizeToIntrinsics = sizeToIntrinsics,
+                        alignment = alignment,
+                        contentScale = contentScale,
+                        alpha = alpha
+                    ),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = true,
+            ) {
+                Text("Content that could go over a few lines")
+            }
+        }
     }
 }
 
@@ -238,7 +361,7 @@ private fun ImageContent() {
             modifier = Modifier.weight(1f).aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp)),
             painter = painterResource(id = R.drawable.card_content_image),
             contentScale = ContentScale.Crop,
-            contentDescription = null
+            contentDescription = "Large blank image"
         )
         Spacer(modifier = Modifier.width(imageEndPaddingDp))
     }
@@ -255,7 +378,7 @@ private fun MultipleImagesContent() {
                     .clip(RoundedCornerShape(16.dp)),
             painter = painterResource(id = R.drawable.card_content_image),
             contentScale = ContentScale.Crop,
-            contentDescription = null
+            contentDescription = "Medium blank image"
         )
         Spacer(Modifier.width(4.dp))
         Image(
@@ -266,7 +389,7 @@ private fun MultipleImagesContent() {
                     .clip(RoundedCornerShape(16.dp)),
             painter = painterResource(id = R.drawable.card_content_image),
             contentScale = ContentScale.Crop,
-            contentDescription = null
+            contentDescription = "Small blank image"
         )
     }
 }
