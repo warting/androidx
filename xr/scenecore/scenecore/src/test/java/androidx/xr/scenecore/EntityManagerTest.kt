@@ -17,7 +17,21 @@
 package androidx.xr.scenecore
 
 import android.app.Activity
+import android.content.Context
+import android.view.View
 import android.widget.TextView
+import androidx.xr.runtime.Session
+import androidx.xr.runtime.internal.ActivityPanelEntity as RtActivityPanelEntity
+import androidx.xr.runtime.internal.ActivitySpace as RtActivitySpace
+import androidx.xr.runtime.internal.AnchorEntity as RtAnchorEntity
+import androidx.xr.runtime.internal.Entity as RtEntity
+import androidx.xr.runtime.internal.GltfEntity as RtGltfEntity
+import androidx.xr.runtime.internal.JxrPlatformAdapter
+import androidx.xr.runtime.internal.PanelEntity as RtPanelEntity
+import androidx.xr.runtime.internal.PixelDimensions as RtPixelDimensions
+import androidx.xr.runtime.internal.SpatialCapabilities as RtSpatialCapabilities
+import androidx.xr.runtime.math.Pose
+import androidx.xr.runtime.testing.FakeRuntimeFactory
 import com.google.common.truth.Truth.assertThat
 import com.google.common.util.concurrent.Futures
 import kotlin.time.Duration.Companion.seconds
@@ -34,13 +48,15 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class EntityManagerTest {
+    private val fakeRuntimeFactory = FakeRuntimeFactory()
     private val activity = Robolectric.buildActivity(Activity::class.java).create().start().get()
-    private val mockRuntime = mock<JxrPlatformAdapter>()
-    private val mockGltfModelEntityImpl = mock<JxrPlatformAdapter.GltfEntity>()
-    private val mockPanelEntityImpl = mock<JxrPlatformAdapter.PanelEntity>()
-    private val mockAnchorEntityImpl = mock<JxrPlatformAdapter.AnchorEntity>()
-    private val mockActivityPanelEntity = mock<JxrPlatformAdapter.ActivityPanelEntity>()
-    private val mockContentlessEntity = mock<JxrPlatformAdapter.Entity>()
+    private val mockPlatformAdapter = mock<JxrPlatformAdapter>()
+    private val mockActivitySpace = mock<RtActivitySpace>()
+    private val mockGltfModelEntityImpl = mock<RtGltfEntity>()
+    private val mockPanelEntityImpl = mock<RtPanelEntity>()
+    private val mockAnchorEntityImpl = mock<RtAnchorEntity>()
+    private val mockActivityPanelEntity = mock<RtActivityPanelEntity>()
+    private val mockContentlessEntity = mock<RtEntity>()
     private val entityManager = EntityManager()
     private lateinit var session: Session
     private lateinit var activitySpace: ActivitySpace
@@ -53,29 +69,37 @@ class EntityManagerTest {
 
     @Before
     fun setUp() {
-        whenever(mockRuntime.spatialEnvironment).thenReturn(mock())
-        whenever(mockRuntime.activitySpace).thenReturn(mock())
-        whenever(mockRuntime.activitySpaceRootImpl).thenReturn(mock())
-        whenever(mockRuntime.headActivityPose).thenReturn(mock())
-        whenever(mockRuntime.perceptionSpaceActivityPose).thenReturn(mock())
-        whenever(mockRuntime.loadGltfByAssetNameSplitEngine(Mockito.anyString()))
+        whenever(mockPlatformAdapter.spatialEnvironment).thenReturn(mock())
+        whenever(mockPlatformAdapter.activitySpace).thenReturn(mockActivitySpace)
+        whenever(mockPlatformAdapter.activitySpaceRootImpl).thenReturn(mockActivitySpace)
+        whenever(mockPlatformAdapter.headActivityPose).thenReturn(mock())
+        whenever(mockPlatformAdapter.perceptionSpaceActivityPose).thenReturn(mock())
+        whenever(mockPlatformAdapter.spatialCapabilities).thenReturn(RtSpatialCapabilities(0))
+        whenever(mockPlatformAdapter.loadGltfByAssetName(Mockito.anyString()))
             .thenReturn(Futures.immediateFuture(mock()))
-        whenever(mockRuntime.createGltfEntity(any(), any(), any()))
+        whenever(mockPlatformAdapter.createGltfEntity(any(), any(), any()))
             .thenReturn(mockGltfModelEntityImpl)
-        whenever(mockRuntime.createPanelEntity(any(), any(), any(), any(), any(), any(), any()))
+        whenever(
+                mockPlatformAdapter.createPanelEntity(
+                    any<Context>(),
+                    any<Pose>(),
+                    any<View>(),
+                    any<RtPixelDimensions>(),
+                    any<String>(),
+                    any<RtEntity>(),
+                )
+            )
             .thenReturn(mockPanelEntityImpl)
-        whenever(mockRuntime.createAnchorEntity(any(), any(), any(), any()))
+        whenever(mockPlatformAdapter.createAnchorEntity(any(), any(), any(), any()))
             .thenReturn(mockAnchorEntityImpl)
-        whenever(mockAnchorEntityImpl.state)
-            .thenReturn(JxrPlatformAdapter.AnchorEntity.State.UNANCHORED)
-        whenever(mockAnchorEntityImpl.persistState)
-            .thenReturn(JxrPlatformAdapter.AnchorEntity.PersistState.PERSIST_NOT_REQUESTED)
-        whenever(mockRuntime.createActivityPanelEntity(any(), any(), any(), any(), any()))
+        whenever(mockAnchorEntityImpl.state).thenReturn(RtAnchorEntity.State.UNANCHORED)
+        whenever(mockPlatformAdapter.createActivityPanelEntity(any(), any(), any(), any(), any()))
             .thenReturn(mockActivityPanelEntity)
-        whenever(mockRuntime.createEntity(any(), any(), any())).thenReturn(mockContentlessEntity)
-        whenever(mockRuntime.mainPanelEntity).thenReturn(mockPanelEntityImpl)
-        session = Session.create(activity, mockRuntime)
-        activitySpace = ActivitySpace.create(mockRuntime, entityManager)
+        whenever(mockPlatformAdapter.createEntity(any(), any(), any()))
+            .thenReturn(mockContentlessEntity)
+        whenever(mockPlatformAdapter.mainPanelEntity).thenReturn(mockPanelEntityImpl)
+        session = Session(activity, fakeRuntimeFactory.createRuntime(activity), mockPlatformAdapter)
+        activitySpace = ActivitySpace.create(mockPlatformAdapter, entityManager)
     }
 
     @Test
@@ -221,25 +245,24 @@ class EntityManagerTest {
     private fun createPanelEntity() {
         panelEntity =
             PanelEntity.create(
-                mockRuntime,
+                activity,
+                mockPlatformAdapter,
                 entityManager,
                 TextView(activity),
-                Dimensions(720f, 480f),
-                Dimensions(0.1f, 0.1f, 0.1f),
+                PixelDimensions(720, 480),
                 "test",
-                activity,
             )
     }
 
     private fun createGltfEntity() {
         gltfModel = GltfModel.create(session, "test.glb").get()
-        gltfModelEntity = GltfModelEntity.create(mockRuntime, entityManager, gltfModel)
+        gltfModelEntity = GltfModelEntity.create(mockPlatformAdapter, entityManager, gltfModel)
     }
 
     private fun createAnchorEntity() {
         anchorEntity =
             AnchorEntity.create(
-                mockRuntime,
+                mockPlatformAdapter,
                 entityManager,
                 Dimensions(),
                 PlaneType.ANY,
@@ -251,7 +274,7 @@ class EntityManagerTest {
     private fun createActivityPanelEntity() {
         activityPanelEntity =
             ActivityPanelEntity.create(
-                mockRuntime,
+                mockPlatformAdapter,
                 entityManager,
                 PixelDimensions(640, 480),
                 "test",
@@ -260,6 +283,6 @@ class EntityManagerTest {
     }
 
     private fun createContentlessEntity() {
-        contentlessEntity = ContentlessEntity.create(mockRuntime, entityManager, "test")
+        contentlessEntity = ContentlessEntity.create(mockPlatformAdapter, entityManager, "test")
     }
 }

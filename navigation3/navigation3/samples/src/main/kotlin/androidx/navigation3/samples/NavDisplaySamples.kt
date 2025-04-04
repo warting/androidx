@@ -30,11 +30,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.navigation3.ViewModelStoreNavLocalProvider
-import androidx.navigation3.NavBackStackProvider
+import androidx.lifecycle.viewmodel.navigation3.ViewModelStoreNavEntryDecorator
+import androidx.navigation3.DecoratedNavEntryProvider
 import androidx.navigation3.NavEntry
-import androidx.navigation3.NavLocalProvider
-import androidx.navigation3.SavedStateNavLocalProvider
+import androidx.navigation3.NavEntryDecorator
+import androidx.navigation3.SaveableStateNavEntryDecorator
+import androidx.navigation3.SavedStateNavEntryDecorator
 import androidx.navigation3.SinglePaneNavDisplay
 import androidx.navigation3.entry
 import androidx.navigation3.entryProvider
@@ -49,8 +50,13 @@ fun BaseNav() {
     val backStack = rememberMutableStateListOf(Profile)
     val showDialog = remember { mutableStateOf(false) }
     SinglePaneNavDisplay(
-        backstack = backStack,
-        localProviders = listOf(SavedStateNavLocalProvider, ViewModelStoreNavLocalProvider),
+        backStack = backStack,
+        entryDecorators =
+            listOf(
+                SaveableStateNavEntryDecorator,
+                SavedStateNavEntryDecorator,
+                ViewModelStoreNavEntryDecorator
+            ),
         onBack = { backStack.removeLast() },
         entryProvider =
             entryProvider({ NavEntry(Unit) { Text(text = "Invalid Key") } }) {
@@ -97,7 +103,7 @@ fun <T : Any> NavSharedElementSample() {
     val backStack = rememberMutableStateListOf(CatList)
     SharedTransitionLayout {
         SinglePaneNavDisplay(
-            backstack = backStack,
+            backStack = backStack,
             onBack = { backStack.removeLast() },
             entryProvider =
                 entryProvider {
@@ -119,12 +125,12 @@ fun <T : Any> NavSharedElementSample() {
 fun <T : Any> CustomBasicDisplay(
     backstack: List<T>,
     modifier: Modifier = Modifier,
-    localProviders: List<NavLocalProvider> = emptyList(),
+    entryDecorators: List<NavEntryDecorator> = emptyList(),
     onBack: () -> Unit = { if (backstack is MutableList) backstack.removeAt(backstack.size - 1) },
     entryProvider: (key: T) -> NavEntry<out T>
 ) {
     BackHandler(backstack.size > 1, onBack)
-    NavBackStackProvider(backstack, entryProvider, localProviders) { entries ->
+    DecoratedNavEntryProvider(backstack, entryProvider, entryDecorators) { entries ->
         val entry = entries.last()
         Box(modifier = modifier) { entry.content.invoke(entry.key) }
     }

@@ -16,6 +16,7 @@
 
 package androidx.xr.compose.spatial
 
+import android.util.Log
 import androidx.annotation.RestrictTo
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,6 +46,8 @@ import androidx.xr.compose.platform.LocalSpatialCapabilities
  * element within the layout.
  *
  * In non-spatial environments, the content is rendered normally without elevation.
+ *
+ * SpatialElevation does not support a [content] lambda that has a width or height of zero.
  *
  * @param spatialElevationLevel the desired elevation level for the panel in spatial environments.
  * @param content the composable content to be displayed within the elevated panel.
@@ -96,9 +99,13 @@ private fun LayoutSpatialElevation(
             Box(
                 Modifier.constrainTo(constraints)
                     .onSizeChanged {
-                        check(it.width > bufferPaddingPx * 2 && it.height > bufferPaddingPx * 2) {
-                            "Empty composables cannot be placed at a SpatialElevation. You may be trying" +
-                                " to use a Popup or Dialog with a SpatialElevation, which is not supported."
+                        if (it.width <= bufferPaddingPx * 2 || it.height <= bufferPaddingPx * 2) {
+                            Log.w(
+                                "SpatialElevation",
+                                "Empty composables cannot be placed at a SpatialElevation. You may be trying" +
+                                    " to use a Popup or Dialog with a SpatialElevation, which is not supported.",
+                            )
+                            return@onSizeChanged
                         }
                         contentSize = it
                     }

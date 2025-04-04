@@ -21,32 +21,31 @@ import android.content.res.Resources
 import android.graphics.Color
 import android.view.View
 import android.widget.TextView
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.xr.arcore.Plane
 import androidx.xr.arcore.TrackingState
+import androidx.xr.runtime.Config
+import androidx.xr.runtime.PlaneTrackingMode
 import androidx.xr.runtime.Session
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Quaternion
 import androidx.xr.runtime.math.Vector2
 import androidx.xr.runtime.math.Vector3
-import androidx.xr.scenecore.Dimensions
 import androidx.xr.scenecore.PanelEntity
 import androidx.xr.scenecore.PixelDimensions
-import androidx.xr.scenecore.Session as JxrCoreSession
+import androidx.xr.scenecore.scene
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /** Class that keeps track of planes rendered as GLTF models in a SceneCore session. */
-internal class PlaneRenderer(
-    val session: Session,
-    val renderSession: JxrCoreSession,
-    val coroutineScope: CoroutineScope,
-) {
+internal class PlaneRenderer(val session: Session, val coroutineScope: CoroutineScope) :
+    DefaultLifecycleObserver {
 
     private val _renderedPlanes: MutableStateFlow<List<PlaneModel>> =
         MutableStateFlow(mutableListOf<PlaneModel>())
@@ -54,14 +53,15 @@ internal class PlaneRenderer(
 
     private lateinit var updateJob: CompletableJob
 
-    internal fun startRendering() {
+    override fun onResume(owner: LifecycleOwner) {
+        session.configure(Config(planeTracking = PlaneTrackingMode.HorizontalAndVertical))
         updateJob =
             SupervisorJob(
                 coroutineScope.launch { Plane.subscribe(session).collect { updatePlaneModels(it) } }
             )
     }
 
-    internal fun stopRendering() {
+    override fun onPause(owner: LifecycleOwner) {
         updateJob.complete()
         _renderedPlanes.value = emptyList<PlaneModel>()
     }
@@ -85,7 +85,7 @@ internal class PlaneRenderer(
     }
 
     private fun addPlaneModel(plane: Plane, planesToRender: MutableList<PlaneModel>) {
-        val view = createPanelDebugViewUsingCompose(plane, renderSession.activity)
+        val view = createPanelDebugViewUsingCompose(plane, session.activity)
         val entity = createPlanePanelEntity(plane, view)
         // The counter starts at max to trigger the resize on the first update loop since emulators
         // only
@@ -102,8 +102,8 @@ internal class PlaneRenderer(
                             entity.setHidden(false)
                             counter++
                             entity.setPose(
-                                renderSession.perceptionSpace
-                                    .transformPoseTo(state.centerPose, renderSession.activitySpace)
+                                session.scene.perceptionSpace
+                                    .transformPoseTo(state.centerPose, session.scene.activitySpace)
                                     // Planes are X-Y while Panels are X-Z, so we need to rotate the
                                     // X-axis by -90
                                     // degrees to align them.
@@ -113,7 +113,7 @@ internal class PlaneRenderer(
                             updateViewText(view, plane, state)
                             if (counter > PANEL_RESIZE_UPDATE_COUNT) {
                                 val panelExtentsInPixels = convertMetersToPixels(state.extents)
-                                entity.setPixelDimensions(
+                                entity.setSizeInPixels(
                                     PixelDimensions(
                                         width = panelExtentsInPixels.x.toInt(),
                                         height = panelExtentsInPixels.y.toInt(),
@@ -133,10 +133,9 @@ internal class PlaneRenderer(
 
     private fun createPlanePanelEntity(plane: Plane, view: View): PanelEntity {
         return PanelEntity.create(
-            renderSession,
+            session,
             view,
-            Dimensions(320f, 320f),
-            Dimensions(1f, 1f, 1f),
+            PixelDimensions(320, 320),
             plane.hashCode().toString(),
             plane.state.value.centerPose,
         )

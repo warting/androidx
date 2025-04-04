@@ -66,6 +66,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
@@ -76,9 +77,11 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.Density
@@ -87,6 +90,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.round
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -215,6 +219,10 @@ internal class TextFieldSelectionState(
      * decider for showing the toolbar. Please refer to [observeTextToolbarVisibility] docs.
      */
     private var textToolbarState by mutableStateOf(None)
+
+    /** Whether the text toolbar is currently shown. */
+    var textToolbarShown by mutableStateOf(false)
+        private set
 
     /** Access helper for text layout node coordinates that checks attached state. */
     private val textLayoutCoordinates: LayoutCoordinates?
@@ -417,7 +425,7 @@ internal class TextFieldSelectionState(
      * Starts observing changes in the current state for reactive rules. For example, the cursor
      * handle or the selection handles should hide whenever the text content changes.
      */
-    suspend fun observeChanges() {
+    suspend fun startToolbarAndHandlesVisibilityObserver() {
         try {
             coroutineScope {
                 launch { observeTextChanges() }
@@ -667,7 +675,11 @@ internal class TextFieldSelectionState(
         private var dragBeginPosition: Offset = Offset.Unspecified
 
         override fun onStart(downPosition: Offset, adjustment: SelectionAdjustment): Boolean {
-            if (!enabled || textFieldState.visualText.isEmpty()) return false
+            val layoutResult = textLayoutState.layoutResult
+            if (!enabled || layoutResult == null || textFieldState.visualText.isEmpty()) {
+                return false
+            }
+
             logDebug { "Mouse.onStart" }
             directDragGestureInitiator = InputType.Mouse
 
@@ -677,30 +689,40 @@ internal class TextFieldSelectionState(
             dragBeginOffsetInText = -1
             dragBeginPosition = downPosition
 
-            val newSelection = updateSelection(downPosition, adjustment, isStartOfSelection = true)
+            val newSelection =
+                updateSelection(downPosition, adjustment, layoutResult, isStartOfSelection = true)
             dragBeginOffsetInText = newSelection.start
 
             return true
         }
 
         override fun onDrag(dragPosition: Offset, adjustment: SelectionAdjustment): Boolean {
-            if (!enabled || textFieldState.visualText.isEmpty()) return false
+            val layoutResult = textLayoutState.layoutResult
+            if (!enabled || layoutResult == null || textFieldState.visualText.isEmpty()) {
+                return false
+            }
+
             logDebug { "Mouse.onDrag $dragPosition" }
-            updateSelection(dragPosition, adjustment, isStartOfSelection = false)
+            updateSelection(dragPosition, adjustment, layoutResult, isStartOfSelection = false)
             return true
         }
 
         private fun updateSelection(
             dragPosition: Offset,
             adjustment: SelectionAdjustment,
+            layoutResult: TextLayoutResult,
             isStartOfSelection: Boolean,
         ): TextRange {
+            val textLength = layoutResult.layoutInput.text.length
             val startOffset: Int =
-                dragBeginOffsetInText.takeIf { it >= 0 }
-                    ?: textLayoutState.getOffsetForPosition(
+                if (0 <= dragBeginOffsetInText && dragBeginOffsetInText <= textLength) {
+                    dragBeginOffsetInText
+                } else {
+                    textLayoutState.getOffsetForPosition(
                         position = dragBeginPosition,
                         coerceInVisibleBounds = false
                     )
+                }
 
             val endOffset: Int =
                 textLayoutState.getOffsetForPosition(
@@ -1107,10 +1129,12 @@ internal class TextFieldSelectionState(
                 }
             }
             .collect { rect ->
-                if (rect == Rect.Zero) {
-                    hideTextToolbar()
-                } else {
+                val textToolbarShown = rect != Rect.Zero
+                this.textToolbarShown = textToolbarShown // don't read the field, it is state.
+                if (textToolbarShown) {
                     textToolbarHandler?.showTextToolbar(this, rect)
+                } else {
+                    hideTextToolbar()
                 }
             }
     }
@@ -1308,16 +1332,27 @@ internal class TextFieldSelectionState(
         textFieldState.collapseSelectionToMax()
     }
 
+    // TODO(grantapher) android ClipboardManager has a way to notify primary clip changes.
+    //  That could possibly be used so that this doesn't have to be updated manually.
+    private var clipEntry: ClipEntry? by mutableStateOf(null)
+
+    suspend fun updateClipboardEntry() {
+        clipEntry = clipboard?.getClipEntry()
+    }
+
     /**
      * Whether a paste operation can execute now and have a meaningful effect. The paste operation
      * requires the text field to be editable, and the clipboard manager to have content to paste.
+     *
+     * This method relies on the clip entry in this [TextFieldSelectionState] to be up to date via
+     * calling [updateClipboardEntry].
      */
-    suspend fun canPaste(): Boolean {
+    fun canPaste(): Boolean {
         if (!editable) return false
         // if receive content is not configured, we expect at least a text item to be present
-        if (clipboard?.getClipEntry()?.hasText() == true) return true
+        if (clipEntry?.hasText() == true) return true
         // if receive content is configured, hasClip should be enough to show the paste option
-        return receiveContentConfiguration?.invoke() != null && clipboard?.getClipEntry() != null
+        return receiveContentConfiguration?.invoke() != null && clipEntry != null
     }
 
     suspend fun paste() {
@@ -1565,3 +1600,8 @@ internal interface TextToolbarHandler {
 
     fun hideTextToolbar()
 }
+
+internal expect fun Modifier.addBasicTextFieldTextContextMenuComponents(
+    state: TextFieldSelectionState,
+    coroutineScope: CoroutineScope,
+): Modifier

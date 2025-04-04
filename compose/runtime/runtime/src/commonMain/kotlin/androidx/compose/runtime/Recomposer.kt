@@ -41,6 +41,8 @@ import androidx.compose.runtime.snapshots.ReaderKind
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshots.SnapshotApplyResult
 import androidx.compose.runtime.snapshots.StateObjectImpl
+import androidx.compose.runtime.snapshots.TransparentObserverMutableSnapshot
+import androidx.compose.runtime.snapshots.TransparentObserverSnapshot
 import androidx.compose.runtime.snapshots.fastAll
 import androidx.compose.runtime.snapshots.fastAny
 import androidx.compose.runtime.snapshots.fastFilterIndexed
@@ -75,7 +77,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
 // TODO: Can we use rootKey for this since all compositions will have an eventual Recomposer parent?
-private const val RecomposerCompoundHashKey = 1000
+private inline val RecomposerCompoundHashKey
+    get() = CompositeKeyHashCode(1000)
 
 /**
  * Runs [block] with a new, active [Recomposer] applying changes in the calling [CoroutineContext].
@@ -671,47 +674,55 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                         }
                     }
 
-                    if (toApply.isNotEmpty()) {
-                        changeCount++
+                    // This is an optimization to avoid reallocating TransparentSnapshot for each
+                    // observeChanges within `apply`. Many modifiers use observation in `onAttach`
+                    // and other lifecycle methods, and allocations can be mitigated by updating
+                    // read observer in the snapshot allocated here.
+                    withTransparentSnapshot {
+                        if (toApply.isNotEmpty()) {
+                            changeCount++
 
-                        // Perform apply changes
-                        try {
-                            // We could do toComplete += toApply but doing it like below
-                            // avoids unnecessary allocations since toApply is a mutable list
-                            // toComplete += toApply
-                            toApply.fastForEach { composition -> toComplete.add(composition) }
-                            toApply.fastForEach { composition -> composition.applyChanges() }
-                        } catch (e: Throwable) {
-                            processCompositionError(e)
-                            clearRecompositionState()
-                            return@withFrameNanos
-                        } finally {
-                            toApply.clear()
+                            // Perform apply changes
+                            try {
+                                // We could do toComplete += toApply but doing it like below
+                                // avoids unnecessary allocations since toApply is a mutable list
+                                // toComplete += toApply
+                                toApply.fastForEach { composition -> toComplete.add(composition) }
+                                toApply.fastForEach { composition -> composition.applyChanges() }
+                            } catch (e: Throwable) {
+                                processCompositionError(e)
+                                clearRecompositionState()
+                                return@withFrameNanos
+                            } finally {
+                                toApply.clear()
+                            }
                         }
-                    }
 
-                    if (toLateApply.isNotEmpty()) {
-                        try {
-                            toComplete += toLateApply
-                            toLateApply.forEach { composition -> composition.applyLateChanges() }
-                        } catch (e: Throwable) {
-                            processCompositionError(e)
-                            clearRecompositionState()
-                            return@withFrameNanos
-                        } finally {
-                            toLateApply.clear()
+                        if (toLateApply.isNotEmpty()) {
+                            try {
+                                toComplete += toLateApply
+                                toLateApply.forEach { composition ->
+                                    composition.applyLateChanges()
+                                }
+                            } catch (e: Throwable) {
+                                processCompositionError(e)
+                                clearRecompositionState()
+                                return@withFrameNanos
+                            } finally {
+                                toLateApply.clear()
+                            }
                         }
-                    }
 
-                    if (toComplete.isNotEmpty()) {
-                        try {
-                            toComplete.forEach { composition -> composition.changesApplied() }
-                        } catch (e: Throwable) {
-                            processCompositionError(e)
-                            clearRecompositionState()
-                            return@withFrameNanos
-                        } finally {
-                            toComplete.clear()
+                        if (toComplete.isNotEmpty()) {
+                            try {
+                                toComplete.forEach { composition -> composition.changesApplied() }
+                            } catch (e: Throwable) {
+                                processCompositionError(e)
+                                clearRecompositionState()
+                                return@withFrameNanos
+                            } finally {
+                                toComplete.clear()
+                            }
                         }
                     }
 
@@ -778,6 +789,33 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
             }
 
             throw e
+        }
+    }
+
+    private inline fun withTransparentSnapshot(block: () -> Unit) {
+        val currentSnapshot = Snapshot.current
+
+        val snapshot =
+            if (currentSnapshot is MutableSnapshot) {
+                TransparentObserverMutableSnapshot(
+                    currentSnapshot,
+                    null,
+                    null,
+                    mergeParentObservers = true,
+                    ownsParentSnapshot = false
+                )
+            } else {
+                TransparentObserverSnapshot(
+                    currentSnapshot,
+                    null,
+                    mergeParentObservers = true,
+                    ownsParentSnapshot = false
+                )
+            }
+        try {
+            snapshot.enter(block)
+        } finally {
+            snapshot.dispose()
         }
     }
 
@@ -1491,7 +1529,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     }
 
     // Recomposer always starts with a constant compound hash
-    internal override val compoundHashKey: Int
+    internal override val compositeKeyHashCode: CompositeKeyHashCode
         get() = RecomposerCompoundHashKey
 
     internal override val collectingCallByInformation: Boolean
@@ -1502,7 +1540,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
         get() = false
 
     internal override val collectingSourceInformation: Boolean
-        get() = compositionStackTraceEnabled
+        get() = composeStackTraceEnabled
 
     internal override fun recordInspectionTable(table: MutableSet<CompositionData>) {
         // TODO: The root recomposer might be a better place to set up inspection

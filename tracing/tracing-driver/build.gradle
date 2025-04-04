@@ -15,7 +15,6 @@
  */
 
 
-import androidx.build.KotlinTarget
 import androidx.build.PlatformIdentifier
 import androidx.build.SoftwareType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -23,13 +22,11 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
-    id("androidx.benchmark")
-    id("com.squareup.wire")
 }
 
 androidXMultiplatform {
     jvm()
-    android()
+    androidTarget()
     defaultPlatform(PlatformIdentifier.ANDROID)
 
     sourceSets {
@@ -38,10 +35,7 @@ androidXMultiplatform {
                 api(libs.kotlinStdlib)
                 api(libs.kotlinCoroutinesCore)
                 api(libs.androidx.annotation)
-
                 implementation("androidx.collection:collection:1.4.5")
-                implementation(libs.wireRuntime)
-                implementation(libs.okio)
             }
         }
         commonTest {
@@ -66,9 +60,12 @@ androidXMultiplatform {
             dependsOn(commonMain)
         }
         androidInstrumentedTest {
+            // Declaring this source set even though we don't really have any instrumentation tests.
+            // This is because commonTest is implicitly treated as something that can be used for
+            // instrumentation tests. Therefore we need to include the test runner; otherwise the
+            // harness fails with an Exception. b/394958372.
             dependsOn(commonTest)
             dependencies {
-                implementation(projectOrArtifact(":benchmark:benchmark-junit4"))
                 implementation(libs.junit)
                 implementation(libs.testExtJunit)
                 implementation(libs.testCore)
@@ -76,21 +73,6 @@ androidXMultiplatform {
                 implementation(libs.testRules)
             }
         }
-    }
-}
-
-// Workarounds for Wire's plugin not setting code generation directory as task output correctly
-// See https://github.com/square/wire/issues/3199
-tasks.named("multiplatformSourceJar").configure {
-    dependsOn(tasks.named("generateCommonMainProtos"))
-}
-
-wire {
-    kotlin {
-        mutableTypes = true
-    }
-    sourcePath {
-        srcDir("src/commonMain/proto")
     }
 }
 
@@ -110,12 +92,8 @@ androidx {
     inceptionYear = "2024"
     description = "AndroidX Tracing Driver"
     metalavaK2UastEnabled = false
-    kotlinTarget = KotlinTarget.KOTLIN_2_0
 }
 
 android {
     namespace = "androidx.tracing.driver"
-    defaultConfig {
-        minSdk = 23
-    }
 }

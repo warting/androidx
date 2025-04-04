@@ -104,7 +104,6 @@ import java.lang.annotation.RetentionPolicy;
  * <p> Note: The constants below are public for the browser implementation's benefit. You are
  * strongly encouraged to use {@link AuthTabIntent.Builder}.
  */
-@ExperimentalAuthTab
 public class AuthTabIntent {
     /** Boolean extra that triggers an Auth Tab launch. */
     public static final String EXTRA_LAUNCH_AUTH_TAB =
@@ -230,13 +229,6 @@ public class AuthTabIntent {
         return defaults;
     }
 
-    private AuthTabIntent(@NonNull Intent intent, @Nullable AuthTabSession session,
-            AuthTabSession.@Nullable PendingSession pendingSession) {
-        this.intent = intent;
-        mSession = session;
-        mPendingSession = pendingSession;
-    }
-
     @Nullable
     public AuthTabSession getSession() {
         return mSession;
@@ -247,9 +239,19 @@ public class AuthTabIntent {
         return mPendingSession;
     }
 
+    /**
+     * Returns the close button icon {@link Bitmap}.
+     */
     @Nullable
     public Bitmap getCloseButtonIcon() {
         return IntentCompat.getParcelableExtra(intent, EXTRA_CLOSE_BUTTON_ICON, Bitmap.class);
+    }
+
+    private AuthTabIntent(@NonNull Intent intent, @Nullable AuthTabSession session,
+            AuthTabSession.@Nullable PendingSession pendingSession) {
+        this.intent = intent;
+        mSession = session;
+        mPendingSession = pendingSession;
     }
 
     /**

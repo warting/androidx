@@ -16,16 +16,19 @@
 
 package androidx.compose.material3
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.testutils.assertIsEqualTo
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -45,16 +48,38 @@ class ButtonGroupTest {
     private val bButton = "BButton"
     private val cButton = "CButton"
     private val dButton = "DButton"
+    private val overflowIndicator = "overflowIndicator"
 
     @Test
     fun default_positioning() {
+        val interactionSources = List(4) { MutableInteractionSource() }
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup {
-                    Button(modifier = Modifier.testTag(aButton), onClick = {}) { Text("A") }
-                    Button(modifier = Modifier.testTag(bButton), onClick = {}) { Text("B") }
-                    Button(modifier = Modifier.testTag(cButton), onClick = {}) { Text("C") }
-                    Button(modifier = Modifier.testTag(dButton), onClick = {}) { Text("D") }
+                ButtonGroup(overflowIndicator = {}) {
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[0]).testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[1]).testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[2]).testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[3]).testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -74,13 +99,34 @@ class ButtonGroupTest {
 
     @Test
     fun differentHorizontalSpacing_positioning() {
+        val interactionSources = List(4) { MutableInteractionSource() }
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(modifier = Modifier.testTag(aButton), onClick = {}) { Text("A") }
-                    Button(modifier = Modifier.testTag(bButton), onClick = {}) { Text("B") }
-                    Button(modifier = Modifier.testTag(cButton), onClick = {}) { Text("C") }
-                    Button(modifier = Modifier.testTag(dButton), onClick = {}) { Text("D") }
+                ButtonGroup(overflowIndicator = {}) {
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[0]).testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[1]).testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[2]).testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier = Modifier.animateWidth(interactionSources[3]).testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -92,34 +138,59 @@ class ButtonGroupTest {
         val dButtonBounds = rule.onNodeWithTag(dButton).getUnclippedBoundsInRoot()
 
         (aButtonBounds.left - wrapperBounds.left).assertIsEqualTo(0.dp)
-        (bButtonBounds.left - aButtonBounds.right).assertIsEqualTo(4.dp)
-        (cButtonBounds.left - bButtonBounds.right).assertIsEqualTo(4.dp)
-        (dButtonBounds.left - cButtonBounds.right).assertIsEqualTo(4.dp)
+        (bButtonBounds.left - aButtonBounds.right).assertIsEqualTo(12.dp)
+        (cButtonBounds.left - bButtonBounds.right).assertIsEqualTo(12.dp)
+        (dButtonBounds.left - cButtonBounds.right).assertIsEqualTo(12.dp)
         (wrapperBounds.right - dButtonBounds.right).assertIsEqualTo(0.dp)
     }
 
     @Test
     fun default_firstPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.15f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * expandedWeight)
+        val expandedRatio = 0.15f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * expandedRatio)
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -147,25 +218,50 @@ class ButtonGroupTest {
     @Test
     fun default_secondPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.15f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * (expandedWeight / 2f))
+        val expandedRatio = 0.15f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * (expandedRatio / 2f))
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -193,25 +289,50 @@ class ButtonGroupTest {
     @Test
     fun default_thirdPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.15f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * (expandedWeight / 2f))
+        val expandedRatio = 0.15f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * (expandedRatio / 2f))
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -239,25 +360,50 @@ class ButtonGroupTest {
     @Test
     fun default_fourthPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.15f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * expandedWeight)
+        val expandedRatio = 0.15f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * expandedRatio)
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -285,25 +431,50 @@ class ButtonGroupTest {
     @Test
     fun customAnimateFraction_firstPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.3f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * expandedWeight)
+        val expandedRatio = 0.3f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * expandedRatio)
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup(expandedRatio = expandedWeight) {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -331,25 +502,50 @@ class ButtonGroupTest {
     @Test
     fun customAnimateFraction_secondPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.3f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * expandedWeight / 2f)
+        val expandedRatio = 0.3f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * expandedRatio / 2f)
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup(expandedRatio = expandedWeight) {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -377,25 +573,50 @@ class ButtonGroupTest {
     @Test
     fun customAnimateFraction_thirdPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.3f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * expandedWeight / 2f)
+        val expandedRatio = 0.3f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * expandedRatio / 2f)
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup(expandedRatio = expandedWeight) {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -423,25 +644,50 @@ class ButtonGroupTest {
     @Test
     fun customAnimateFraction_fourthPressed_buttonSizing() {
         val width = 75.dp
-        val expandedWeight = 0.3f
-        val expectedExpandWidth = width + (width * expandedWeight)
-        val expectedCompressWidth = width - (width * expandedWeight)
+        val expandedRatio = 0.3f
+        val expectedExpandWidth = width + (width * expandedRatio)
+        val expectedCompressWidth = width - (width * expandedRatio)
+        val interactionSources = List(4) { MutableInteractionSource() }
 
         rule.setMaterialContent(lightColorScheme()) {
             Box(Modifier.testTag(wrapperTestTag)) {
-                ButtonGroup(expandedRatio = expandedWeight) {
-                    Button(modifier = Modifier.width(width).testTag(aButton), onClick = {}) {
-                        Text("A")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(bButton), onClick = {}) {
-                        Text("B")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(cButton), onClick = {}) {
-                        Text("C")
-                    }
-                    Button(modifier = Modifier.width(width).testTag(dButton), onClick = {}) {
-                        Text("D")
-                    }
+                ButtonGroup(overflowIndicator = {}, expandedRatio = expandedRatio) {
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[0])
+                                .testTag(aButton),
+                        interactionSource = interactionSources[0],
+                        label = "A"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[1])
+                                .testTag(bButton),
+                        interactionSource = interactionSources[1],
+                        label = "B"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[2])
+                                .testTag(cButton),
+                        interactionSource = interactionSources[2],
+                        label = "C"
+                    )
+                    clickableItem(
+                        onClick = {},
+                        modifier =
+                            Modifier.width(width)
+                                .animateWidth(interactionSources[3])
+                                .testTag(dButton),
+                        interactionSource = interactionSources[3],
+                        label = "D"
+                    )
                 }
             }
         }
@@ -464,5 +710,74 @@ class ButtonGroupTest {
         bButton.assertWidthIsEqualTo(width)
         cButton.assertWidthIsEqualTo(expectedCompressWidth)
         dButton.assertWidthIsEqualTo(expectedExpandWidth)
+    }
+
+    @Test
+    fun overflowIndicator_tooManyItems_Exists() {
+        val numButtons = 100
+        rule.setContent {
+            Box(Modifier.testTag(wrapperTestTag)) {
+                ButtonGroup(
+                    overflowIndicator = {
+                        IconButton(modifier = Modifier.testTag(overflowIndicator), onClick = {}) {}
+                    }
+                ) {
+                    for (i in 0 until numButtons) {
+                        clickableItem(onClick = {}, label = "$i")
+                    }
+                }
+            }
+        }
+        rule.onNodeWithTag(overflowIndicator).assertIsDisplayed()
+    }
+
+    @Test
+    fun overflowIndicator_fitsOnScreen_doesNotExists() {
+        val numButtons = 4
+        rule.setContent {
+            Box(Modifier.testTag(wrapperTestTag)) {
+                ButtonGroup(
+                    overflowIndicator = {
+                        IconButton(modifier = Modifier.testTag(overflowIndicator), onClick = {}) {}
+                    }
+                ) {
+                    for (i in 0 until numButtons) {
+                        clickableItem(onClick = {}, label = "$i")
+                    }
+                }
+            }
+        }
+        rule.onNodeWithTag(overflowIndicator).assertIsNotDisplayed()
+    }
+
+    @Test
+    fun overflowMenu_tooManyItems_exists() {
+        val numButtons = 10
+        rule.setContent {
+            Box(Modifier.testTag(wrapperTestTag)) {
+                ButtonGroup(
+                    overflowIndicator = { menuState ->
+                        IconButton(
+                            modifier = Modifier.testTag(overflowIndicator),
+                            onClick = {
+                                if (menuState.isExpanded) {
+                                    menuState.dismiss()
+                                } else {
+                                    menuState.show()
+                                }
+                            }
+                        ) {}
+                    }
+                ) {
+                    for (i in 0 until numButtons) {
+                        clickableItem(onClick = {}, label = "$i")
+                    }
+                }
+            }
+        }
+
+        rule.onNodeWithTag(overflowIndicator).performClick()
+
+        rule.onNodeWithTag(buttonGroupMenuTestTag).assertIsDisplayed()
     }
 }

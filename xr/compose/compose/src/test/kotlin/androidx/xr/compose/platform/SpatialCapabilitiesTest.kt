@@ -17,13 +17,12 @@
 package androidx.xr.compose.platform
 
 import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.xr.compose.testing.SubspaceTestingActivity
 import androidx.xr.compose.testing.TestSetup
+import androidx.xr.scenecore.scene
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -140,6 +139,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = false) {
                 Text("${LocalSpatialCapabilities.current.isSpatialUiEnabled}")
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -151,7 +151,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = false) {
                 Text("${LocalSpatialCapabilities.current.isSpatialUiEnabled}")
-                this.spatialEnvironment.requestFullSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestFullSpaceMode()
             }
         }
 
@@ -163,7 +163,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = true) {
                 Text("${LocalSpatialCapabilities.current.isSpatialUiEnabled}")
-                this.spatialEnvironment.requestHomeSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -174,8 +174,8 @@ class SpatialCapabilitiesTest {
     fun isContent3dEnabled_homeSpaceMode_returnsFalse() {
         composeTestRule.setContent {
             TestSetup {
-                this.spatialEnvironment.requestHomeSpaceMode()
                 Text("${LocalSpatialCapabilities.current.isContent3dEnabled}")
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -187,7 +187,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = false) {
                 Text("${LocalSpatialCapabilities.current.isContent3dEnabled}")
-                this.spatialEnvironment.requestFullSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestFullSpaceMode()
             }
         }
 
@@ -199,7 +199,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = true) {
                 Text("${LocalSpatialCapabilities.current.isContent3dEnabled}")
-                this.spatialEnvironment.requestHomeSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -210,8 +210,8 @@ class SpatialCapabilitiesTest {
     fun isAppEnvironmentEnabled_homeSpaceMode_returnsFalse() {
         composeTestRule.setContent {
             TestSetup {
-                this.spatialEnvironment.requestHomeSpaceMode()
                 Text(text = "${LocalSpatialCapabilities.current.isAppEnvironmentEnabled}")
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -223,7 +223,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = false) {
                 Text(text = "${LocalSpatialCapabilities.current.isAppEnvironmentEnabled}")
-                this.spatialEnvironment.requestFullSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestFullSpaceMode()
             }
         }
 
@@ -235,7 +235,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = true) {
                 Text(text = "${LocalSpatialCapabilities.current.isAppEnvironmentEnabled}")
-                this.spatialEnvironment.requestHomeSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -246,8 +246,8 @@ class SpatialCapabilitiesTest {
     fun isPassthroughControlEnabled_homeSpaceMode_returnsFalse() {
         composeTestRule.setContent {
             TestSetup {
-                this.spatialEnvironment.requestHomeSpaceMode()
                 Text(text = "${LocalSpatialCapabilities.current.isPassthroughControlEnabled}")
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -259,7 +259,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = false) {
                 Text(text = "${LocalSpatialCapabilities.current.isPassthroughControlEnabled}")
-                this.spatialEnvironment.requestFullSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestFullSpaceMode()
             }
         }
 
@@ -271,7 +271,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = true) {
                 Text(text = "${LocalSpatialCapabilities.current.isPassthroughControlEnabled}")
-                this.spatialEnvironment.requestHomeSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -282,8 +282,8 @@ class SpatialCapabilitiesTest {
     fun isSpatialAudioEnabled_homeSpaceMode_returnsFalse() {
         composeTestRule.setContent {
             TestSetup {
-                this.spatialEnvironment.requestHomeSpaceMode()
                 Text(text = "${LocalSpatialCapabilities.current.isSpatialAudioEnabled}")
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 
@@ -295,7 +295,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = false) {
                 Text(text = "${LocalSpatialCapabilities.current.isSpatialAudioEnabled}")
-                this.spatialEnvironment.requestFullSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestFullSpaceMode()
             }
         }
 
@@ -307,7 +307,7 @@ class SpatialCapabilitiesTest {
         composeTestRule.setContent {
             TestSetup(isFullSpace = true) {
                 Text(text = "${LocalSpatialCapabilities.current.isSpatialAudioEnabled}")
-                this.spatialEnvironment.requestHomeSpaceMode()
+                LocalSession.current?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             }
         }
 

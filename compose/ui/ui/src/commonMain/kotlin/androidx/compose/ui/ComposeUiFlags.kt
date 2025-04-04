@@ -65,16 +65,6 @@ object ComposeUiFlags {
     @Suppress("MutableBareField") @JvmField var isRectTrackingEnabled: Boolean = true
 
     /**
-     * Selecting flag to enable the change new onPostFling nested scroll behavior for ongoing
-     * flings. If a nested scroll node is removed from the tree before sending the onPostFling
-     * callback, we will hold on to the next node in the tree so we have a handle to send the
-     * information after the fling finish/is cancelled.
-     */
-    @Suppress("MutableBareField")
-    @JvmField
-    var NewNestedScrollFlingDispatchingEnabled: Boolean = true
-
-    /**
      * With this flag on, the new semantic version of Autofill APIs will be enabled. Turning this
      * flag off will disable the new Semantic Autofill APIs, and the new refactored semantics.
      */
@@ -84,7 +74,14 @@ object ComposeUiFlags {
      * This enables fixes for View focus. The changes are large enough to require a flag to allow
      * disabling them.
      */
-    @Suppress("MutableBareField") @JvmField var isViewFocusFixEnabled: Boolean = true
+    @Suppress("MutableBareField") @JvmField var isViewFocusFixEnabled: Boolean = false
+
+    /**
+     * When an embedded view that is focused is removed from the hierarchy, it triggers a
+     * requestFocus() which tries to re-assign focus before the previous composition is complete.
+     * This flag enables a fix for this issue.
+     */
+    @Suppress("MutableBareField") @JvmField var isRemoveFocusedViewFixEnabled: Boolean = false
 
     /**
      * With this flag on, the new focus state management implementation is enabled. The new
@@ -93,4 +90,40 @@ object ComposeUiFlags {
      * the cost of initializing the focus system.
      */
     @Suppress("MutableBareField") @JvmField var isTrackFocusEnabled: Boolean = true
+
+    /**
+     * With this flag on, when an AccessibilityService performs ACTION_FOCUS on a Composable node,
+     * if it is in touch mode, it will exit touch mode first, then try to request focus on the node.
+     */
+    @Suppress("MutableBareField") @JvmField var isFocusActionExitsTouchModeEnabled: Boolean = true
+
+    /**
+     * With this flag on, Modifier.focusRestorer() will not pin the item that needs to be restored.
+     * Users are responsible for providing a key for the item that needs to be restored b/330696779.
+     */
+    @Suppress("MutableBareField") @JvmField var isNoPinningInFocusRestorationEnabled: Boolean = true
+
+    /*
+     * Enable lower-level logging of input events where a cancellation event does not stop input
+     * events from finishing processing before the cancellation event. This is to track down why a
+     * certain build of CI is failing with this functionality enabled: b/399055247
+     */
+    @Suppress("MutableBareField") @JvmField var isHitPathTrackerLoggingEnabled: Boolean = false
+
+    /**
+     * With this flag on, SubcomposeLayout will deactivate not used content slots outside of the
+     * frame, not as part of a regular recomposition phase. It allows to not block the drawing
+     * phase, improving the scrolling performance for lazy layouts.
+     */
+    @Suppress("MutableBareField") @JvmField var isOutOfFrameDeactivationEnabled: Boolean = true
+
+    /** Enable clearing focus when a focused item is removed from a lazyList. */
+    @Suppress("MutableBareField") @JvmField var isClearFocusOnResetEnabled: Boolean = true
+
+    /**
+     * With this flag on, the adaptive refresh rate (ARR) feature will be enabled. A preferred frame
+     * rate can be set on a Composable through frame rate modifier:
+     * Modifier.requestedFrameRate(frameRate: Float)
+     */
+    @Suppress("MutableBareField") @JvmField var isAdaptiveRefreshRateEnabled: Boolean = true
 }

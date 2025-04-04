@@ -1772,13 +1772,8 @@ class AppBarTest {
                     },
                     navigationIcon = { FakeIcon(Modifier.testTag(NavigationIconTestTag)) },
                     actions = { FakeIcon(Modifier.testTag(ActionsTestTag)) },
-                    height = { expanded ->
-                        if (expanded) {
-                            expandedHeightDp
-                        } else {
-                            collapsedHeightDp
-                        }
-                    }
+                    collapsedHeight = collapsedHeightDp,
+                    expandedHeight = expandedHeightDp,
                 )
             }
         }
@@ -1807,13 +1802,8 @@ class AppBarTest {
                         },
                         navigationIcon = { FakeIcon(Modifier.testTag(NavigationIconTestTag)) },
                         actions = { FakeIcon(Modifier.testTag(ActionsTestTag)) },
-                        height = { expanded ->
-                            if (expanded) {
-                                expandedHeightDp
-                            } else {
-                                collapsedHeightDp
-                            }
-                        },
+                        collapsedHeight = collapsedHeightDp,
+                        expandedHeight = expandedHeightDp,
                         windowInsets = windowInsets,
                         scrollBehavior = scrollBehavior,
                     )
@@ -2095,6 +2085,30 @@ class AppBarTest {
 
         rule.onNodeWithTag(LazyListTag).performTouchInput { swipeRight() }
         rule.runOnIdle { assertThat(state.firstVisibleItemIndex).isEqualTo(0) }
+    }
+
+    @Test
+    fun bottomAppBar_exitAlways_outOfRangeOffsetHandled() {
+        lateinit var scrollBehavior: BottomAppBarScrollBehavior
+
+        rule.setMaterialContent(lightColorScheme()) {
+            scrollBehavior = BottomAppBarDefaults.exitAlwaysScrollBehavior()
+            // Set negative initial height offset to emulate out of range exception.
+            scrollBehavior.state.heightOffset = -1000f
+            Scaffold(
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+                bottomBar = {
+                    BottomAppBar(
+                        modifier = Modifier.testTag(BottomAppBarTestTag),
+                        scrollBehavior = scrollBehavior
+                    ) {}
+                }
+            ) { contentPadding ->
+                Box(modifier = Modifier.padding(contentPadding))
+            }
+        }
+
+        rule.onNodeWithTag(BottomAppBarTestTag).assertHeightIsEqualTo(0.dp)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

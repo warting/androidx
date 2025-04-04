@@ -35,9 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.navigation3.NavBackStackProvider
+import androidx.navigation3.DecoratedNavEntryProvider
 import androidx.navigation3.NavEntry
-import androidx.navigation3.NavLocalProvider
+import androidx.navigation3.NavEntryDecorator
 import androidx.navigation3.samples.CommonUiNavDisplay.DEFAULT_TRANSITION_DURATION_MILLISECOND
 import androidx.navigation3.samples.CommonUiNavDisplay.ENTER_TRANSITION_KEY
 import androidx.navigation3.samples.CommonUiNavDisplay.EXIT_TRANSITION_KEY
@@ -55,15 +55,15 @@ object CommonUiNavDisplay {
     const val DEFAULT_TRANSITION_DURATION_MILLISECOND = 700
 
     /**
-     * Function to be called on the [NavEntry.featureMap] to notify the [CommonUiNavDisplay] that
-     * the content should be animated using the provided transitions.
+     * Function to be called on the [NavEntry.metadata] to notify the [CommonUiNavDisplay] that the
+     * content should be animated using the provided transitions.
      */
     fun transition(enter: EnterTransition?, exit: ExitTransition?): Map<String, Any> =
         if (enter == null || exit == null) emptyMap()
         else mapOf(ENTER_TRANSITION_KEY to enter, EXIT_TRANSITION_KEY to exit)
 
     /**
-     * Function to be called on the [NavEntry.featureMap] to notify the [CommonUiNavDisplay] that,
+     * Function to be called on the [NavEntry.metadata] to notify the [CommonUiNavDisplay] that,
      * when popping from backstack, the content should be animated using the provided transitions.
      */
     fun popTransition(enter: EnterTransition?, exit: ExitTransition?): Map<String, Any> =
@@ -71,7 +71,7 @@ object CommonUiNavDisplay {
         else mapOf(POP_ENTER_TRANSITION_KEY to enter, POP_EXIT_TRANSITION_KEY to exit)
 
     /**
-     * Function to be called on the [NavEntry.featureMap] to notify the [CommonUiNavDisplay] that
+     * Function to be called on the [NavEntry.metadata] to notify the [CommonUiNavDisplay] that
      * updates the [NavUiLayoutPolicy].
      */
     fun layoutPolicy(value: NavUiLayoutPolicy = NavUiLayoutPolicy.Default): Map<String, Any> =
@@ -84,7 +84,7 @@ fun <T : Any> CommonUiNavDisplay(
     topLevelRoutes: List<TopLevelRoute>,
     onItemClick: (TopLevelRoute) -> Unit,
     modifier: Modifier = Modifier,
-    localProviders: List<NavLocalProvider> = emptyList(),
+    entryDecorators: List<NavEntryDecorator> = emptyList(),
     contentAlignment: Alignment = Alignment.TopStart,
     sizeTransform: SizeTransform? = null,
     enterTransition: EnterTransition =
@@ -107,7 +107,7 @@ fun <T : Any> CommonUiNavDisplay(
     entryProvider: (key: T) -> NavEntry<out T>
 ) {
     BackHandler(backstack.size > 1, onBack)
-    NavBackStackProvider(backstack, entryProvider, localProviders) { entries ->
+    DecoratedNavEntryProvider(backstack, entryProvider, entryDecorators) { entries ->
         // Make a copy shallow copy so that transition.currentState and transition.targetState are
         // different backstack instances. This ensures currentState reflects the old backstack when
         // the backstack (targetState) is updated.
@@ -119,15 +119,15 @@ fun <T : Any> CommonUiNavDisplay(
         // NavDisplay
         val finalEnterTransition =
             if (isPop) {
-                entry.featureMap[POP_ENTER_TRANSITION_KEY] as? EnterTransition ?: popEnterTransition
+                entry.metadata[POP_ENTER_TRANSITION_KEY] as? EnterTransition ?: popEnterTransition
             } else {
-                entry.featureMap[ENTER_TRANSITION_KEY] as? EnterTransition ?: enterTransition
+                entry.metadata[ENTER_TRANSITION_KEY] as? EnterTransition ?: enterTransition
             }
         val finalExitTransition =
             if (isPop) {
-                entry.featureMap[POP_EXIT_TRANSITION_KEY] as? ExitTransition ?: popExitTransition
+                entry.metadata[POP_EXIT_TRANSITION_KEY] as? ExitTransition ?: popExitTransition
             } else {
-                entry.featureMap[EXIT_TRANSITION_KEY] as? ExitTransition ?: exitTransition
+                entry.metadata[EXIT_TRANSITION_KEY] as? ExitTransition ?: exitTransition
             }
         transition.AnimatedContent(
             modifier = modifier,
@@ -143,7 +143,7 @@ fun <T : Any> CommonUiNavDisplay(
         ) { innerStack ->
             val lastKey = innerStack.last()
             val layoutPolicy =
-                entry.featureMap[NAV_UI_LAYOUT_POLICY] as? NavUiLayoutPolicy
+                entry.metadata[NAV_UI_LAYOUT_POLICY] as? NavUiLayoutPolicy
                     ?: NavUiLayoutPolicy.Default
             NavigationSuiteScaffold(
                 layoutType = layoutPolicy.toLayoutType(),

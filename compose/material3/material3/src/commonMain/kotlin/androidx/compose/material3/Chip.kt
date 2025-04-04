@@ -81,8 +81,7 @@ import androidx.compose.ui.util.fastMaxOfOrNull
 import androidx.compose.ui.util.fastSumBy
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design assist chip</a>.
+ * [Material Design assist chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -157,8 +156,7 @@ fun AssistChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design assist chip</a>.
+ * [Material Design assist chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -243,8 +241,7 @@ fun AssistChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design elevated assist chip</a>.
+ * [Material Design elevated assist chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -318,8 +315,7 @@ fun ElevatedAssistChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design elevated assist chip</a>.
+ * [Material Design elevated assist chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -403,8 +399,7 @@ fun ElevatedAssistChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design filter chip</a>.
+ * [Material Design filter chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -490,8 +485,7 @@ fun FilterChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design elevated filter chip</a>.
+ * [Material Design elevated filter chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -573,8 +567,7 @@ fun ElevatedFilterChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design input chip</a>.
+ * [Material Design input chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -691,8 +684,7 @@ fun InputChip(
 }
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design suggestion chip</a>.
+ * [Material Design suggestion chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -764,8 +756,7 @@ fun SuggestionChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design suggestion chip</a>.
+ * [Material Design suggestion chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -847,8 +838,7 @@ fun SuggestionChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design elevated suggestion chip</a>.
+ * [Material Design elevated suggestion chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable
@@ -919,8 +909,7 @@ fun ElevatedSuggestionChip(
     )
 
 /**
- * <a href="https://m3.material.io/components/chips/overview" class="external"
- * target="_blank">Material Design elevated suggestion chip</a>.
+ * [Material Design elevated suggestion chip](https://m3.material.io/components/chips/overview)
  *
  * Chips help people enter information, make selections, filter content, or trigger actions. Chips
  * can show multiple interactive elements together in the same area, such as a list of selectable

@@ -828,7 +828,7 @@ object IconButtonDefaults {
             if (enabled) {
                 outlineColor
             } else {
-                outlineColor.copy(alpha = OutlinedIconButtonTokens.DisabledContainerOpacity)
+                outlineColor.copy(alpha = OutlinedIconButtonTokens.DisabledOpacity)
             }
         return remember(color) { BorderStroke(SmallIconButtonTokens.OutlinedOutlineWidth, color) }
     }
@@ -846,7 +846,7 @@ object IconButtonDefaults {
             if (enabled) {
                 outlineColor
             } else {
-                outlineColor.copy(alpha = OutlinedIconButtonTokens.DisabledContainerOpacity)
+                outlineColor.copy(alpha = OutlinedIconButtonTokens.DisabledOpacity)
             }
         return remember(color) { BorderStroke(SmallIconButtonTokens.OutlinedOutlineWidth, color) }
     }
@@ -867,35 +867,35 @@ object IconButtonDefaults {
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default round shape for any extra small icon button. */
-    val xSmallRoundShape: Shape
+    val extraSmallRoundShape: Shape
         @Composable get() = XSmallIconButtonTokens.ContainerShapeRound.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default square shape for any extra small icon button. */
-    val xSmallSquareShape: Shape
+    val extraSmallSquareShape: Shape
         @Composable get() = XSmallIconButtonTokens.ContainerShapeSquare.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default pressed shape for any extra small icon button. */
-    val xSmallPressedShape: Shape
+    val extraSmallPressedShape: Shape
         @Composable get() = XSmallIconButtonTokens.PressedContainerShape.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default selected shape for any extra small icon button. */
-    val xSmallSelectedRoundShape: Shape
+    val extraSmallSelectedRoundShape: Shape
         @Composable get() = XSmallIconButtonTokens.SelectedContainerShapeRound.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default selected shape for any extra small, square icon button. */
-    val xSmallSelectedSquareShape: Shape
+    val extraSmallSelectedSquareShape: Shape
         @Composable get() = XSmallIconButtonTokens.SelectedContainerShapeSquare.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
@@ -1006,36 +1006,36 @@ object IconButtonDefaults {
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
-    /** Default shape for any xlarge icon button. */
-    val xLargeRoundShape: Shape
+    /** Default shape for any extra large icon button. */
+    val extraLargeRoundShape: Shape
         @Composable get() = XLargeIconButtonTokens.ContainerShapeRound.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
-    /** Default shape for any xlarge icon button. */
-    val xLargeSquareShape: Shape
+    /** Default shape for any extra large icon button. */
+    val extraLargeSquareShape: Shape
         @Composable get() = XLargeIconButtonTokens.ContainerShapeSquare.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default pressed shape for any extra large icon button. */
-    val xLargePressedShape: Shape
+    val extraLargePressedShape: Shape
         @Composable get() = XLargeIconButtonTokens.PressedContainerShape.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default selected shape for any extra large icon button. */
-    val xLargeSelectedRoundShape: Shape
+    val extraLargeSelectedRoundShape: Shape
         @Composable get() = XLargeIconButtonTokens.SelectedContainerShapeRound.value
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default selected shape for any extra large, square icon button. */
-    val xLargeSelectedSquareShape: Shape
+    val extraLargeSelectedSquareShape: Shape
         @Composable get() = XLargeIconButtonTokens.SelectedContainerShapeSquare.value
 
     /**
@@ -1065,12 +1065,11 @@ object IconButtonDefaults {
 
     @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     internal val Shapes.defaultIconButtonShapes: IconButtonShapes
-        @Composable
         get() {
             return defaultIconButtonShapesCached
                 ?: IconButtonShapes(
-                        shape = smallRoundShape,
-                        pressedShape = smallPressedShape,
+                        shape = fromToken(SmallIconButtonTokens.ContainerShapeRound),
+                        pressedShape = fromToken(SmallIconButtonTokens.PressedContainerShape),
                     )
                     .also { defaultIconButtonShapesCached = it }
         }
@@ -1109,13 +1108,12 @@ object IconButtonDefaults {
 
     @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     internal val Shapes.defaultIconToggleButtonShapes: IconToggleButtonShapes
-        @Composable
         get() {
             return defaultIconToggleButtonShapesCached
                 ?: IconToggleButtonShapes(
-                        shape = smallRoundShape,
-                        pressedShape = smallPressedShape,
-                        checkedShape = smallSelectedRoundShape
+                        shape = fromToken(SmallIconButtonTokens.ContainerShapeRound),
+                        pressedShape = fromToken(SmallIconButtonTokens.PressedContainerShape),
+                        checkedShape = fromToken(SmallIconButtonTokens.SelectedContainerShapeRound)
                     )
                     .also { defaultIconToggleButtonShapesCached = it }
         }
@@ -1124,7 +1122,7 @@ object IconButtonDefaults {
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
     /** Default container for any extra small icon button. */
-    val xSmallIconSize: Dp = XSmallIconButtonTokens.IconSize
+    val extraSmallIconSize: Dp = XSmallIconButtonTokens.IconSize
 
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
@@ -1148,7 +1146,7 @@ object IconButtonDefaults {
     @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
     @get:ExperimentalMaterial3ExpressiveApi
     @ExperimentalMaterial3ExpressiveApi
-    val xLargeIconSize: Dp = XLargeIconButtonTokens.IconSize
+    val extraLargeIconSize: Dp = XLargeIconButtonTokens.IconSize
 
     /**
      * Default container size for any extra small icon button.
@@ -1156,7 +1154,7 @@ object IconButtonDefaults {
      * @param widthOption the width of the container
      */
     @ExperimentalMaterial3ExpressiveApi
-    fun xSmallContainerSize(
+    fun extraSmallContainerSize(
         widthOption: IconButtonWidthOption = IconButtonWidthOption.Uniform
     ): DpSize {
         val horizontalSpace =
@@ -1165,8 +1163,8 @@ object IconButtonDefaults {
                     XSmallIconButtonTokens.NarrowLeadingSpace +
                         XSmallIconButtonTokens.NarrowTrailingSpace
                 IconButtonWidthOption.Uniform ->
-                    XSmallIconButtonTokens.UniformLeadingSpace +
-                        XSmallIconButtonTokens.UniformLeadingSpace
+                    XSmallIconButtonTokens.DefaultLeadingSpace +
+                        XSmallIconButtonTokens.DefaultLeadingSpace
                 IconButtonWidthOption.Wide ->
                     XSmallIconButtonTokens.WideLeadingSpace +
                         XSmallIconButtonTokens.WideTrailingSpace
@@ -1193,8 +1191,8 @@ object IconButtonDefaults {
                     SmallIconButtonTokens.NarrowLeadingSpace +
                         SmallIconButtonTokens.NarrowTrailingSpace
                 IconButtonWidthOption.Uniform ->
-                    SmallIconButtonTokens.UniformLeadingSpace +
-                        SmallIconButtonTokens.UniformLeadingSpace
+                    SmallIconButtonTokens.DefaultLeadingSpace +
+                        SmallIconButtonTokens.DefaultLeadingSpace
                 IconButtonWidthOption.Wide ->
                     SmallIconButtonTokens.WideLeadingSpace + SmallIconButtonTokens.WideTrailingSpace
                 else -> 0.dp
@@ -1220,8 +1218,8 @@ object IconButtonDefaults {
                     MediumIconButtonTokens.NarrowLeadingSpace +
                         MediumIconButtonTokens.NarrowTrailingSpace
                 IconButtonWidthOption.Uniform ->
-                    MediumIconButtonTokens.UniformLeadingSpace +
-                        MediumIconButtonTokens.UniformLeadingSpace
+                    MediumIconButtonTokens.DefaultLeadingSpace +
+                        MediumIconButtonTokens.DefaultLeadingSpace
                 IconButtonWidthOption.Wide ->
                     MediumIconButtonTokens.WideLeadingSpace +
                         MediumIconButtonTokens.WideTrailingSpace
@@ -1266,7 +1264,7 @@ object IconButtonDefaults {
      * @param widthOption the width of the container
      */
     @ExperimentalMaterial3ExpressiveApi
-    fun xLargeContainerSize(
+    fun extraLargeContainerSize(
         widthOption: IconButtonWidthOption = IconButtonWidthOption.Uniform
     ): DpSize {
         val horizontalSpace =
@@ -1275,8 +1273,8 @@ object IconButtonDefaults {
                     XLargeIconButtonTokens.NarrowLeadingSpace +
                         XLargeIconButtonTokens.NarrowTrailingSpace
                 IconButtonWidthOption.Uniform ->
-                    XLargeIconButtonTokens.UniformLeadingSpace +
-                        XLargeIconButtonTokens.UniformLeadingSpace
+                    XLargeIconButtonTokens.DefaultLeadingSpace +
+                        XLargeIconButtonTokens.DefaultLeadingSpace
                 IconButtonWidthOption.Wide ->
                     XLargeIconButtonTokens.WideLeadingSpace +
                         XLargeIconButtonTokens.WideTrailingSpace

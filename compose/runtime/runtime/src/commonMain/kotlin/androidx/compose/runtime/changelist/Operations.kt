@@ -342,11 +342,12 @@ internal class Operations : OperationsDebugStringFormattable() {
     fun executeAndFlushAllPendingOperations(
         applier: Applier<*>,
         slots: SlotWriter,
-        rememberManager: RememberManager
+        rememberManager: RememberManager,
+        errorContext: OperationErrorContext?
     ) {
         drain {
             with(operation) {
-                execute(applier = applier, slots = slots, rememberManager = rememberManager)
+                executeWithComposeStackTrace(applier, slots, rememberManager, errorContext)
             }
         }
     }
@@ -561,6 +562,7 @@ internal class Operations : OperationsDebugStringFormattable() {
         }
     }
 
+    @Suppress("POTENTIALLY_NON_REPORTED_ANNOTATION")
     @Deprecated(
         "toString() will return the default implementation from Any. " +
             "Did you mean to use toDebugString()?",

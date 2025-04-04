@@ -27,6 +27,7 @@ import androidx.xr.runtime.math.Pose
  * @property pose the pose of the center of the detected anchor. Can be null iff the tracking state
  *   is [TrackingState.Stopped].
  */
+@Suppress("DataClassDefinition")
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
 public data class AnchorState(
     val trackingState: TrackingState = TrackingState.Paused,

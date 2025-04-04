@@ -81,6 +81,11 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     }
 
     @Override
+    public int getCompressionMemLevel() {
+        return mIcingOptionsConfig.getCompressionMemLevel();
+    }
+
+    @Override
     public boolean getAllowCircularSchemaDefinitions() {
         return mIcingOptionsConfig.getAllowCircularSchemaDefinitions();
     }
@@ -136,6 +141,11 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     }
 
     @Override
+    public int getMaxByteLimitForBatchPut() {
+        return mLimitConfig.getMaxByteLimitForBatchPut();
+    }
+
+    @Override
     public int getPerPackageDocumentCountLimit() {
         return mLimitConfig.getPerPackageDocumentCountLimit();
     }
@@ -171,8 +181,18 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     }
 
     @Override
+    public @NonNull String getIcuDataFileAbsolutePath() {
+        return mIcingOptionsConfig.getIcuDataFileAbsolutePath();
+    }
+
+    @Override
     public PersistType. @NonNull Code getLightweightPersistType() {
         return mPersistToDiskRecoveryProof ?
                 PersistType.Code.RECOVERY_PROOF : PersistType.Code.LITE;
+    }
+
+    @Override
+    public int getCompressionThresholdBytes() {
+        return mIcingOptionsConfig.getCompressionThresholdBytes();
     }
 }

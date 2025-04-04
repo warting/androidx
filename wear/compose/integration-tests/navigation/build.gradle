@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+
 plugins {
     id("AndroidXPlugin")
     id("AndroidXComposePlugin")
@@ -59,4 +60,7 @@ dependencies {
     // Align dependencies in debugRuntimeClasspath and debugAndroidTestRuntimeClasspath.
 
     androidTestImplementation("androidx.lifecycle:lifecycle-common:2.8.7")
+}
+
+androidx {
 }

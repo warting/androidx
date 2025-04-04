@@ -21,7 +21,6 @@
  * Please use that script when creating a new project, rather than copying an existing project and
  * modifying its settings.
  */
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 
@@ -32,8 +31,9 @@ plugins {
 }
 
 androidXMultiplatform {
-    android()
+    androidTarget()
     jvmStubs()
+    linuxX64Stubs()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -41,7 +41,7 @@ androidXMultiplatform {
         commonMain {
             dependencies {
                 implementation(libs.kotlinStdlib)
-                implementation("androidx.collection:collection-ktx:1.4.5")
+                implementation("androidx.collection:collection:1.4.5")
                 implementation("androidx.compose.runtime:runtime:1.7.5")
                 implementation("androidx.compose.runtime:runtime-saveable:1.7.5")
                 implementation("androidx.lifecycle:lifecycle-runtime:2.8.7")
@@ -118,6 +118,5 @@ androidx {
             "easily supports extensions."
     samples(project(":navigation3:navigation3:navigation3-samples"))
     doNotDocumentReason = "Not published to maven"
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
     addGoldenImageAssets()
 }

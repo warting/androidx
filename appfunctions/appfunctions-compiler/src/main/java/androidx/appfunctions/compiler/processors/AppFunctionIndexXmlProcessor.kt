@@ -16,9 +16,10 @@
 
 package androidx.appfunctions.compiler.processors
 
+import androidx.appfunctions.compiler.core.AnnotatedAppFunctionSerializableProxy.ResolvedAnnotatedSerializableProxies
 import androidx.appfunctions.compiler.core.AnnotatedAppFunctions
 import androidx.appfunctions.compiler.core.AppFunctionSymbolResolver
-import androidx.appfunctions.metadata.AppFunctionMetadata
+import androidx.appfunctions.metadata.CompileTimeAppFunctionMetadata
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
@@ -34,8 +35,8 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 
 /**
- * Generates AppFunction's index xml file with all properties of [AppFunctionMetadata] for the
- * AppSearch indexer to index.
+ * Generates AppFunction's index xml file with all properties of [CompileTimeAppFunctionMetadata]
+ * for the AppSearch indexer to index.
  *
  * The generator would write an XML file as `/assets/app_functions_dynamic_schema.xml`. The file
  * would be packaged into the APK's asset when assembled, so that the AppSearch indexer can look up
@@ -46,30 +47,45 @@ class AppFunctionIndexXmlProcessor(
 ) : SymbolProcessor {
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        generateIndexXml(AppFunctionSymbolResolver(resolver).resolveAnnotatedAppFunctions())
+        val appFunctionSymbolResolver = AppFunctionSymbolResolver(resolver)
+        val resolvedAnnotatedSerializableProxies =
+            ResolvedAnnotatedSerializableProxies(
+                appFunctionSymbolResolver.resolveAllAnnotatedSerializableProxiesFromModule()
+            )
+        generateIndexXml(
+            appFunctionSymbolResolver.getAnnotatedAppFunctionsFromAllModules(),
+            resolvedAnnotatedSerializableProxies
+        )
         return emptyList()
     }
 
     /**
      * Generates AppFunction's index xml files for indexer in App Search.
      *
-     * @param appFunctionsByClass a collection of functions annotated with @AppFunction grouped by
-     *   their enclosing classes.
+     * @param appFunctionsByClass a collection of functions annotated with @AppFunction
+     * @param resolvedAnnotatedSerializableProxies a collection of resolved annotated serializable
+     *   proxies
      */
     private fun generateIndexXml(
         appFunctionsByClass: List<AnnotatedAppFunctions>,
+        resolvedAnnotatedSerializableProxies: ResolvedAnnotatedSerializableProxies
     ) {
         if (appFunctionsByClass.isEmpty()) {
             return
         }
-        writeXmlFile(appFunctionsByClass)
+        writeXmlFile(appFunctionsByClass, resolvedAnnotatedSerializableProxies)
     }
 
     private fun writeXmlFile(
         appFunctionsByClass: List<AnnotatedAppFunctions>,
+        resolvedAnnotatedSerializableProxies: ResolvedAnnotatedSerializableProxies
     ) {
         val appFunctionMetadataList =
-            appFunctionsByClass.flatMap { it.createAppFunctionMetadataInstances() }
+            appFunctionsByClass.flatMap {
+                it.createAppFunctionMetadataList(resolvedAnnotatedSerializableProxies).map {
+                    it.toAppFunctionMetadataDocument()
+                }
+            }
 
         val xmlDocumentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
         val xmlDocument = xmlDocumentBuilder.newDocument().apply { xmlStandalone = true }
@@ -192,7 +208,7 @@ class AppFunctionIndexXmlProcessor(
 
     private companion object {
         const val XML_PACKAGE_NAME = "assets"
-        const val XML_FILE_NAME = "app_functions_dynamic_schema"
+        const val XML_FILE_NAME = "app_functions_v2"
         const val XML_EXTENSION = "xml"
         const val APP_FUNCTIONS_ELEMENTS_TAG = "appfunctions"
         const val APP_FUNCTION_ITEM_TAG = "appfunction"

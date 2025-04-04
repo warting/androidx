@@ -1,3 +1,4 @@
+
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
@@ -34,4 +35,7 @@ dependencies {
     implementation(libs.testRules)
     implementation(libs.testExtJunit)
     implementation(libs.testCore)
+}
+
+androidx {
 }

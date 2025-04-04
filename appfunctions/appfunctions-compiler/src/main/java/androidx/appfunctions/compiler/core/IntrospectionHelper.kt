@@ -21,8 +21,10 @@ import com.squareup.kotlinpoet.ClassName
 /** Helper class to introspect AppFunction symbols. */
 object IntrospectionHelper {
     // Package names
+    const val APP_FUNCTIONS_AGGREGATED_DEPS_PACKAGE_NAME = "appfunctions_aggregated_deps"
+    const val SERIALIZABLE_PROXY_PACKAGE_NAME = "androidx.appfunctions.internal.serializableproxies"
+    const val APP_FUNCTIONS_INTERNAL_PACKAGE_NAME = "androidx.appfunctions.internal"
     private const val APP_FUNCTIONS_PACKAGE_NAME = "androidx.appfunctions"
-    private const val APP_FUNCTIONS_INTERNAL_PACKAGE_NAME = "androidx.appfunctions.internal"
     private const val APP_FUNCTIONS_METADATA_PACKAGE_NAME = "androidx.appfunctions.metadata"
 
     // Annotation classes
@@ -42,13 +44,54 @@ object IntrospectionHelper {
         val CLASS_NAME = ClassName(APP_FUNCTIONS_PACKAGE_NAME, "AppFunctionSerializable")
     }
 
+    object AppFunctionSerializableProxyAnnotation {
+        val CLASS_NAME = ClassName(APP_FUNCTIONS_PACKAGE_NAME, "AppFunctionSerializableProxy")
+        const val PROPERTY_TARGET_CLASS = "targetClass"
+    }
+
+    object AppFunctionSchemaCapability {
+        val CLASS_NAME = ClassName(APP_FUNCTIONS_PACKAGE_NAME, "AppFunctionSchemaCapability")
+    }
+
+    object AppFunctionComponentRegistryAnnotation {
+        val CLASS_NAME = ClassName(APP_FUNCTIONS_PACKAGE_NAME, "AppFunctionComponentRegistry")
+        const val PROPERTY_COMPONENT_CATEGORY = "componentCategory"
+        const val PROPERTY_COMPONENT_NAMES = "componentNames"
+
+        object Category {
+            const val INVENTORY = "INVENTORY"
+            const val INVOKER = "INVOKER"
+            const val FUNCTION = "FUNCTION"
+        }
+    }
+
     // Classes
     val APP_FUNCTION_INVENTORY_CLASS =
         ClassName(APP_FUNCTIONS_INTERNAL_PACKAGE_NAME, "AppFunctionInventory")
     val APP_FUNCTION_METADATA_CLASS =
-        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionMetadata")
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "CompileTimeAppFunctionMetadata")
     val APP_FUNCTION_FUNCTION_NOT_FOUND_EXCEPTION_CLASS =
         ClassName(APP_FUNCTIONS_PACKAGE_NAME, "AppFunctionFunctionNotFoundException")
+    val APP_FUNCTION_SCHEMA_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionSchemaMetadata")
+    val APP_FUNCTION_PARAMETER_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionParameterMetadata")
+    val APP_FUNCTION_DATA_TYPE_METADATA =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionDataTypeMetadata")
+    val APP_FUNCTION_PRIMITIVE_TYPE_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionPrimitiveTypeMetadata")
+    val APP_FUNCTION_OBJECT_TYPE_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionObjectTypeMetadata")
+    val APP_FUNCTION_ARRAY_TYPE_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionArrayTypeMetadata")
+    val APP_FUNCTION_REFERENCE_TYPE_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionReferenceTypeMetadata")
+    val APP_FUNCTION_ALL_OF_TYPE_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionAllOfTypeMetadata")
+    val APP_FUNCTION_COMPONENTS_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionComponentsMetadata")
+    val APP_FUNCTION_RESPONSE_METADATA_CLASS =
+        ClassName(APP_FUNCTIONS_METADATA_PACKAGE_NAME, "AppFunctionResponseMetadata")
 
     object ConfigurableAppFunctionFactoryClass {
         val CLASS_NAME =
@@ -74,5 +117,67 @@ object IntrospectionHelper {
             const val FUNCTION_ID_PARAM_NAME = "functionIdentifier"
             const val PARAMETERS_PARAM_NAME = "parameters"
         }
+    }
+
+    object AppFunctionSerializableFactoryClass {
+        val CLASS_NAME =
+            ClassName(APP_FUNCTIONS_INTERNAL_PACKAGE_NAME, "AppFunctionSerializableFactory")
+
+        object FromAppFunctionDataMethod {
+            const val METHOD_NAME = "fromAppFunctionData"
+            const val APP_FUNCTION_DATA_PARAM_NAME = "appFunctionData"
+        }
+
+        object ToAppFunctionDataMethod {
+            const val METHOD_NAME = "toAppFunctionData"
+            const val APP_FUNCTION_SERIALIZABLE_PARAM_NAME = "appFunctionSerializable"
+        }
+
+        object TypeParameterClass {
+            val CLASS_NAME =
+                ClassName(
+                    APP_FUNCTIONS_INTERNAL_PACKAGE_NAME,
+                    "AppFunctionSerializableFactory",
+                    "TypeParameter"
+                )
+
+            object PrimitiveTypeParameterClass {
+                val CLASS_NAME =
+                    ClassName(
+                        APP_FUNCTIONS_INTERNAL_PACKAGE_NAME,
+                        "AppFunctionSerializableFactory",
+                        "TypeParameter",
+                        "PrimitiveTypeParameter"
+                    )
+
+                val PROPERTY_CLAZZ_NAME = "clazz"
+            }
+
+            object ListTypeParameterClass {
+                val CLASS_NAME =
+                    ClassName(
+                        APP_FUNCTIONS_INTERNAL_PACKAGE_NAME,
+                        "AppFunctionSerializableFactory",
+                        "TypeParameter",
+                        "ListTypeParameter"
+                    )
+
+                val PROPERTY_ITEM_CLAZZ_NAME = "itemClazz"
+            }
+        }
+    }
+
+    object AggregatedAppFunctionInventoryClass {
+        val CLASS_NAME =
+            ClassName(APP_FUNCTIONS_INTERNAL_PACKAGE_NAME, "AggregatedAppFunctionInventory")
+
+        const val PROPERTY_INVENTORIES_NAME = "inventories"
+    }
+
+    object AggregatedAppFunctionInvokerClass {
+        val CLASS_NAME =
+            ClassName(APP_FUNCTIONS_INTERNAL_PACKAGE_NAME, "AggregatedAppFunctionInvoker")
+
+        const val PROPERTY_INVOKERS_NAME = "invokers"
     }
 }

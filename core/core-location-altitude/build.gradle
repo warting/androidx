@@ -21,13 +21,13 @@
  * Please use that script when creating a new project, rather than copying an existing project and
  * modifying its settings.
  */
-import androidx.build.BundleInsideHelper
+
 import androidx.build.SoftwareType
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -43,9 +43,12 @@ dependencies {
     api("androidx.annotation:annotation:1.8.1")
 
     implementation(project(":core:core-location-altitude-proto"))
-    implementation(libs.autoValueAnnotations)
     implementation("androidx.core:core:1.13.0")
     implementation(project(":room:room-runtime"))
+    implementation(project(":room:room-common"))
+    implementation(project(":sqlite:sqlite"))
+    implementation(libs.autoValueAnnotations)
+    implementation(libs.kotlinStdlib)
 
     annotationProcessor(libs.autoValue)
     annotationProcessor(project(":room:room-compiler"))

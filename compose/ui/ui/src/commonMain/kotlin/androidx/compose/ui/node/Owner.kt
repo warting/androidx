@@ -370,6 +370,19 @@ internal interface Owner : PositionCalculator {
      */
     fun decrementSensitiveComponentCount() {}
 
+    val outOfFrameExecutor: OutOfFrameExecutor?
+        get() = null
+
+    /** This can be used to Vote for a preferred frame rate. */
+    fun voteFrameRate(frameRate: Float) {}
+
+    /**
+     * Dispatches a callback when something in this hierarchy scrolls.
+     *
+     * @param offset Delta scrolled.
+     */
+    fun dispatchOnScrollChanged(delta: Offset) {}
+
     companion object {
         /**
          * Enables additional (and expensive to do in production) assertions. Useful to be set to

@@ -183,5 +183,30 @@ internal val STUBS =
                 }
             """
                 .trimIndent()
+        ),
+        kotlin(
+            "src/org/gradle/kotlin/dsl/DomainObjectCollectionExtensions.kt",
+            """
+                package org.gradle.kotlin.dsl
+                import org.gradle.api.DomainObjectCollection
+
+                inline fun <reified S : Any> DomainObjectCollection<in S>.withType(): DomainObjectCollection<S> = TODO()
+                inline fun <reified S : Any> DomainObjectCollection<in S>.withType(noinline configuration: S.() -> Unit): DomainObjectCollection<S> = TODO()
+            """
+                .trimIndent()
+        ),
+        kotlin(
+            """
+                package com.android.build.gradle.internal.tasks
+                annotation class BuildAnalyzer
+            """
+                .trimIndent()
+        ),
+        kotlin(
+            """
+                package org.gradle.process.internal
+                class ExecException : Exception()
+            """
+                .trimIndent()
         )
     )

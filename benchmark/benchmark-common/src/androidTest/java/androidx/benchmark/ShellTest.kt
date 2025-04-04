@@ -29,6 +29,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import org.junit.After
 import org.junit.Assert
 import org.junit.Assume.assumeTrue
@@ -39,6 +40,7 @@ import org.junit.runner.RunWith
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class ShellTest {
+
     @Before
     @After
     fun setup() {
@@ -254,6 +256,15 @@ class ShellTest {
         assertTrue(backgroundProcess.isAlive())
         Shell.killProcessesAndWait(listOf(backgroundProcess))
         assertFalse(backgroundProcess.isAlive())
+    }
+
+    @SdkSuppress(minSdkVersion = 23)
+    @Test
+    fun killProcessesAndWait_nonExistentProcess() {
+        Shell.killProcessesAndWait(
+            processName = Packages.FAKE,
+            processKiller = { fail("shouldn't execute process killer, no process of this name") }
+        )
     }
 
     @SdkSuppress(minSdkVersion = 23)
@@ -530,6 +541,26 @@ class ShellTest {
         assertTrue(Shell.fullProcessNameMatchesProcess("example.app:ui", "example.app:ui"))
         assertTrue(Shell.fullProcessNameMatchesProcess("example.app:ui", "example.app"))
         assertFalse(Shell.fullProcessNameMatchesProcess("example.app:ui", "example.ap"))
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 36)
+    fun pgrepLF() {
+        val processPids = Shell.pgrepLF(Packages.TEST)
+        assertTrue(
+            processPids.any { it.processName == Packages.TEST },
+            "expected package name to be contained in output:\n${processPids.joinToString("\n")}"
+        )
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 23, maxSdkVersion = 35)
+    fun pgrepLFBelowApi36() {
+        val processPids = Shell.pgrepLF(Packages.TEST)
+        assertTrue(
+            processPids.any { it.processName == Packages.TEST },
+            "expected package name to be contained in output:\n${processPids.joinToString("\n")}"
+        )
     }
 
     private fun pidof(packageName: String): Int? {

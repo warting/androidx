@@ -55,6 +55,14 @@ import androidx.wear.protolayout.modifiers.padding
  *
  * Those are vertically stacked title and content, and additional side slot for a time.
  *
+ * It is highly recommended to set its height to fill the available space, with [expand] for optimal
+ * experience across different screen sizes.
+ *
+ * The card's [colors] default to using [ColorScheme] from the [MaterialScope] it's defined in,
+ * which defaults to [dynamicColorScheme], meaning that the colors follow system theme if available
+ * on device. If not, or switched off by user, uses fallback [ColorScheme] defined in its
+ * [MaterialScope].
+ *
  * @param onClick Associated [Clickable] for click events. When the card is clicked it will fire the
  *   associated action.
  * @param title A slot for displaying the title of the card, expected to be one or two lines of
@@ -103,7 +111,11 @@ public fun MaterialScope.titleCard(
     time: (MaterialScope.() -> LayoutElement)? = null,
     height: ContainerDimension = wrapWithMinTapTargetDimension(),
     shape: Corner =
-        if (deviceConfiguration.screenWidthDp.isBreakpoint()) shapes.extraLarge else shapes.large,
+        if (deviceConfiguration.screenWidthDp.isBreakpoint()) {
+            shapes.extraLarge
+        } else {
+            shapes.large
+        },
     colors: CardColors = filledCardColors(),
     backgroundContent: (MaterialScope.() -> LayoutElement)? = null,
     style: TitleCardStyle = defaultTitleCardStyle(),
@@ -174,6 +186,11 @@ public fun MaterialScope.titleCard(
  *
  * The rest of the [appCard] contains the content which should be [text].
  *
+ * The card's [colors] default to using [ColorScheme] from the [MaterialScope] it's defined in,
+ * which defaults to [dynamicColorScheme], meaning that the colors follow system theme if available
+ * on device. If not, or switched off by user, uses fallback [ColorScheme] defined in its
+ * [MaterialScope].
+ *
  * @param onClick Associated [Clickable] for click events. When the card is clicked it will fire the
  *   associated action.
  * @param title A slot for displaying the title of the card, expected to be one line of text. Uses
@@ -225,7 +242,11 @@ public fun MaterialScope.appCard(
     time: (MaterialScope.() -> LayoutElement)? = null,
     height: ContainerDimension = wrapWithMinTapTargetDimension(),
     shape: Corner =
-        if (deviceConfiguration.screenWidthDp.isBreakpoint()) shapes.extraLarge else shapes.large,
+        if (deviceConfiguration.screenWidthDp.isBreakpoint()) {
+            shapes.extraLarge
+        } else {
+            shapes.large
+        },
     colors: CardColors = filledCardColors(),
     backgroundContent: (MaterialScope.() -> LayoutElement)? = null,
     style: AppCardStyle = defaultAppCardStyle(),
@@ -246,7 +267,8 @@ public fun MaterialScope.appCard(
                             TextElementStyle(
                                 typography = style.titleTypography,
                                 color = colors.titleColor,
-                                alignment = TEXT_ALIGN_START
+                                alignment = TEXT_ALIGN_START,
+                                maxLines = 2,
                             )
                     )
                     .title(),
@@ -307,6 +329,11 @@ public fun MaterialScope.appCard(
  *
  * This card works well in [buttonGroup] with cards [width] and [height] is set to [expand].
  *
+ * The card's [colors] default to using [ColorScheme] from the [MaterialScope] it's defined in,
+ * which defaults to [dynamicColorScheme], meaning that the colors follow system theme if available
+ * on device. If not, or switched off by user, uses fallback [ColorScheme] defined in its
+ * [MaterialScope].
+ *
  * @param onClick Associated [Clickable] for click events. When the card is clicked it will fire the
  *   associated action.
  * @param modifier Modifiers to set to this element. It's highly recommended to set a content
@@ -363,7 +390,11 @@ public fun MaterialScope.textDataCard(
     colors: CardColors = filledCardColors(),
     backgroundContent: (MaterialScope.() -> LayoutElement)? = null,
     style: DataCardStyle =
-        if (secondaryText == null) defaultCompactDataCardStyle() else defaultDataCardStyle(),
+        if (secondaryText == null) {
+            defaultCompactDataCardStyle()
+        } else {
+            defaultDataCardStyle()
+        },
     contentPadding: Padding = style.innerPadding,
 ): LayoutElement =
     card(
@@ -423,6 +454,11 @@ public fun MaterialScope.textDataCard(
  *
  * This card works well in [buttonGroup] with cards [width] and [height] set to [expand].
  *
+ * The card's [colors] default to using [ColorScheme] from the [MaterialScope] it's defined in,
+ * which defaults to [dynamicColorScheme], meaning that the colors follow system theme if available
+ * on device. If not, or switched off by user, uses fallback [ColorScheme] defined in its
+ * [MaterialScope].
+ *
  * @param onClick Associated [Clickable] for click events. When the card is clicked it will fire the
  *   associated action.
  * @param modifier Modifiers to set to this element. It's highly recommended to set a content
@@ -481,7 +517,11 @@ public fun MaterialScope.iconDataCard(
     colors: CardColors = filledCardColors(),
     backgroundContent: (MaterialScope.() -> LayoutElement)? = null,
     style: DataCardStyle =
-        if (secondaryIcon == null) defaultCompactDataCardStyle() else defaultDataCardStyle(),
+        if (secondaryIcon == null) {
+            defaultCompactDataCardStyle()
+        } else {
+            defaultDataCardStyle()
+        },
     titleContentPlacement: TitleContentPlacementInDataCard = TitleContentPlacementInDataCard.Bottom,
     contentPadding: Padding = style.innerPadding,
 ): LayoutElement =
@@ -534,6 +574,14 @@ public fun MaterialScope.iconDataCard(
 /**
  * Opinionated ProtoLayout Material3 graphic data card that offers a slot for graphic data such as
  * progress indicator and up to 2 vertically stacked slots, usually for textual description.
+ *
+ * It is highly recommended to set its height to fill the available space, with [expand] for optimal
+ * experience across different screen sizes.
+ *
+ * The card's [colors] default to using [ColorScheme] from the [MaterialScope] it's defined in,
+ * which defaults to [dynamicColorScheme], meaning that the colors follow system theme if available
+ * on device. If not, or switched off by user, uses fallback [ColorScheme] defined in its
+ * [MaterialScope].
  *
  * @param onClick Associated [Clickable] for click events. When the card is clicked it will fire the
  *   associated action.
@@ -635,9 +683,11 @@ public fun MaterialScope.graphicDataCard(
                 if (
                     horizontalAlignment != HORIZONTAL_ALIGN_START &&
                         horizontalAlignment != HORIZONTAL_ALIGN_END
-                )
+                ) {
                     HORIZONTAL_ALIGN_START
-                else horizontalAlignment
+                } else {
+                    horizontalAlignment
+                }
         )
     }
 
@@ -652,6 +702,9 @@ public fun MaterialScope.graphicDataCard(
  * experience across different screen sizes.
  *
  * It can be used for displaying any clickable container with additional data, text or graphics.
+ *
+ * It is highly recommended to set its height to fill the available space, with [expand] for optimal
+ * experience across different screen sizes.
  *
  * @param onClick Associated [Clickable] for click events. When the card is clicked it will fire the
  *   associated action.

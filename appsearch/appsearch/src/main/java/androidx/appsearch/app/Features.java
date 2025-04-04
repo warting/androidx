@@ -324,6 +324,51 @@ public interface Features {
             "SCHEMA_STRING_PROPERTY_CONFIG_DELETE_PROPAGATION_TYPE_PROPAGATE_FROM";
 
     /**
+     * Feature for {@link #isFeatureSupported(String)}. This feature covers whether to use isolated
+     * storage for user data.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    String ISOLATED_STORAGE = "ISOLATED_STORAGE";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}. This feature covers the use of the
+     * "minOrDefault" and "maxOrDefault" functions in ranking expressions.
+     *
+     * <p>For details on the functions in the ranking language, see
+     * {@link SearchSpec.Builder#setRankingStrategy(String)}.
+     */
+    @ExperimentalAppSearchApi
+    String SEARCH_SPEC_RANKING_FUNCTION_MAX_MIN_OR_DEFAULT =
+            "SEARCH_SPEC_RANKING_FUNCTION_MAX_MIN_OR_DEFAULT";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}. This feature covers the use of the
+     * "filterByRange" function in ranking expressions.
+     *
+     * <p>For details on the function in the ranking language, see
+     * {@link SearchSpec.Builder#setRankingStrategy(String)}.
+     */
+    @ExperimentalAppSearchApi
+    String SEARCH_SPEC_RANKING_FUNCTION_FILTER_BY_RANGE =
+            "SEARCH_SPEC_RANKING_FUNCTION_FILTER_BY_RANGE";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}. This feature covers
+     * {@link SearchSpec.Builder#setRetrieveEmbeddingMatchInfos(boolean)}.
+     */
+    @ExperimentalAppSearchApi
+    String SEARCH_EMBEDDING_MATCH_INFO = "SEARCH_EMBEDDING_MATCH_INFO";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}. This feature covers {@link
+     * ActionAccumulator#create}.
+     */
+    // TODO(b/395157195): Update Javadoc and imports once ActionAccumulator class is available
+    // Due to lint checks, we cannot include the word "ACTION" in this value
+    @ExperimentalAppSearchApi
+    String SEARCH_AND_CLICK_ACCUMULATOR = "SEARCH_AND_CLICK_ACCUMULATOR";
+
+    /**
      * Returns whether a feature is supported at run-time. Feature support depends on the
      * feature in question, the AppSearch backend being used and the Android version of the
      * device.

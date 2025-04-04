@@ -19,7 +19,6 @@ package androidx.wear.compose.material3
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
@@ -90,7 +89,8 @@ import kotlinx.coroutines.launch
  * @sample androidx.wear.compose.material3.samples.ConfirmationDialogSample
  * @param visible A boolean indicating whether the confirmation dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed - either by
- *   swiping right or when the [durationMillis] has passed.
+ *   swiping right or when the [durationMillis] has passed. Implementation of this lambda must
+ *   remove the dialog from the composition hierarchy e.g. by setting [visible] to false.
  * @param curvedText A slot for displaying curved text content which will be shown along the bottom
  *   edge of the dialog. We recommend using [confirmationDialogCurvedText] for this parameter, which
  *   will give the default sweep angle and padding.
@@ -188,7 +188,8 @@ public fun ConfirmationDialogContent(
  * @sample androidx.wear.compose.material3.samples.LongTextConfirmationDialogSample
  * @param visible A boolean indicating whether the confirmation dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed - either by
- *   swiping right or when the [durationMillis] has passed.
+ *   swiping right or when the [durationMillis] has passed. Implementation of this lambda must
+ *   remove the dialog from the composition hierarchy e.g. by setting [visible] to false.
  * @param text A slot for displaying text below the icon. It should not exceed 3 lines.
  * @param modifier Modifier to be applied to the confirmation content.
  * @param colors A [ConfirmationDialogColors] object for customizing the colors used in this
@@ -312,7 +313,8 @@ public fun ConfirmationDialogContent(
  * @sample androidx.wear.compose.material3.samples.SuccessConfirmationDialogSample
  * @param visible A boolean indicating whether the confirmation dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed - either by
- *   swiping right or when the [durationMillis] has passed.
+ *   swiping right or when the [durationMillis] has passed. Implementation of this lambda must
+ *   remove the dialog from the composition hierarchy e.g. by setting [visible] to false.
  * @param curvedText A slot for displaying curved text content which will be shown along the bottom
  *   edge of the dialog. We recommend using [confirmationDialogCurvedText] for this parameter, which
  *   will give the default sweep angle and padding, and [ConfirmationDialogDefaults.curvedTextStyle]
@@ -420,7 +422,8 @@ public fun SuccessConfirmationDialogContent(
  * @sample androidx.wear.compose.material3.samples.FailureConfirmationDialogSample
  * @param visible A boolean indicating whether the confirmation dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed - either by
- *   swiping right or when the [durationMillis] has passed.
+ *   swiping right or when the [durationMillis] has passed. Implementation of this lambda must
+ *   remove the dialog from the composition hierarchy e.g. by setting [visible] to false.
  * @param curvedText A slot for displaying curved text content which will be shown along the bottom
  *   edge of the dialog. We recommend using [confirmationDialogCurvedText] for this parameter, which
  *   will give the default sweep angle and padding.
@@ -548,13 +551,12 @@ public object ConfirmationDialogDefaults {
 
     /** The default style for curved text content. */
     public val curvedTextStyle: CurvedTextStyle
-        @Composable get() = CurvedTextStyle(MaterialTheme.typography.titleLarge)
+        @Composable get() = MaterialTheme.typography.arcLarge
 
     /**
      * A default composable used in [SuccessConfirmationDialog] that displays a success icon with an
      * animation.
      */
-    @OptIn(ExperimentalAnimationGraphicsApi::class)
     @Composable
     public fun SuccessIcon() {
         val animation =
@@ -577,7 +579,6 @@ public object ConfirmationDialogDefaults {
      * A default composable used in [FailureConfirmationDialog] that displays a failure icon with an
      * animation.
      */
-    @OptIn(ExperimentalAnimationGraphicsApi::class)
     @Composable
     public fun FailureIcon() {
         val animation =
@@ -683,7 +684,7 @@ public object ConfirmationDialogDefaults {
      * Default timeout for the [ConfirmationDialog] dialog, in milliseconds. The actual timeout used
      * will be adjusted for accessibility, taking into account the contents displayed.
      */
-    public const val DurationMillis: Long = 4000L
+    public val DurationMillis: Long = 4000L
 
     /** Default icon size for the [ConfirmationDialog] with curved content */
     public val IconSize: Dp = 52.dp

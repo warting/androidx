@@ -28,12 +28,13 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.xr.compose.spatial.Subspace
 import androidx.xr.compose.subspace.SpatialPanel
-import androidx.xr.compose.subspace.layout.CoreEntity
 import androidx.xr.compose.subspace.layout.CoreEntityNode
+import androidx.xr.compose.subspace.layout.CoreEntityScope
 import androidx.xr.compose.subspace.layout.SubspaceModifier
 import androidx.xr.compose.testing.SubspaceTestingActivity
-import androidx.xr.compose.testing.setSubspaceContent
+import androidx.xr.compose.testing.TestSetup
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule
@@ -55,40 +56,46 @@ class SubspaceModifierNodeChainTest {
 
     @Test
     fun nodeChain_statefulModifierNodesAreReused() {
-        composeTestRule.setSubspaceContent {
-            var count by remember { mutableStateOf(100) }
-            SpatialPanel(SubspaceModifier.count(count = count)) {
-                Button(modifier = Modifier.testTag("button"), onClick = { count += 1 }) {
-                    Text(text = "Click to recompose")
+        composeTestRule.setContent {
+            TestSetup {
+                Subspace {
+                    var count by remember { mutableStateOf(100) }
+                    SpatialPanel(SubspaceModifier.count(count = count)) {
+                        Button(modifier = Modifier.testTag("button"), onClick = { count += 1 }) {
+                            Text(text = "Click to recompose")
+                        }
+                    }
                 }
             }
         }
 
-        // There should be a single initial composition.
-        assertThat(nodeCount).isEqualTo(1)
+        // There should be multiple initial compositions as the SpatialPanel is attempting to size
+        // itself and the state manager is initialized and settled.
+        var count = 4
+        assertThat(nodeCount).isEqualTo(count)
 
         // Trigger one recomposition.
         composeTestRule.onNodeWithTag("button").performClick()
         composeTestRule.waitForIdle()
-        assertThat(nodeCount).isEqualTo(2)
+        assertThat(nodeCount).isEqualTo(++count)
 
         // Trigger one recomposition.
         composeTestRule.onNodeWithTag("button").performClick()
         composeTestRule.waitForIdle()
-        assertThat(nodeCount).isEqualTo(3)
+        assertThat(nodeCount).isEqualTo(++count)
 
         // Trigger two recompositions.
         composeTestRule.onNodeWithTag("button").performClick()
         composeTestRule.onNodeWithTag("button").performClick()
         composeTestRule.waitForIdle()
-        assertThat(nodeCount).isEqualTo(5)
+        assertThat(nodeCount).isEqualTo(count + 2)
     }
 
     private fun SubspaceModifier.count(count: Int): SubspaceModifier =
         this.then(CountElement(count))
 
     private inner class CountElement(private val count: Int) :
-        SubspaceModifierElement<CountNode>() {
+        SubspaceModifierNodeElement<CountNode>() {
 
         override fun create(): CountNode = CountNode(count)
 
@@ -112,7 +119,7 @@ class SubspaceModifierNodeChainTest {
         // This is used to track the number of times the node is reused.
         private var internalCount = 0
 
-        override fun modifyCoreEntity(coreEntity: CoreEntity) {
+        override fun CoreEntityScope.modifyCoreEntity() {
             nodeCount = ++internalCount
         }
     }

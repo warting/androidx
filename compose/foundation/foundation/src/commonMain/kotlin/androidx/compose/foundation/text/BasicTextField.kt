@@ -16,6 +16,8 @@
 
 package androidx.compose.foundation.text
 
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
@@ -49,6 +51,7 @@ import androidx.compose.foundation.text.input.internal.selection.TextFieldSelect
 import androidx.compose.foundation.text.input.internal.selection.TextFieldSelectionState.InputType
 import androidx.compose.foundation.text.input.internal.selection.TextToolbarHandler
 import androidx.compose.foundation.text.input.internal.selection.TextToolbarState
+import androidx.compose.foundation.text.input.internal.selection.addBasicTextFieldTextContextMenuComponents
 import androidx.compose.foundation.text.input.internal.selection.menuItem
 import androidx.compose.foundation.text.selection.SelectionHandle
 import androidx.compose.runtime.Composable
@@ -85,6 +88,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -246,7 +250,6 @@ internal fun BasicTextField(
 ) {
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    val windowInfo = LocalWindowInfo.current
     val singleLine = lineLimits == SingleLine
     // We're using this to communicate focus state to cursor for now.
     @Suppress("NAME_SHADOWING")
@@ -254,7 +257,9 @@ internal fun BasicTextField(
     val orientation = if (singleLine) Orientation.Horizontal else Orientation.Vertical
     val isFocused = interactionSource.collectIsFocusedAsState().value
     val isDragHovered = interactionSource.collectIsHoveredAsState().value
-    val isWindowFocused = windowInfo.isWindowFocused
+    // Avoid reading LocalWindowInfo.current.isWindowFocused when the text field is not focused;
+    // otherwise all text fields in a window will be recomposed when it becomes focused.
+    val isWindowAndTextFieldFocused = isFocused && LocalWindowInfo.current.isWindowFocused
     val stylusHandwritingTrigger = remember {
         MutableSharedFlow<Unit>(replay = 1, onBufferOverflow = BufferOverflow.DROP_LATEST)
     }
@@ -293,7 +298,7 @@ internal fun BasicTextField(
                 density = density,
                 enabled = enabled,
                 readOnly = readOnly,
-                isFocused = isFocused && isWindowFocused,
+                isFocused = isWindowAndTextFieldFocused,
                 isPassword = isPassword,
             )
         }
@@ -310,6 +315,7 @@ internal fun BasicTextField(
                     rect: Rect
                 ) =
                     with(selectionState) {
+                        selectionState.updateClipboardEntry()
                         currentTextToolbar.showMenu(
                             rect = rect,
                             onCopyRequested =
@@ -427,6 +433,7 @@ internal fun BasicTextField(
                 interactionSource = interactionSource,
             )
             .pointerHoverIcon(PointerIcon.Text)
+            .addContextMenuComponents(textFieldSelectionState, coroutineScope)
 
     Box(decorationModifiers, propagateMinConstraints = true) {
         ContextMenuArea(textFieldSelectionState, enabled) {
@@ -455,7 +462,7 @@ internal fun BasicTextField(
                             .clipToBounds()
                             .then(
                                 TextFieldCoreModifier(
-                                    isFocused = isFocused && isWindowFocused,
+                                    isFocused = isWindowAndTextFieldFocused,
                                     isDragHovered = isDragHovered,
                                     textLayoutState = textLayoutState,
                                     textFieldState = transformedState,
@@ -484,8 +491,7 @@ internal fun BasicTextField(
 
                     if (
                         enabled &&
-                            isFocused &&
-                            isWindowFocused &&
+                            isWindowAndTextFieldFocused &&
                             textFieldSelectionState.isInTouchMode
                     ) {
                         TextFieldSelectionHandles(selectionState = textFieldSelectionState)
@@ -498,6 +504,15 @@ internal fun BasicTextField(
         }
     }
 }
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.addContextMenuComponents(
+    textFieldSelectionState: TextFieldSelectionState,
+    coroutineScope: CoroutineScope
+): Modifier =
+    if (ComposeFoundationFlags.isNewContextMenuEnabled)
+        addBasicTextFieldTextContextMenuComponents(textFieldSelectionState, coroutineScope)
+    else this
 
 @Composable
 internal fun TextFieldCursorHandle(selectionState: TextFieldSelectionState) {
@@ -523,11 +538,15 @@ internal fun TextFieldCursorHandle(selectionState: TextFieldSelectionState) {
 @Composable
 internal fun TextFieldSelectionHandles(selectionState: TextFieldSelectionState) {
     // Does not recompose if only position of the handle changes.
-    val startHandleState by remember {
-        derivedStateOf {
-            selectionState.getSelectionHandleState(isStartHandle = true, includePosition = false)
+    val startHandleState by
+        remember(selectionState) {
+            derivedStateOf {
+                selectionState.getSelectionHandleState(
+                    isStartHandle = true,
+                    includePosition = false
+                )
+            }
         }
-    }
     if (startHandleState.visible) {
         SelectionHandle(
             offsetProvider = {
@@ -548,11 +567,15 @@ internal fun TextFieldSelectionHandles(selectionState: TextFieldSelectionState) 
     }
 
     // Does not recompose if only position of the handle changes.
-    val endHandleState by remember {
-        derivedStateOf {
-            selectionState.getSelectionHandleState(isStartHandle = false, includePosition = false)
+    val endHandleState by
+        remember(selectionState) {
+            derivedStateOf {
+                selectionState.getSelectionHandleState(
+                    isStartHandle = false,
+                    includePosition = false
+                )
+            }
         }
-    }
     if (endHandleState.visible) {
         SelectionHandle(
             offsetProvider = {

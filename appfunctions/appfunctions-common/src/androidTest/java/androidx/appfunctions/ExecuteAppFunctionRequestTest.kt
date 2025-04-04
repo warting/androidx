@@ -16,27 +16,29 @@
 
 package androidx.appfunctions
 
+import android.os.Build
 import android.os.Bundle
-import androidx.annotation.RequiresApi
+import androidx.appfunctions.ExecuteAppFunctionRequest.Companion.EXTRA_PARAMETERS
+import androidx.appfunctions.ExecuteAppFunctionRequest.Companion.EXTRA_USE_JETPACK_SCHEMA
 import androidx.test.filters.SdkSuppress
 import com.google.common.truth.Truth.assertThat
 import org.junit.AssumptionViolatedException
 import org.junit.Test
 
-@RequiresApi(36)
-@SdkSuppress(minSdkVersion = 31)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
 class ExecuteAppFunctionRequestTest {
     @Test
-    fun toPlatformClass_success() {
+    fun toPlatformExtensionClass_success() {
         assumeAppFunctionExtensionLibraryAvailable()
         val appFunctionData = AppFunctionData.Builder("").setString("testString", "value").build()
         val request = ExecuteAppFunctionRequest("pkg", "method", appFunctionData)
-        val platformRequest = request.toPlatformClass()
+        val platformRequest = request.toPlatformExtensionClass()
 
         assertThat(platformRequest.targetPackageName).isEqualTo("pkg")
         assertThat(platformRequest.functionIdentifier).isEqualTo("method")
         assertThat(platformRequest.parameters).isEqualTo(appFunctionData.genericDocument)
-        assertThat(platformRequest.extras.isEmpty()).isTrue()
+        assertThat(platformRequest.extras.getBundle(EXTRA_PARAMETERS)?.isEmpty()).isTrue()
+        assertThat(platformRequest.extras.getBoolean(EXTRA_USE_JETPACK_SCHEMA)).isTrue()
 
         // Test with extras set
         val bundle = Bundle()
@@ -44,12 +46,12 @@ class ExecuteAppFunctionRequestTest {
         val appFunctionDataWithExtras = AppFunctionData(appFunctionData.genericDocument, bundle)
         val requestWithExtras =
             ExecuteAppFunctionRequest("pkg2", "method2", appFunctionDataWithExtras)
-        val platformRequestWithExtras = requestWithExtras.toPlatformClass()
+        val platformRequestWithExtras = requestWithExtras.toPlatformExtensionClass()
 
         assertThat(platformRequestWithExtras.targetPackageName).isEqualTo("pkg2")
         assertThat(platformRequestWithExtras.functionIdentifier).isEqualTo("method2")
         assertThat(platformRequestWithExtras.parameters).isEqualTo(appFunctionData.genericDocument)
-        assertThat(platformRequestWithExtras.extras).isEqualTo(bundle)
+        assertThat(platformRequestWithExtras.extras.getBundle(EXTRA_PARAMETERS)).isEqualTo(bundle)
     }
 
     @Test
@@ -60,12 +62,30 @@ class ExecuteAppFunctionRequestTest {
             com.android.extensions.appfunctions.ExecuteAppFunctionRequest.Builder("pkg", "method")
                 .setParameters(appFunctionData.genericDocument)
                 .build()
-        val request = ExecuteAppFunctionRequest.fromPlatformClass(platformRequest)
+
+        val request = ExecuteAppFunctionRequest.fromPlatformExtensionClass(platformRequest)
+
         assertThat(request.targetPackageName).isEqualTo("pkg")
         assertThat(request.functionIdentifier).isEqualTo("method")
         assertThat(request.functionParameters.genericDocument)
             .isEqualTo(appFunctionData.genericDocument)
         assertThat(request.functionParameters.extras.isEmpty).isTrue()
+        assertThat(request.useJetpackSchema).isFalse()
+    }
+
+    @Test
+    fun fromPlatformClass_fromJetPackInExtrasIsTrue_fromJetPackIsTrue() {
+        assumeAppFunctionExtensionLibraryAvailable()
+        val appFunctionData = AppFunctionData.Builder("").setString("testString", "value").build()
+        val platformRequest =
+            com.android.extensions.appfunctions.ExecuteAppFunctionRequest.Builder("pkg", "method")
+                .setParameters(appFunctionData.genericDocument)
+                .setExtras(Bundle().apply { putBoolean(EXTRA_USE_JETPACK_SCHEMA, true) })
+                .build()
+
+        val request = ExecuteAppFunctionRequest.fromPlatformExtensionClass(platformRequest)
+
+        assertThat(request.useJetpackSchema).isTrue()
     }
 
     private fun assumeAppFunctionExtensionLibraryAvailable() {

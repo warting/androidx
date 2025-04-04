@@ -16,6 +16,9 @@
 
 package androidx.xr.compose.platform
 
+import android.os.Handler
+import android.os.Looper
+import androidx.compose.runtime.snapshots.SnapshotStateObserver
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.xr.compose.subspace.node.SubspaceLayoutNode
@@ -43,6 +46,15 @@ internal class AndroidComposeSpatialElement :
     SpatialElement(), SubspaceOwner, DefaultLifecycleObserver {
     override val root: SubspaceLayoutNode = SubspaceLayoutNode()
 
+    private val handler by lazy { Handler(Looper.getMainLooper()) }
+    private val snapshotStateObserver: SnapshotStateObserver = SnapshotStateObserver {
+        if (handler.looper === Looper.myLooper()) {
+            it()
+        } else {
+            handler.post(it)
+        }
+    }
+
     internal var wrappedComposition: WrappedComposition? = null
 
     /**
@@ -63,6 +75,8 @@ internal class AndroidComposeSpatialElement :
      * Tracks whether a layout is currently in progress to avoid recursively triggering a layout.
      */
     private var isLayoutInProgress = false
+
+    internal var rootVolumeConstraints: VolumeConstraints = VolumeConstraints.Unbounded
 
     init {
         root.attach(this)
@@ -87,6 +101,7 @@ internal class AndroidComposeSpatialElement :
         super.onAttachedToSubspace(spatialComposeScene)
 
         spatialComposeScene.lifecycle.addObserver(this)
+        snapshotStateObserver.start()
         onSubspaceAvailable?.invoke(spatialComposeScene)
         onSubspaceAvailable = null
     }
@@ -95,6 +110,8 @@ internal class AndroidComposeSpatialElement :
         super.onDetachedFromSubspace(spatialComposeScene)
 
         spatialComposeScene.lifecycle.removeObserver(this)
+        snapshotStateObserver.stop()
+        snapshotStateObserver.clear()
     }
 
     override fun onAttach(node: SubspaceLayoutNode) {
@@ -142,12 +159,10 @@ internal class AndroidComposeSpatialElement :
         isLayoutRequested = false
         isLayoutInProgress = true
 
-        val measureResults =
-            root.measurableLayout.measure(
-                VolumeConstraints(0, VolumeConstraints.INFINITY, 0, VolumeConstraints.INFINITY)
-            )
-
-        (measureResults as SubspaceLayoutNode.MeasurableLayout).placeAt(Pose.Identity)
+        snapshotStateObserver.observeReads(this, onLayoutStateValueChanged) {
+            val measureResults = root.measurableLayout.measure(rootVolumeConstraints)
+            (measureResults as SubspaceLayoutNode.MeasurableLayout).placeAt(Pose.Identity)
+        }
 
         Logger.log("AndroidComposeSpatialElement") { root.debugTreeToString() }
         Logger.log("AndroidComposeSpatialElement") { root.debugEntityTreeToString() }
@@ -155,6 +170,12 @@ internal class AndroidComposeSpatialElement :
         isLayoutInProgress = false
         if (isLayoutRequested) {
             refreshLayout()
+        }
+    }
+
+    public companion object {
+        private val onLayoutStateValueChanged: (AndroidComposeSpatialElement) -> Unit = {
+            it.requestRelayout()
         }
     }
 }
