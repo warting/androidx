@@ -20,6 +20,8 @@ import static com.google.common.truth.Truth.assertThat;
 
 import androidx.appsearch.app.AppSearchResult;
 import androidx.appsearch.app.AppSearchSchema;
+import androidx.appsearch.app.AppSearchSchema.PropertyConfig;
+import androidx.appsearch.app.AppSearchSchema.StringPropertyConfig;
 import androidx.appsearch.app.GenericDocument;
 import androidx.appsearch.app.InternalSetSchemaResponse;
 import androidx.appsearch.app.JoinSpec;
@@ -92,6 +94,7 @@ public class AppSearchLoggerTest {
                 /*initStatsBuilder=*/ null,
                 /*visibilityChecker=*/ null,
                 /*revocableFileDescriptorStore=*/ null,
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
         mLogger = new SimpleTestLogger();
     }
@@ -168,6 +171,8 @@ public class AppSearchLoggerTest {
         final int nativeIntegerIndexLatencyMillis = 10;
         final int nativeQualifiedIdJoinIndexLatencyMillis = 11;
         final int nativeLiteIndexSortLatencyMillis = 12;
+        final int mMetadataTermIndexLatencyMillis = 13;
+        final int mEmbeddingIndexLatencyMillis = 14;
         PutDocumentStatsProto nativePutDocumentStats = PutDocumentStatsProto.newBuilder()
                 .setLatencyMs(nativeLatencyMillis)
                 .setDocumentStoreLatencyMs(nativeDocumentStoreLatencyMillis)
@@ -181,6 +186,8 @@ public class AppSearchLoggerTest {
                 .setIntegerIndexLatencyMs(nativeIntegerIndexLatencyMillis)
                 .setQualifiedIdJoinIndexLatencyMs(nativeQualifiedIdJoinIndexLatencyMillis)
                 .setLiteIndexSortLatencyMs(nativeLiteIndexSortLatencyMillis)
+                .setMetadataTermIndexLatencyMs(mMetadataTermIndexLatencyMillis)
+                .setEmbeddingIndexLatencyMs(mEmbeddingIndexLatencyMillis)
                 .build();
         PutDocumentStats.Builder pBuilder = new PutDocumentStats.Builder(PACKAGE_NAME, DATABASE);
 
@@ -203,6 +210,10 @@ public class AppSearchLoggerTest {
                 nativeQualifiedIdJoinIndexLatencyMillis);
         assertThat(pStats.getNativeLiteIndexSortLatencyMillis()).isEqualTo(
                 nativeLiteIndexSortLatencyMillis);
+        assertThat(pStats.getMetadataTermIndexLatencyMillis()).isEqualTo(
+                mMetadataTermIndexLatencyMillis);
+        assertThat(pStats.getEmbeddingIndexLatencyMillis()).isEqualTo(
+                mEmbeddingIndexLatencyMillis);
     }
 
     @Test
@@ -284,6 +295,12 @@ public class AppSearchLoggerTest {
         final int nativeLatencyMillis = 1;
         final int nativeDeleteType = 2;
         final int nativeNumDocumentDeleted = 3;
+        final int queryLength = 4;
+        final int numTerms = 5;
+        final int numNamespacesFiltered = 6;
+        final int numSchemaTypesFiltered = 7;
+        final int parseQueryLatencyMillis = 8;
+        final int documentRemovalLatencyMillis = 9;
         DeleteStatsProto nativeDeleteStatsProto = DeleteStatsProto.newBuilder()
                 .setLatencyMs(nativeLatencyMillis)
                 .setDeleteType(DeleteStatsProto.DeleteType.Code.forNumber(nativeDeleteType))
@@ -291,7 +308,13 @@ public class AppSearchLoggerTest {
                 .build();
         RemoveStats.Builder rBuilder = new RemoveStats.Builder(
                 "packageName",
-                "database");
+                "database")
+                .setQueryLength(queryLength)
+                .setNumTerms(numTerms)
+                .setNumNamespacesFiltered(numNamespacesFiltered)
+                .setNumSchemaTypesFiltered(numSchemaTypesFiltered)
+                .setParseQueryLatencyMillis(parseQueryLatencyMillis)
+                .setDocumentRemovalLatencyMillis(documentRemovalLatencyMillis);
 
         AppSearchLoggerHelper.copyNativeStats(nativeDeleteStatsProto, rBuilder);
 
@@ -299,6 +322,13 @@ public class AppSearchLoggerTest {
         assertThat(rStats.getNativeLatencyMillis()).isEqualTo(nativeLatencyMillis);
         assertThat(rStats.getDeleteType()).isEqualTo(nativeDeleteType);
         assertThat(rStats.getDeletedDocumentCount()).isEqualTo(nativeNumDocumentDeleted);
+        assertThat(rStats.getQueryLength()).isEqualTo(queryLength);
+        assertThat(rStats.getNumTerms()).isEqualTo(numTerms);
+        assertThat(rStats.getNumNamespacesFiltered()).isEqualTo(numNamespacesFiltered);
+        assertThat(rStats.getNumSchemaTypesFiltered()).isEqualTo(numSchemaTypesFiltered);
+        assertThat(rStats.getParseQueryLatencyMillis()).isEqualTo(parseQueryLatencyMillis);
+        assertThat(rStats.getDocumentRemovalLatencyMillis())
+                .isEqualTo(documentRemovalLatencyMillis);
     }
 
     @Test
@@ -312,6 +342,9 @@ public class AppSearchLoggerTest {
         long nativeStorageSizeBeforeBytes = Integer.MAX_VALUE + 1;
         long nativeStorageSizeAfterBytes = Integer.MAX_VALUE + 2;
         long nativeTimeSinceLastOptimizeMillis = Integer.MAX_VALUE + 3;
+        int indexRestorationMode = OptimizeStats.FULL_INDEX_REBUILD;
+        int numOriginalNamespaces = 7;
+        int numDeletedNamespaces = 8;
         OptimizeStatsProto optimizeStatsProto = OptimizeStatsProto.newBuilder()
                 .setLatencyMs(nativeLatencyMillis)
                 .setDocumentStoreOptimizeLatencyMs(nativeDocumentStoreOptimizeLatencyMillis)
@@ -322,6 +355,10 @@ public class AppSearchLoggerTest {
                 .setStorageSizeBefore(nativeStorageSizeBeforeBytes)
                 .setStorageSizeAfter(nativeStorageSizeAfterBytes)
                 .setTimeSinceLastOptimizeMs(nativeTimeSinceLastOptimizeMillis)
+                .setIndexRestorationMode(
+                        OptimizeStatsProto.IndexRestorationMode.forNumber(indexRestorationMode))
+                .setNumOriginalNamespaces(numOriginalNamespaces)
+                .setNumDeletedNamespaces(numDeletedNamespaces)
                 .build();
         OptimizeStats.Builder oBuilder = new OptimizeStats.Builder();
 
@@ -340,6 +377,9 @@ public class AppSearchLoggerTest {
         assertThat(oStats.getStorageSizeAfterBytes()).isEqualTo(nativeStorageSizeAfterBytes);
         assertThat(oStats.getTimeSinceLastOptimizeMillis()).isEqualTo(
                 nativeTimeSinceLastOptimizeMillis);
+        assertThat(oStats.getIndexRestorationMode()).isEqualTo(indexRestorationMode);
+        assertThat(oStats.getNumOriginalNamespaces()).isEqualTo(numOriginalNamespaces);
+        assertThat(oStats.getNumDeletedNamespaces()).isEqualTo(numDeletedNamespaces);
     }
 
     @Test
@@ -383,6 +423,7 @@ public class AppSearchLoggerTest {
                 initStatsBuilder,
                 /*visibilityChecker=*/ null,
                 /*revocableFileDescriptorStore=*/ null,
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
         InitializeStats iStats = initStatsBuilder.build();
         appSearchImpl.close();
@@ -404,6 +445,7 @@ public class AppSearchLoggerTest {
 
     @Test
     @RequiresFlagsDisabled(Flags.FLAG_ENABLE_BLOB_STORE)
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_initializeWithDocuments_success() throws Exception {
         final String testPackageName = "testPackage";
         final String testDatabase = "testDatabase";
@@ -415,6 +457,7 @@ public class AppSearchLoggerTest {
                 /*initStatsBuilder=*/ null,
                 /*visibilityChecker=*/ null,
                 /*revocableFileDescriptorStore=*/ null,
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
         List<AppSearchSchema> schemas = ImmutableList.of(
                 new AppSearchSchema.Builder("Type1").build(),
@@ -451,6 +494,7 @@ public class AppSearchLoggerTest {
         appSearchImpl = AppSearchImpl.create(folder, mConfig,
                 initStatsBuilder, /*visibilityChecker=*/ null,
                 /*revocableFileDescriptorStore=*/ null,
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
         InitializeStats iStats = initStatsBuilder.build();
 
@@ -473,6 +517,7 @@ public class AppSearchLoggerTest {
 
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_BLOB_STORE)
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_enableBlobStore_initializeWithDocuments_success()
             throws Exception {
         final String testPackageName = "testPackage";
@@ -485,6 +530,7 @@ public class AppSearchLoggerTest {
                 /*initStatsBuilder=*/ null,
                 /*visibilityChecker=*/ null,
                 new JetpackRevocableFileDescriptorStore(mConfig),
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
 
         List<AppSearchSchema> schemas = ImmutableList.of(
@@ -522,6 +568,7 @@ public class AppSearchLoggerTest {
         appSearchImpl = AppSearchImpl.create(folder, mConfig,
                 initStatsBuilder, /*visibilityChecker=*/ null,
                 /*revocableFileDescriptorStore=*/ null,
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
         InitializeStats iStats = initStatsBuilder.build();
 
@@ -544,6 +591,7 @@ public class AppSearchLoggerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_initialize_failure() throws Exception {
         final String testPackageName = "testPackage";
         final String testDatabase = "testDatabase";
@@ -552,6 +600,7 @@ public class AppSearchLoggerTest {
         AppSearchImpl appSearchImpl = AppSearchImpl.create(folder, mConfig,
                 /*initStatsBuilder=*/ null, /*visibilityChecker=*/ null,
                 /*revocableFileDescriptorStore=*/ null,
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
 
         List<AppSearchSchema> schemas = ImmutableList.of(
@@ -592,6 +641,7 @@ public class AppSearchLoggerTest {
         appSearchImpl = AppSearchImpl.create(folder, mConfig,
                 initStatsBuilder, /*visibilityChecker=*/ null,
                 /*revocableFileDescriptorStore=*/ null,
+                /*icingSearchEngine=*/ null,
                 ALWAYS_OPTIMIZE);
         InitializeStats iStats = initStatsBuilder.build();
 
@@ -603,6 +653,7 @@ public class AppSearchLoggerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_putDocument_success() throws Exception {
         // Insert schema
         final String testPackageName = "testPackage";
@@ -649,6 +700,7 @@ public class AppSearchLoggerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_putDocument_failure() throws Exception {
         // Insert schema
         final String testPackageName = "testPackage";
@@ -694,6 +746,7 @@ public class AppSearchLoggerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_search_success() throws Exception {
         // Insert schema
         final String testPackageName = "testPackage";
@@ -819,6 +872,7 @@ public class AppSearchLoggerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_search_join() throws Exception {
         AppSearchSchema actionSchema = new AppSearchSchema.Builder("ViewAction")
                 .addProperty(new AppSearchSchema.StringPropertyConfig.Builder("entityId")
@@ -973,6 +1027,7 @@ public class AppSearchLoggerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_remove_success() throws Exception {
         // Insert schema
         final String testPackageName = "testPackage";
@@ -1012,6 +1067,7 @@ public class AppSearchLoggerTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation") // AppSearchImpl.putDocument
     public void testLoggingStats_remove_failure() throws Exception {
         // Insert schema
         final String testPackageName = "testPackage";
@@ -1056,14 +1112,21 @@ public class AppSearchLoggerTest {
     }
 
     @Test
-    @SuppressWarnings("deprecation") // DEPRECATED_QUERY_VALUE
+    @SuppressWarnings("deprecation") // DEPRECATED_QUERY_VALUE, AppSearchImpl.putDocument
     public void testLoggingStats_removeByQuery_success() throws Exception {
         // Insert schema
         final String testPackageName = "testPackage";
         final String testDatabase = "testDatabase";
         final String testNamespace = "testNameSpace";
-        List<AppSearchSchema> schemas =
-                Collections.singletonList(new AppSearchSchema.Builder("type").build());
+        List<AppSearchSchema> schemas = Collections.singletonList(
+                new AppSearchSchema.Builder("type")
+                        .addProperty(
+                                new AppSearchSchema.StringPropertyConfig.Builder("body")
+                                        .setCardinality(PropertyConfig.CARDINALITY_REQUIRED)
+                                        .setTokenizerType(StringPropertyConfig.TOKENIZER_TYPE_PLAIN)
+                                        .setIndexingType(
+                                                StringPropertyConfig.INDEXING_TYPE_PREFIXES)
+                                        .build()).build());
         InternalSetSchemaResponse internalSetSchemaResponse = mAppSearchImpl.setSchema(
                 testPackageName,
                 testDatabase,
@@ -1074,9 +1137,11 @@ public class AppSearchLoggerTest {
                 /* setSchemaStatsBuilder= */ null);
         assertThat(internalSetSchemaResponse.isSuccess()).isTrue();
         GenericDocument document1 =
-                new GenericDocument.Builder<>(testNamespace, "id1", "type").build();
+                new GenericDocument.Builder<>(testNamespace, "id1", "type")
+                        .setPropertyString("body", "body1").build();
         GenericDocument document2 =
-                new GenericDocument.Builder<>(testNamespace, "id2", "type").build();
+                new GenericDocument.Builder<>(testNamespace, "id2", "type")
+                        .setPropertyString("body", "body2").build();
         mAppSearchImpl.putDocument(
                 testPackageName,
                 testDatabase,
@@ -1095,7 +1160,7 @@ public class AppSearchLoggerTest {
 
         RemoveStats.Builder rStatsBuilder = new RemoveStats.Builder(testPackageName, testDatabase);
         mAppSearchImpl.removeByQuery(testPackageName, testDatabase,
-                /*queryExpression=*/"", searchSpec,
+                /*queryExpression=*/"body", searchSpec,
                 rStatsBuilder);
         RemoveStats rStats = rStatsBuilder.build();
 
@@ -1106,6 +1171,10 @@ public class AppSearchLoggerTest {
         assertThat(rStats.getDeleteType())
                 .isEqualTo(DeleteStatsProto.DeleteType.Code.DEPRECATED_QUERY_VALUE);
         assertThat(rStats.getDeletedDocumentCount()).isEqualTo(2);
+        assertThat(rStats.getQueryLength()).isEqualTo(4);
+        assertThat(rStats.getNumTerms()).isEqualTo(1);
+        assertThat(rStats.getNumSchemaTypesFiltered()).isEqualTo(1);
+        assertThat(rStats.getNumNamespacesFiltered()).isEqualTo(1);
     }
 
     @Test

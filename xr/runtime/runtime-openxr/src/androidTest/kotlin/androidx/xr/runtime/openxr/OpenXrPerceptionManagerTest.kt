@@ -21,8 +21,11 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.filters.SdkSuppress
+import androidx.xr.runtime.HandJointType
+import androidx.xr.runtime.TrackingState
+import androidx.xr.runtime.internal.AnchorInvalidUuidException
 import androidx.xr.runtime.internal.AnchorResourcesExhaustedException
-import androidx.xr.runtime.internal.HandJointType
+import androidx.xr.runtime.internal.Config
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Quaternion
 import androidx.xr.runtime.math.Ray
@@ -106,10 +109,26 @@ class OpenXrPerceptionManagerTest {
     }
 
     @Test
+    fun updatePlanes_addsIdentityPlane() = initOpenXrManagerAndRunTest {
+        // TODO: b/345314278 -- Add more meaningful tests once trackables are implemented properly
+        // and a
+        // fake perception library can be used mock trackables.
+        underTest.updatePlanes(XR_TIME)
+
+        assertThat(underTest.trackables).hasSize(1)
+        // TODO - b/346615429: Define values here using the stub's Kotlin API. For the time being
+        // they
+        // come from `kPose` defined in //third_party/jetpack_xr_natives/openxr/openxr_stub.cc
+        assertThat((underTest.trackables.first() as OpenXrPlane).centerPose)
+            .isEqualTo(Pose(Vector3(0f, 0f, 0f), Quaternion(0f, 0f, 0f, 1.0f)))
+    }
+
+    @Test
     fun update_updatesTrackables() = initOpenXrManagerAndRunTest {
         // TODO: b/345314278 -- Add more meaningful tests once trackables are implemented properly
         // and a
         // fake perception library can be used mock trackables.
+        underTest.updatePlanes(XR_TIME)
         underTest.update(XR_TIME)
 
         assertThat(underTest.trackables).hasSize(1)
@@ -123,30 +142,58 @@ class OpenXrPerceptionManagerTest {
     @Test
     fun update_updatesHands() = initOpenXrManagerAndRunTest {
         check(underTest.xrResources.updatables.size == 2)
-        check(!underTest.leftHand.isActive)
-        check(!underTest.rightHand.isActive)
+        check(underTest.leftHand.trackingState != TrackingState.Tracking)
+        check(underTest.rightHand.trackingState != TrackingState.Tracking)
 
         underTest.update(XR_TIME)
 
         // TODO - b/346615429: Define values here using the stub's Kotlin API. For the time being
         // they
         // come from `kPose` defined in //third_party/jetpack_xr_natives/openxr/openxr_stub.cc
-        assertThat(underTest.leftHand.isActive).isTrue()
-        assertThat(underTest.leftHand.handJoints).hasSize(1)
-        assertThat(underTest.leftHand.handJoints[HandJointType.PALM]!!.rotation)
-            .isEqualTo(Quaternion(1.0f, 2.0f, 3.0f, 4.0f))
-        assertThat(underTest.leftHand.handJoints[HandJointType.PALM]!!.translation)
-            .isEqualTo(Vector3(5.0f, 6.0f, 7.0f))
-        assertThat(underTest.rightHand.isActive).isTrue()
-        assertThat(underTest.rightHand.handJoints).hasSize(1)
-        assertThat(underTest.rightHand.handJoints[HandJointType.PALM]!!.rotation)
-            .isEqualTo(Quaternion(1.0f, 2.0f, 3.0f, 4.0f))
-        assertThat(underTest.rightHand.handJoints[HandJointType.PALM]!!.translation)
-            .isEqualTo(Vector3(5.0f, 6.0f, 7.0f))
+        val leftHandJoints = underTest.leftHand.handJoints
+        assertThat(underTest.leftHand.trackingState).isEqualTo(TrackingState.Tracking)
+        assertThat(leftHandJoints).hasSize(HandJointType.values().size)
+        for (jointType in HandJointType.values()) {
+            val jointTypeIndex = jointType.ordinal.toFloat()
+            assertThat(leftHandJoints[jointType]!!.rotation)
+                .isEqualTo(
+                    Quaternion(
+                        jointTypeIndex + 0.1f,
+                        jointTypeIndex + 0.2f,
+                        jointTypeIndex + 0.3f,
+                        jointTypeIndex + 0.4f,
+                    )
+                )
+            assertThat(leftHandJoints[jointType]!!.translation)
+                .isEqualTo(
+                    Vector3(jointTypeIndex + 0.5f, jointTypeIndex + 0.6f, jointTypeIndex + 0.7f)
+                )
+        }
+
+        val rightHandJoints = underTest.rightHand.handJoints
+        assertThat(underTest.rightHand.trackingState).isEqualTo(TrackingState.Tracking)
+        assertThat(rightHandJoints).hasSize(HandJointType.values().size)
+        for (jointType in HandJointType.values()) {
+            val jointTypeIndex = jointType.ordinal.toFloat()
+            assertThat(rightHandJoints[jointType]!!.rotation)
+                .isEqualTo(
+                    Quaternion(
+                        jointTypeIndex + 0.1f,
+                        jointTypeIndex + 0.2f,
+                        jointTypeIndex + 0.3f,
+                        jointTypeIndex + 0.4f,
+                    )
+                )
+            assertThat(rightHandJoints[jointType]!!.translation)
+                .isEqualTo(
+                    Vector3(jointTypeIndex + 0.5f, jointTypeIndex + 0.6f, jointTypeIndex + 0.7f)
+                )
+        }
     }
 
     @Test
     fun hitTest_returnsHitResults() = initOpenXrManagerAndRunTest {
+        underTest.updatePlanes(XR_TIME)
         underTest.update(XR_TIME)
         check(underTest.trackables.isNotEmpty())
         val trackable = underTest.trackables.first() as OpenXrPlane
@@ -173,6 +220,11 @@ class OpenXrPerceptionManagerTest {
         // come from `kUuid` defined in //third_party/jetpack_xr_natives/openxr/openxr_stub.cc
         assertThat(underTest.getPersistedAnchorUuids())
             .containsExactly(UUID.fromString("01020304-0506-0708-090a-0b0c0d0e0f10"))
+    }
+
+    @Test
+    fun loadAnchor_invalidUuid_throwsException() = initOpenXrManagerAndRunTest {
+        assertThrows(AnchorInvalidUuidException::class.java) { underTest.loadAnchor(UUID(0L, 0L)) }
     }
 
     @Test
@@ -223,6 +275,7 @@ class OpenXrPerceptionManagerTest {
 
     @Test
     fun clear_clearXrResources() = initOpenXrManagerAndRunTest {
+        underTest.updatePlanes(XR_TIME)
         underTest.update(XR_TIME)
         underTest.createAnchor(Pose())
         check(underTest.trackables.isNotEmpty())
@@ -242,6 +295,12 @@ class OpenXrPerceptionManagerTest {
             openXrManager = OpenXrManager(it, underTest, timeSource)
             openXrManager.create()
             openXrManager.resume()
+            openXrManager.configure(
+                Config(
+                    planeTracking = Config.PlaneTrackingMode.HorizontalAndVertical,
+                    handTracking = Config.HandTrackingMode.Enabled,
+                )
+            )
 
             testBody()
 

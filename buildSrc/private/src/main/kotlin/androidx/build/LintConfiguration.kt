@@ -15,9 +15,11 @@
  */
 package androidx.build
 
+import androidx.build.checkapi.shouldConfigureApiTasks
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.api.dsl.Lint
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
+import com.android.build.api.variant.LintLifecycleExtension
 import com.android.build.gradle.AppPlugin
 import com.android.build.gradle.LibraryPlugin
 import com.android.build.gradle.api.KotlinMultiplatformAndroidPlugin
@@ -73,11 +75,11 @@ fun Project.configureLint() {
 
 /** Android Lint configuration entry point for Android projects. */
 private fun Project.configureAndroidProjectForLint(isLibrary: Boolean) =
-    androidExtension.finalizeDsl { extension ->
+    extensions.findByType(LintLifecycleExtension::class.java)!!.finalizeDsl { lint ->
         // The lintAnalyze task is used by `androidx-studio-integration-lint.sh`.
         tasks.register("lintAnalyze") { task -> task.enabled = false }
 
-        configureLint(extension.lint, isLibrary)
+        configureLint(lint, isLibrary)
     }
 
 private fun Project.configureAndroidMultiplatformProjectForLint(
@@ -193,8 +195,10 @@ private fun Project.configureLint(lint: Lint, isLibrary: Boolean) {
         }
         ignoreWarnings = true
 
-        // Run lint on tests. Uses top-level lint.xml to specify checks.
-        checkTestSources = true
+        // Run lint on tests. All checks defined with test scope will be run on test sources.
+        // Additional checks for tests can be specified in the top-level lint.xml.
+        ignoreTestSources = false
+        checkTestSources = false
 
         // Write output directly to the console (and nowhere else).
         textReport = true
@@ -307,11 +311,29 @@ private fun Project.configureLint(lint: Lint, isLibrary: Boolean) {
         fatal.add("UastImplementation") // go/hide-uast-impl
         fatal.add("KotlincFE10") // b/239982263
 
+        disable.add("RequiresWindowSdk") // temporarily disable this check due to downstream diff
+
+        // Report errors for incompatible custom lint jars
+        fatal.add("ObsoleteLintCustomCheck")
+
+        // If a project targets only Kotlin consumers, it is allowed to define experimental
+        // properties because the Kotlin compiler warns users that the properties are experimental.
+        // If a project can have Java clients, enable the lint check banning experimental properties
+        // because the experimental detector lint which warns Java clients about experimental usage
+        // isn't able to handle experimental properties correctly.
+        // Projects that don't run API compatibility checks can define experimental properties (lint
+        // check disabled) since the entire API surface makes no compatibility guarantees.
+        if (extension.type.targetsKotlinConsumersOnly || !extension.shouldConfigureApiTasks()) {
+            disable.add("ExperimentalPropertyAnnotation")
+        } else {
+            fatal.add("ExperimentalPropertyAnnotation")
+        }
+
         val lintXmlPath =
             if (extension.type == SoftwareType.SAMPLES) {
-                "buildSrc/lint_samples.xml"
+                "buildSrc/lint/lint_samples.xml"
             } else {
-                "buildSrc/lint.xml"
+                "buildSrc/lint/lint.xml"
             }
 
         // Prevent libraries from fully overriding the config from buildSrc. Projects can create a

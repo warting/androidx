@@ -2639,9 +2639,9 @@ class CompositionTests {
     }
 
     @Test
-    fun testCompoundKeyHashStaysTheSameAfterRecompositions() = compositionTest {
-        val outerKeys = mutableListOf<Int>()
-        val innerKeys = mutableListOf<Int>()
+    fun testCompoundKeyHashCodeStaysTheSameAfterRecompositions() = compositionTest {
+        val outerKeys = mutableListOf<CompositeKeyHashCode>()
+        val innerKeys = mutableListOf<CompositeKeyHashCode>()
         var previousOuterKeysSize = 0
         var previousInnerKeysSize = 0
         var outerScope: RecomposeScope? = null
@@ -2650,15 +2650,15 @@ class CompositionTests {
         @Composable
         fun Test() {
             outerScope = currentRecomposeScope
-            outerKeys.add(currentComposer.compoundKeyHash)
+            outerKeys.add(currentComposer.compositeKeyHashCode)
             Container {
                 Linear {
                     innerScope = currentRecomposeScope
-                    innerKeys.add(currentComposer.compoundKeyHash)
+                    innerKeys.add(currentComposer.compositeKeyHashCode)
                 }
             }
             // asserts that the key is correctly rolled back after start and end of Observe
-            assertEquals(outerKeys.last(), currentComposer.compoundKeyHash)
+            assertEquals(outerKeys.last(), currentComposer.compositeKeyHashCode)
         }
 
         compose { Test() }
@@ -3577,11 +3577,11 @@ class CompositionTests {
 
     @Test
     fun enumCompositeKeyShouldBeStable() = compositionTest {
-        var parentHash: Int = 0
-        var compositeHash: Int = 0
+        var parentHash = EmptyCompositeKeyHashCode
+        var compositeHash = EmptyCompositeKeyHashCode
         compose {
-            parentHash = currentCompositeKeyHash
-            key(MyEnum.First) { compositeHash = currentCompositeKeyHash }
+            parentHash = currentCompositeKeyHashCode
+            key(MyEnum.First) { compositeHash = currentCompositeKeyHashCode }
         }
 
         val effectiveHash = compositeHash xor (parentHash rol 6)
@@ -3590,11 +3590,11 @@ class CompositionTests {
 
     @Test
     fun enumCompositeKeysShouldBeStable() = compositionTest {
-        var parentHash: Int = 0
-        var compositeHash: Int = 0
+        var parentHash = EmptyCompositeKeyHashCode
+        var compositeHash = EmptyCompositeKeyHashCode
         compose {
-            parentHash = currentCompositeKeyHash
-            key(MyEnum.First, MyEnum.Second) { compositeHash = currentCompositeKeyHash }
+            parentHash = currentCompositeKeyHashCode
+            key(MyEnum.First, MyEnum.Second) { compositeHash = currentCompositeKeyHashCode }
         }
 
         val effectiveHash = compositeHash xor (parentHash rol 6)
@@ -3618,6 +3618,110 @@ class CompositionTests {
         // Force Defaults to recompose
         stateA++
         advance()
+    }
+
+    // Regression test for b/383769314
+    @Test
+    fun testRememberNotRecomputedInElidedGroupAfterMovableGroup() = compositionTest {
+        var baseKey by mutableIntStateOf(0)
+        var rememberInvocations = 0
+
+        compose {
+            key(baseKey) { remember { baseKey.toString() } }
+
+            key(Unit) {}
+
+            remember {
+                assertEquals(
+                    1,
+                    ++rememberInvocations,
+                    "Remember block should be invoked exactly once"
+                )
+            }
+        }
+
+        baseKey++
+        advance()
+
+        assertEquals(1, rememberInvocations, "Remember block should be invoked exactly once")
+    }
+
+    // Regression test for b/383769314
+    @Test
+    fun testRememberNotRecomputedInElidedGroupAfterNestedMovableGroup() = compositionTest {
+        var baseKey by mutableIntStateOf(0)
+        var rememberInvocations = 0
+
+        compose {
+            key(baseKey) { remember { baseKey.toString() } }
+
+            key(Unit) { key(Unit) {} }
+
+            remember {
+                assertEquals(
+                    1,
+                    ++rememberInvocations,
+                    "Remember block should be invoked exactly once"
+                )
+            }
+        }
+
+        baseKey++
+        advance()
+
+        assertEquals(1, rememberInvocations, "Remember block should be invoked exactly once")
+    }
+
+    // Regression test for b/383769314
+    @Test
+    fun testInvalidateCapturingLambdaInElidedGroupAfterMovableGroup() = compositionTest {
+        var baseKey by mutableIntStateOf(0)
+        var lastOuterSeen = ""
+        var lastInnerSeen = ""
+
+        compose {
+            val captor = key(baseKey) { remember { baseKey.toString() } }
+
+            key(Unit) {}
+
+            lastOuterSeen = captor
+            Container { lastInnerSeen = captor }
+        }
+
+        assertEquals("0", lastOuterSeen, "Outer scope did not compose")
+        assertEquals("0", lastInnerSeen, "Inner scope did not compose")
+
+        baseKey++
+        advance()
+
+        assertEquals("1", lastOuterSeen, "Outer scope did not recompose")
+        assertEquals("1", lastInnerSeen, "Inner scope did not recompose")
+    }
+
+    // Regression test for b/383769314
+    @Test
+    fun testInvalidateCapturingLambdaInElidedGroupAfterNestedMovableGroup() = compositionTest {
+        var baseKey by mutableIntStateOf(0)
+        var lastOuterSeen = ""
+        var lastInnerSeen = ""
+
+        compose {
+            val captor = key(baseKey) { remember { baseKey.toString() } }
+
+            key(Unit) { key(Unit) {} }
+
+            lastOuterSeen = captor
+            Container { lastInnerSeen = captor }
+        }
+
+        assertEquals("0", lastOuterSeen, "Outer scope did not compose")
+        assertEquals("0", lastInnerSeen, "Inner scope did not compose")
+
+        baseKey++
+        advance()
+
+        assertEquals("1", lastOuterSeen, "Outer scope did not recompose")
+        assertEquals("1", lastInnerSeen, "Inner scope did not recompose")
     }
 
     enum class MyEnum {
@@ -4332,24 +4436,24 @@ class CompositionTests {
         compose {
             composers += currentComposer
             if (rememberValue) {
-                remember { value }
+                // <Any> prevents implicit coercion to Unit from inline lambda
+                // https://youtrack.jetbrains.com/issue/KT-76579
+                remember<Any> { value }
             }
         }
 
-        validate { assertFalse(value in composition!!.getSlots()) }
+        assertFalse(value in composition!!.getSlots())
 
         rememberValue = true
         expectChanges()
 
-        validate { assertTrue(value in composition!!.getSlots()) }
+        assertTrue(value in composition!!.getSlots())
 
         rememberValue = false
         expectChanges()
 
-        validate {
-            assertFalse(value in composition!!.getSlots())
-            assertFalse(composers.any { value in it.getInsertTableSlots() })
-        }
+        assertFalse(value in composition!!.getSlots())
+        assertFalse(composers.any { value in it.getInsertTableSlots() })
     }
 
     @Stable

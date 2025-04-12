@@ -67,11 +67,12 @@ internal class ExtensionInitializationScopeImpl(
     }
 
     override fun addParticipantExtension(
-        initialParticipants: Set<Participant>,
+        initialParticipants: List<Participant>,
         initialActiveParticipant: Participant?
     ): ParticipantExtension {
         val participant = ParticipantExtensionImpl(initialParticipants, initialActiveParticipant)
-        registerExtension(onExchangeStarted = participant::onExchangeStarted)
+        registerExtension(onExchangeStarted = participant::onParticipantExchangeStarted)
+        registerExtension(onExchangeStarted = participant::onMeetingSummaryExchangeStarted)
         return participant
     }
 

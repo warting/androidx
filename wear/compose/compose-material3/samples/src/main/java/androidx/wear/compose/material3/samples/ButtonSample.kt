@@ -118,6 +118,28 @@ fun ButtonExtraLargeIconSample(
 
 @Sampled
 @Composable
+fun ButtonWithImageSample(modifier: Modifier = Modifier.fillMaxWidth(), enabled: Boolean = true) {
+    Button(
+        onClick = { /* Do something */ },
+        containerPainter =
+            ButtonDefaults.containerPainter(
+                image = painterResource(id = R.drawable.backgroundimage)
+            ),
+        enabled = enabled,
+        label = { Text("Button") },
+        secondaryLabel = { Text("Secondary label") },
+        icon = {
+            Icon(
+                painter = painterResource(R.drawable.ic_favorite_rounded),
+                contentDescription = "Favorite icon",
+            )
+        },
+        modifier = modifier
+    )
+}
+
+@Sampled
+@Composable
 fun SimpleFilledTonalButtonSample(modifier: Modifier = Modifier.fillMaxWidth()) {
     FilledTonalButton(
         onClick = { /* Do something */ },
@@ -140,7 +162,7 @@ fun FilledTonalButtonSample(modifier: Modifier = Modifier.fillMaxWidth()) {
                 modifier = Modifier.size(ButtonDefaults.IconSize)
             )
         },
-        modifier = modifier,
+        modifier = modifier
     )
 }
 
@@ -180,7 +202,7 @@ fun SimpleOutlinedButtonSample(modifier: Modifier = Modifier.fillMaxWidth()) {
     OutlinedButton(
         onClick = { /* Do something */ },
         label = { Text("Outlined Button") },
-        modifier = modifier,
+        modifier = modifier
     )
 }
 

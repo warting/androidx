@@ -31,6 +31,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import android.content.Context;
 import android.content.res.Resources;
 import android.util.Log;
+import android.util.Printer;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -939,14 +940,21 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
     }
 
     @UiThread
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    @RestrictTo(Scope.LIBRARY_GROUP)
     public @NonNull ListenableFuture<RenderingArtifact> renderLayoutAndAttach(
             @NonNull Layout layout,
             ResourceProto.@NonNull Resources resources,
             @NonNull ViewGroup attachParent) {
-
         return renderAndAttach(
                 layout, resources, attachParent, mProviderStatsLogger.createInflaterStatsLogger());
+    }
+
+    /** Dumps the state of this tile view instance. */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    @UiThread
+    public void dump(@NonNull Printer printer) {
+        printer.println(
+                "attachedParent: " + Integer.toHexString(System.identityHashCode(mAttachParent)));
     }
 
     /**
@@ -1060,7 +1068,7 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                 ProtoLayoutInflater.clearRenderedMetadata(checkNotNull(prevInflateParent));
             }
 
-                        RenderedMetadata prevRenderedMetadata =
+            RenderedMetadata prevRenderedMetadata =
                     prevInflateParent != null
                             ? ProtoLayoutInflater.getRenderedMetadata(prevInflateParent)
                             : null;
@@ -1339,6 +1347,15 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                 mDataPipeline.setFullyVisible(false);
                 mWasFullyVisibleBefore = false;
             }
+        }
+    }
+
+    /** Sets whether a new layout is pending. This is used to update the data pipeline. */
+    @RestrictTo(Scope.LIBRARY)
+    @UiThread
+    public void setLayoutUpdatePending(boolean isLayoutUpdatePending) {
+        if (mDataPipeline != null) {
+            mDataPipeline.setLayoutUpdatePending(isLayoutUpdatePending);
         }
     }
 

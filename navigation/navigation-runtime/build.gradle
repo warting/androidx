@@ -22,7 +22,6 @@
  * modifying its settings.
  */
 
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -34,7 +33,7 @@ plugins {
 }
 
 androidXMultiplatform {
-    android()
+    androidTarget()
     desktop()
     mac()
     linux()
@@ -48,9 +47,9 @@ androidXMultiplatform {
                 api(libs.kotlinStdlib)
                 api(libs.kotlinCoroutinesCore)
                 api(project(":navigation:navigation-common"))
-                api("androidx.lifecycle:lifecycle-common:2.6.2")
-                api("androidx.lifecycle:lifecycle-runtime:2.6.2")
-                api("androidx.lifecycle:lifecycle-viewmodel:2.6.2")
+                api("androidx.lifecycle:lifecycle-common:2.8.7")
+                api("androidx.lifecycle:lifecycle-runtime:2.8.7")
+                api("androidx.lifecycle:lifecycle-viewmodel:2.8.7")
 
                 implementation(libs.kotlinSerializationCore)
                 implementation("androidx.collection:collection:1.4.2")
@@ -84,8 +83,8 @@ androidXMultiplatform {
         androidMain {
             dependsOn(jvmCommonMain)
             dependencies {
-                api("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
-                api("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
+                api("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+                api("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
                 api("androidx.activity:activity-ktx:1.7.1")
                 api("androidx.core:core-ktx:1.8.0")
                 api("androidx.annotation:annotation-experimental:1.4.1")
@@ -98,10 +97,10 @@ androidXMultiplatform {
             dependsOn(commonTest)
             dependencies {
                 implementation("androidx.annotation:annotation:1.8.0")
-                implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2")
-                implementation("androidx.lifecycle:lifecycle-common:2.6.2")
-                implementation("androidx.lifecycle:lifecycle-runtime:2.6.2")
-                implementation("androidx.lifecycle:lifecycle-runtime-testing:2.6.2")
+                implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.7")
+                implementation("androidx.lifecycle:lifecycle-common:2.8.7")
+                implementation("androidx.lifecycle:lifecycle-runtime:2.8.7")
+                implementation("androidx.lifecycle:lifecycle-runtime-testing:2.8.7")
                 implementation(project(":internal-testutils-navigation"))
                 implementation(project(":internal-testutils-runtime"))
                 implementation(libs.hamcrestCore)
@@ -119,22 +118,14 @@ androidXMultiplatform {
                 implementation(libs.mockitoCore)
             }
         }
-        nonJvmCommonMain {
-            dependsOn(nonAndroidMain)
-        }
-        nonJvmCommonTest {
-            dependsOn(nonAndroidTest)
-        }
-        nativeMain {
-            dependsOn(nonJvmCommonMain)
-        }
-        linuxMain.dependsOn(nativeMain)
-        darwinMain.dependsOn(nativeMain)
-        nativeTest {
-            dependsOn(nonJvmCommonTest)
-        }
-        linuxTest.dependsOn(nativeTest)
-        darwinTest.dependsOn(nativeTest)
+        nonJvmCommonMain { dependsOn(nonAndroidMain) }
+        nonJvmCommonTest { dependsOn(nonAndroidTest) }
+        nativeMain { dependsOn(nonJvmCommonMain) }
+        linuxMain { dependsOn(nativeMain) }
+        darwinMain { dependsOn(nativeMain) }
+        nativeTest { dependsOn(nonJvmCommonTest) }
+        linuxTest { dependsOn(nativeTest) }
+        darwinTest { dependsOn(nativeTest) }
         targets.configureEach { target ->
             if (target.platformType == KotlinPlatformType.native) {
                 if (target.konanTarget.family.appleFamily) {
@@ -162,5 +153,5 @@ androidx {
     type = SoftwareType.PUBLISHED_LIBRARY
     inceptionYear = "2017"
     description = "Android Navigation-Runtime"
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
+    metalavaK2UastEnabled = false
 }

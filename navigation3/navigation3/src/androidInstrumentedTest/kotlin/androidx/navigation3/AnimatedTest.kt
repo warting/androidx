@@ -23,10 +23,16 @@ import androidx.compose.animation.SharedTransitionScope.SharedContentState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDisplayed
@@ -34,7 +40,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.kruth.assertThat
-import androidx.navigation3.SinglePaneNavDisplay.DEFAULT_TRANSITION_DURATION_MILLISECOND
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.navigation3.SceneNavDisplay.DEFAULT_TRANSITION_DURATION_MILLISECOND
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import kotlin.test.Test
@@ -50,16 +58,26 @@ class AnimatedTest {
 
     @Test
     fun testNavHostAnimations() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
+        lateinit var firstLifecycle: Lifecycle
+        lateinit var secondLifecycle: Lifecycle
 
         composeTestRule.mainClock.autoAdvance = false
 
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first) }
+            SceneNavDisplay(backStack) {
                 when (it) {
-                    first -> NavEntry(first) { Text(first) }
-                    second -> NavEntry(second) { Text(second) }
+                    first ->
+                        NavEntry(first) {
+                            firstLifecycle = LocalLifecycleOwner.current.lifecycle
+                            Text(first)
+                        }
+                    second ->
+                        NavEntry(second) {
+                            secondLifecycle = LocalLifecycleOwner.current.lifecycle
+                            Text(second)
+                        }
                     else -> error("Invalid key passed")
                 }
             }
@@ -69,10 +87,11 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         assertThat(composeTestRule.onNodeWithText(first).isDisplayed()).isTrue()
+        assertThat(firstLifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
 
         composeTestRule.mainClock.autoAdvance = false
 
-        composeTestRule.runOnIdle { backstack.add(second) }
+        composeTestRule.runOnIdle { backStack.add(second) }
 
         // advance half way between animations
         composeTestRule.mainClock.advanceTimeBy(
@@ -81,25 +100,28 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(first).assertExists()
+        assertThat(firstLifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
         composeTestRule.onNodeWithText(second).assertExists()
+        assertThat(secondLifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
 
         composeTestRule.mainClock.autoAdvance = true
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertExists()
+        assertThat(secondLifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
     }
 
     @Test
     fun testNavHostAnimationsCustom() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
 
         composeTestRule.mainClock.autoAdvance = false
         val customDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND * 2
 
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -110,8 +132,8 @@ class AnimatedTest {
                     second ->
                         NavEntry(
                             second,
-                            featureMap =
-                                SinglePaneNavDisplay.transition(
+                            metadata =
+                                SceneNavDisplay.transition(
                                     enter = fadeIn(tween(customDuration)),
                                     exit = fadeOut(tween(customDuration))
                                 )
@@ -130,7 +152,7 @@ class AnimatedTest {
 
         composeTestRule.mainClock.autoAdvance = false
 
-        composeTestRule.runOnIdle { backstack.add(second) }
+        composeTestRule.runOnIdle { backStack.add(second) }
 
         // advance past the default duration but not the custom duration
         composeTestRule.mainClock.advanceTimeBy(
@@ -149,27 +171,27 @@ class AnimatedTest {
     }
 
     @Test
-    fun testPop() {
-        lateinit var backstack: MutableList<Any>
+    fun testPopAnimationsCustom() {
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, second) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
                             first,
-                            featureMap =
-                                SinglePaneNavDisplay.popTransition(
-                                    enter = fadeIn(tween(testDuration)),
-                                    exit = fadeOut(tween(testDuration))
-                                )
                         ) {
                             Text(first)
                         }
                     second ->
                         NavEntry(
                             second,
+                            metadata =
+                                SceneNavDisplay.popTransition(
+                                    enter = fadeIn(tween(testDuration)),
+                                    exit = fadeOut(tween(testDuration))
+                                )
                         ) {
                             Text(second)
                         }
@@ -180,10 +202,10 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(second).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second)
+        assertThat(backStack).containsExactly(first, second)
 
         composeTestRule.mainClock.autoAdvance = false
-        composeTestRule.runOnIdle { backstack.removeAt(1) }
+        composeTestRule.runOnIdle { backStack.removeAt(1) }
 
         // advance by a duration that is much shorter than the default duration
         // to ensure that the custom animation is used and has completed after this
@@ -191,27 +213,22 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         // pop to first
-        assertThat(backstack).containsExactly(first)
+        assertThat(backStack).containsExactly(first)
         composeTestRule.onNodeWithText(first).assertIsDisplayed()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
     }
 
     @Test
     fun testPopMultiple() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second, third) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, second, third) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
                             first,
-                            featureMap =
-                                SinglePaneNavDisplay.popTransition(
-                                    enter = fadeIn(tween(testDuration)),
-                                    exit = fadeOut(tween(testDuration))
-                                )
                         ) {
                             Text(first)
                         }
@@ -224,6 +241,11 @@ class AnimatedTest {
                     third ->
                         NavEntry(
                             third,
+                            metadata =
+                                SceneNavDisplay.popTransition(
+                                    enter = fadeIn(tween(testDuration)),
+                                    exit = fadeOut(tween(testDuration))
+                                )
                         ) {
                             Text(third)
                         }
@@ -234,12 +256,12 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second, third)
+        assertThat(backStack).containsExactly(first, second, third)
 
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.runOnIdle {
-            backstack.removeAt(2)
-            backstack.removeAt(1)
+            backStack.removeAt(2)
+            backStack.removeAt(1)
         }
 
         // advance by a duration that is much shorter than the default duration
@@ -248,7 +270,7 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         // pop to first
-        assertThat(backstack).containsExactly(first)
+        assertThat(backStack).containsExactly(first)
         composeTestRule.onNodeWithText(first).assertIsDisplayed()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertDoesNotExist()
@@ -256,11 +278,11 @@ class AnimatedTest {
 
     @Test
     fun testPopNavigate() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, second) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -277,8 +299,8 @@ class AnimatedTest {
                     third ->
                         NavEntry(
                             third,
-                            featureMap =
-                                SinglePaneNavDisplay.transition(
+                            metadata =
+                                SceneNavDisplay.transition(
                                     enter = fadeIn(tween(testDuration)),
                                     exit = fadeOut(tween(testDuration))
                                 )
@@ -292,12 +314,12 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(second).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second)
+        assertThat(backStack).containsExactly(first, second)
 
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.runOnIdle {
-            backstack.removeAt(1)
-            backstack.add(third)
+            backStack.removeAt(1)
+            backStack.add(third)
         }
 
         // advance by a duration that is much shorter than the default duration
@@ -305,7 +327,7 @@ class AnimatedTest {
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, third)
+        assertThat(backStack).containsExactly(first, third)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
@@ -313,11 +335,11 @@ class AnimatedTest {
 
     @Test
     fun testCentrePop() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second, third) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, second, third) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -334,8 +356,8 @@ class AnimatedTest {
                     third ->
                         NavEntry(
                             third,
-                            featureMap =
-                                SinglePaneNavDisplay.transition(
+                            metadata =
+                                SceneNavDisplay.transition(
                                     enter = fadeIn(tween(testDuration)),
                                     exit = fadeOut(tween(testDuration))
                                 )
@@ -349,17 +371,17 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second, third)
+        assertThat(backStack).containsExactly(first, second, third)
 
         composeTestRule.mainClock.autoAdvance = false
-        composeTestRule.runOnIdle { backstack.removeAt(1) }
+        composeTestRule.runOnIdle { backStack.removeAt(1) }
 
         // advance by a duration that is much shorter than the default duration
         // to ensure that the custom animation is used and has completed after this
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, third)
+        assertThat(backStack).containsExactly(first, third)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
@@ -367,11 +389,11 @@ class AnimatedTest {
 
     @Test
     fun testCentreNavigate() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, third) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, third) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -388,8 +410,8 @@ class AnimatedTest {
                     third ->
                         NavEntry(
                             third,
-                            featureMap =
-                                SinglePaneNavDisplay.transition(
+                            metadata =
+                                SceneNavDisplay.transition(
                                     enter = fadeIn(tween(testDuration)),
                                     exit = fadeOut(tween(testDuration))
                                 )
@@ -403,17 +425,17 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, third)
+        assertThat(backStack).containsExactly(first, third)
 
         composeTestRule.mainClock.autoAdvance = false
-        composeTestRule.runOnIdle { backstack.add(1, second) }
+        composeTestRule.runOnIdle { backStack.add(1, second) }
 
         // advance by a duration that is much shorter than the default duration
         // to ensure that the custom animation is used and has completed after this
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, second, third)
+        assertThat(backStack).containsExactly(first, second, third)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
@@ -421,11 +443,11 @@ class AnimatedTest {
 
     @Test
     fun testCentrePopAndEndPop() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second, third, fourth) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, second, third, fourth) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -442,7 +464,7 @@ class AnimatedTest {
                     third ->
                         NavEntry(
                             third,
-                            SinglePaneNavDisplay.transition(
+                            SceneNavDisplay.transition(
                                 enter = fadeIn(tween(testDuration)),
                                 exit = fadeOut(tween(testDuration))
                             )
@@ -462,12 +484,12 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(fourth).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second, third, fourth)
+        assertThat(backStack).containsExactly(first, second, third, fourth)
 
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.runOnIdle {
-            backstack.removeAt(3)
-            backstack.removeAt(1)
+            backStack.removeAt(3)
+            backStack.removeAt(1)
         }
 
         // advance by a duration that is much shorter than the default duration
@@ -475,7 +497,7 @@ class AnimatedTest {
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, third)
+        assertThat(backStack).containsExactly(first, third)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
@@ -484,11 +506,11 @@ class AnimatedTest {
 
     @Test
     fun testCentrePopAndEndNavigate() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second, third) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, second, third) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -511,8 +533,8 @@ class AnimatedTest {
                     fourth ->
                         NavEntry(
                             fourth,
-                            featureMap =
-                                SinglePaneNavDisplay.transition(
+                            metadata =
+                                SceneNavDisplay.transition(
                                     enter = fadeIn(tween(testDuration)),
                                     exit = fadeOut(tween(testDuration))
                                 )
@@ -526,12 +548,12 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second, third)
+        assertThat(backStack).containsExactly(first, second, third)
 
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.runOnIdle {
-            backstack.removeAt(1)
-            backstack.add(fourth)
+            backStack.removeAt(1)
+            backStack.add(fourth)
         }
 
         // advance by a duration that is much shorter than the default duration
@@ -539,7 +561,7 @@ class AnimatedTest {
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
 
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, third, fourth)
+        assertThat(backStack).containsExactly(first, third, fourth)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertDoesNotExist()
         composeTestRule.onNodeWithText(fourth).assertIsDisplayed()
@@ -547,11 +569,11 @@ class AnimatedTest {
 
     @Test
     fun testCentreNavigateAndEndPop() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, third, fourth) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, third, fourth) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -568,8 +590,8 @@ class AnimatedTest {
                     third ->
                         NavEntry(
                             third,
-                            featureMap =
-                                SinglePaneNavDisplay.transition(
+                            metadata =
+                                SceneNavDisplay.transition(
                                     enter = fadeIn(tween(testDuration)),
                                     exit = fadeOut(tween(testDuration))
                                 )
@@ -589,11 +611,11 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(fourth).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, third, fourth)
+        assertThat(backStack).containsExactly(first, third, fourth)
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.runOnIdle {
-            backstack.removeAt(2)
-            backstack.add(1, second)
+            backStack.removeAt(2)
+            backStack.add(1, second)
         }
 
         // advance by a duration that is much shorter than the default duration
@@ -601,7 +623,7 @@ class AnimatedTest {
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, second, third)
+        assertThat(backStack).containsExactly(first, second, third)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
@@ -610,11 +632,11 @@ class AnimatedTest {
 
     @Test
     fun testCentreNavigateAndEndNavigate() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, third) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, third) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -637,7 +659,7 @@ class AnimatedTest {
                     fourth ->
                         NavEntry(
                             fourth,
-                            SinglePaneNavDisplay.transition(
+                            SceneNavDisplay.transition(
                                 enter = fadeIn(tween(testDuration)),
                                 exit = fadeOut(tween(testDuration))
                             )
@@ -651,12 +673,12 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, third)
+        assertThat(backStack).containsExactly(first, third)
 
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.runOnIdle {
-            backstack.add(1, second)
-            backstack.add(fourth)
+            backStack.add(1, second)
+            backStack.add(fourth)
         }
 
         // advance by a duration that is much shorter than the default duration
@@ -664,7 +686,7 @@ class AnimatedTest {
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, second, third, fourth)
+        assertThat(backStack).containsExactly(first, second, third, fourth)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertDoesNotExist()
@@ -673,11 +695,11 @@ class AnimatedTest {
 
     @Test
     fun testSameStack() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second) }
-            SinglePaneNavDisplay(backstack) {
+            backStack = remember { mutableStateListOf(first, second) }
+            SceneNavDisplay(backStack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -688,7 +710,7 @@ class AnimatedTest {
                     second ->
                         NavEntry(
                             second,
-                            SinglePaneNavDisplay.transition(
+                            SceneNavDisplay.transition(
                                 enter = fadeIn(tween(testDuration)),
                                 exit = fadeOut(tween(testDuration))
                             )
@@ -702,12 +724,12 @@ class AnimatedTest {
 
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(second).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second)
+        assertThat(backStack).containsExactly(first, second)
 
         composeTestRule.mainClock.autoAdvance = false
         composeTestRule.runOnIdle {
-            backstack.removeAt(1)
-            backstack.add(second)
+            backStack.removeAt(1)
+            backStack.add(second)
         }
 
         // advance by a duration that is much shorter than the default duration
@@ -715,18 +737,17 @@ class AnimatedTest {
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, second)
+        assertThat(backStack).containsExactly(first, second)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertIsDisplayed()
     }
 
     @Test
-    fun testDuplicateLastEntry() {
+    fun testPoppedEntryIsAnimated() {
         lateinit var backstack: MutableList<Any>
-        val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first, second, third) }
-            SinglePaneNavDisplay(backstack) {
+            backstack = remember { mutableStateListOf(first, second) }
+            SceneNavDisplay(backstack) {
                 when (it) {
                     first ->
                         NavEntry(
@@ -737,8 +758,102 @@ class AnimatedTest {
                     second ->
                         NavEntry(
                             second,
-                            featureMap =
-                                SinglePaneNavDisplay.transition(
+                        ) {
+                            Box(Modifier.fillMaxSize().background(Color.Red)) { Text(second) }
+                        }
+                    else -> error("Invalid key passed")
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(second).assertIsDisplayed()
+        assertThat(backstack).containsExactly(first, second)
+
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.runOnIdle { backstack.removeAt(1) }
+
+        // advance by a duration that is much shorter than the default duration
+        // to ensure that the custom animation is used and has completed after this
+        composeTestRule.mainClock.advanceTimeByFrame()
+        composeTestRule.mainClock.advanceTimeByFrame()
+
+        composeTestRule.onNodeWithText(second).assertIsDisplayed()
+    }
+
+    @Test
+    fun testPoppedEntryIsWrapped() {
+        lateinit var backstack: MutableList<Any>
+        val LocalHasProvidedToEntry = compositionLocalOf { false }
+        val provider =
+            createTestNavEntryDecorator<String>(
+                decorateBackStack = { _, content ->
+                    CompositionLocalProvider(LocalHasProvidedToEntry provides false) {
+                        content.invoke()
+                    }
+                },
+                decorateEntry = { entry ->
+                    CompositionLocalProvider(LocalHasProvidedToEntry provides true) {
+                        entry.content.invoke(entry.key)
+                    }
+                }
+            )
+        var secondEntryIsWrapped = false
+        composeTestRule.setContent {
+            backstack = remember { mutableStateListOf(first, second) }
+            SceneNavDisplay(backstack, postEntryDecorators = listOf(provider)) {
+                when (it) {
+                    first ->
+                        NavEntry(
+                            first,
+                        ) {
+                            Text(first)
+                        }
+                    second ->
+                        NavEntry(
+                            second,
+                        ) {
+                            secondEntryIsWrapped = LocalHasProvidedToEntry.current
+                            Box(Modifier.fillMaxSize().background(Color.Red)) { Text(second) }
+                        }
+                    else -> error("Invalid key passed")
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(second).assertIsDisplayed()
+        assertThat(backstack).containsExactly(first, second)
+
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.runOnIdle { backstack.removeAt(1) }
+
+        // advance by a duration that is much shorter than the default duration
+        // to ensure that the custom animation is used and has completed after this
+        composeTestRule.mainClock.advanceTimeByFrame()
+        composeTestRule.mainClock.advanceTimeByFrame()
+        assertTrue(secondEntryIsWrapped)
+    }
+
+    @Test
+    fun testDuplicateLastEntry() {
+        lateinit var backStack: MutableList<Any>
+        val testDuration = DEFAULT_TRANSITION_DURATION_MILLISECOND / 5
+        composeTestRule.setContent {
+            backStack = remember { mutableStateListOf(first, second, third) }
+            SceneNavDisplay(backStack) {
+                when (it) {
+                    first ->
+                        NavEntry(
+                            first,
+                        ) {
+                            Text(first)
+                        }
+                    second ->
+                        NavEntry(
+                            second,
+                            metadata =
+                                SceneNavDisplay.transition(
                                     enter = fadeIn(tween(testDuration)),
                                     exit = fadeOut(tween(testDuration))
                                 )
@@ -760,17 +875,17 @@ class AnimatedTest {
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertIsDisplayed()
-        assertThat(backstack).containsExactly(first, second, third)
+        assertThat(backStack).containsExactly(first, second, third)
 
         composeTestRule.mainClock.autoAdvance = false
-        composeTestRule.runOnIdle { backstack.add(second) }
+        composeTestRule.runOnIdle { backStack.add(second) }
 
         // advance by a duration that is much shorter than the default duration
         // to ensure that the custom animation is used and has completed after this
         composeTestRule.mainClock.advanceTimeBy((testDuration * 1.5).toLong())
         // not pop
         composeTestRule.waitForIdle()
-        assertThat(backstack).containsExactly(first, second, third, second)
+        assertThat(backStack).containsExactly(first, second, third, second)
         composeTestRule.onNodeWithText(first).assertDoesNotExist()
         composeTestRule.onNodeWithText(third).assertDoesNotExist()
         composeTestRule.onNodeWithText(second).assertIsDisplayed()
@@ -779,15 +894,15 @@ class AnimatedTest {
     @OptIn(ExperimentalSharedTransitionApi::class)
     @Test
     fun testSharedElement() {
-        lateinit var backstack: MutableList<Any>
+        lateinit var backStack: MutableList<Any>
         var transitionScope: SharedTransitionScope? = null
         val sharedStates = mutableSetOf<SharedContentState>()
         val sharedContentStateKey = 1
         val sharedText = "shared text"
         composeTestRule.setContent {
-            backstack = remember { mutableStateListOf(first) }
+            backStack = remember { mutableStateListOf(first) }
             SharedTransitionLayout {
-                SinglePaneNavDisplay(backstack = backstack) {
+                SceneNavDisplay(backStack = backStack) {
                     transitionScope = this
                     when (it) {
                         first ->
@@ -830,7 +945,7 @@ class AnimatedTest {
         sharedStates.clear()
 
         composeTestRule.mainClock.autoAdvance = false
-        composeTestRule.runOnIdle { backstack.add(second) }
+        composeTestRule.runOnIdle { backStack.add(second) }
 
         composeTestRule.mainClock.advanceTimeBy(
             (DEFAULT_TRANSITION_DURATION_MILLISECOND / 4).toLong()
@@ -839,6 +954,64 @@ class AnimatedTest {
         composeTestRule.onAllNodesWithText(sharedText).assertCountEquals(2)
         assertTrue(transitionScope?.isTransitionActive == true)
         sharedStates.forEach { state -> assertTrue(state.isMatchFound) }
+    }
+
+    @Test
+    fun testPopLifecycle() {
+        lateinit var backStack: MutableList<Any>
+        lateinit var firstLifecycle: Lifecycle
+        lateinit var secondLifecycle: Lifecycle
+
+        composeTestRule.setContent {
+            backStack = remember { mutableStateListOf(first, second) }
+            SceneNavDisplay(backStack) {
+                when (it) {
+                    first ->
+                        NavEntry(
+                            first,
+                        ) {
+                            firstLifecycle = LocalLifecycleOwner.current.lifecycle
+                            Text(first)
+                        }
+                    second ->
+                        NavEntry(
+                            second,
+                        ) {
+                            secondLifecycle = LocalLifecycleOwner.current.lifecycle
+                            Text(second)
+                        }
+                    else -> error("Invalid key passed")
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(second).assertIsDisplayed()
+        assertThat(secondLifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+        assertThat(backStack).containsExactly(first, second)
+
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.runOnIdle { backStack.removeAt(1) }
+
+        // advance half way between animations
+        composeTestRule.mainClock.advanceTimeBy(
+            (DEFAULT_TRANSITION_DURATION_MILLISECOND / 2).toLong()
+        )
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(first).assertExists()
+        assertThat(firstLifecycle.currentState).isEqualTo(Lifecycle.State.STARTED)
+        composeTestRule.onNodeWithText(second).assertExists()
+        assertThat(secondLifecycle.currentState).isEqualTo(Lifecycle.State.CREATED)
+
+        composeTestRule.mainClock.autoAdvance = true
+
+        composeTestRule.waitForIdle()
+        // pop to first
+        assertThat(backStack).containsExactly(first)
+        composeTestRule.onNodeWithText(first).assertIsDisplayed()
+        assertThat(firstLifecycle.currentState).isEqualTo(Lifecycle.State.RESUMED)
+        composeTestRule.onNodeWithText(second).assertDoesNotExist()
     }
 }
 

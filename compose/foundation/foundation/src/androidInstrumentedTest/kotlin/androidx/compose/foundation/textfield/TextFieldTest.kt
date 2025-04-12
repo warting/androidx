@@ -47,6 +47,11 @@ import androidx.compose.foundation.text.Handle
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.computeSizeForDefaultText
+import androidx.compose.foundation.text.contextmenu.internal.ProvidePlatformTextContextMenuToolbar
+import androidx.compose.foundation.text.contextmenu.test.ContextMenuFlagFlipperRunner
+import androidx.compose.foundation.text.contextmenu.test.ContextMenuFlagSuppress
+import androidx.compose.foundation.text.contextmenu.test.SpyTextActionModeCallback
+import androidx.compose.foundation.text.contextmenu.test.assertShown
 import androidx.compose.foundation.text.input.InputMethodInterceptor
 import androidx.compose.foundation.text.selection.fetchTextLayoutResult
 import androidx.compose.foundation.text.selection.isSelectionHandle
@@ -73,6 +78,10 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
@@ -117,6 +126,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -156,7 +166,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.filters.MediumTest
 import androidx.test.filters.SdkSuppress
@@ -164,6 +173,7 @@ import androidx.testutils.fonts.R
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -174,7 +184,7 @@ import org.junit.runner.RunWith
 import org.mockito.kotlin.mock
 
 @MediumTest
-@RunWith(AndroidJUnit4::class)
+@RunWith(ContextMenuFlagFlipperRunner::class)
 class TextFieldTest : FocusedWindowTest {
     @get:Rule val rule = createComposeRule()
 
@@ -777,6 +787,7 @@ class TextFieldTest : FocusedWindowTest {
         rule.onNodeWithTag(Tag).assertTextEquals("HELLO")
     }
 
+    @ContextMenuFlagSuppress(suppressedFlagValue = true)
     @LargeTest
     @Test
     fun semantics_longClick() {
@@ -798,6 +809,34 @@ class TextFieldTest : FocusedWindowTest {
         rule.onNodeWithTag(Tag).performSemanticsAction(SemanticsActions.OnLongClick) { it() }
 
         rule.runOnIdle { assertThat(toolbar?.status).isEqualTo(TextToolbarStatus.Shown) }
+    }
+
+    @ContextMenuFlagSuppress(suppressedFlagValue = false)
+    @LargeTest
+    @Test
+    fun semantics_longClick_newContextMenu() {
+        val text = "Hello World"
+        var value by mutableStateOf(TextFieldValue(text, TextRange(text.length)))
+        val spyTextActionModeCallback = SpyTextActionModeCallback()
+
+        rule.setTextFieldTestContent {
+            ProvidePlatformTextContextMenuToolbar(
+                callbackInjector = { spyTextActionModeCallback.apply { delegate = it } }
+            ) {
+                BasicTextField(
+                    modifier = Modifier.testTag(Tag),
+                    value = value,
+                    onValueChange = { value = it }
+                )
+            }
+        }
+
+        spyTextActionModeCallback.assertShown(false)
+
+        rule.onNodeWithTag(Tag).performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        rule.waitForIdle()
+
+        spyTextActionModeCallback.assertShown(true)
     }
 
     @Test
@@ -1558,6 +1597,41 @@ class TextFieldTest : FocusedWindowTest {
         rule.onNodeWithTag(Tag).requestFocus()
         rule.runOnIdle { windowFocus = false }
         inputMethodInterceptor.assertSessionActive()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun singleLineTextField_enterIsNotConsumed_withDefaultKeyboardAction() {
+        var keyDownReceived = false
+        var keyUpReceived = false
+        rule.setTextFieldTestContent {
+            var value by remember { mutableStateOf("") }
+            Box(
+                Modifier.onKeyEvent {
+                    if (it.key == Key.Enter) {
+                        when (it.type) {
+                            KeyEventType.KeyDown -> keyDownReceived = true
+                            KeyEventType.KeyUp -> keyUpReceived = true
+                        }
+                    }
+                    false
+                }
+            ) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = true,
+                    modifier = Modifier.testTag(Tag),
+                )
+            }
+        }
+        rule.onNodeWithTag(Tag).apply {
+            requestFocus()
+            performKeyInput { pressKey(Key.Enter) }
+        }
+
+        assertTrue(keyDownReceived)
+        assertTrue(keyUpReceived)
     }
 }
 

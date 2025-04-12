@@ -16,14 +16,17 @@
 
 package androidx.pdf.view
 
-import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
+import android.os.DeadObjectException
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import androidx.annotation.VisibleForTesting
 import androidx.pdf.PdfDocument
 import androidx.pdf.content.PageSelection
+import androidx.pdf.exceptions.RequestFailedException
+import androidx.pdf.exceptions.RequestMetadata
+import androidx.pdf.util.CONTENT_SELECTION_REQUEST_NAME
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -39,6 +42,7 @@ internal class SelectionStateManager(
     private val pdfDocument: PdfDocument,
     private val backgroundScope: CoroutineScope,
     private val handleTouchTargetSizePx: Int,
+    private val errorFlow: MutableSharedFlow<Throwable>,
     initialSelection: SelectionModel? = null,
 ) {
     /** The current [Selection] */
@@ -90,7 +94,7 @@ internal class SelectionStateManager(
         _selectionUiSignalBus.tryEmit(
             SelectionUiSignal.PlayHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         )
-        updateSelectionAsync(pdfPoint, pdfPoint)
+        updateRangeSelectionAsync(pdfPoint, pdfPoint)
     }
 
     /** Synchronously resets all state of this manager */
@@ -114,19 +118,13 @@ internal class SelectionStateManager(
         _selectionUiSignalBus.tryEmit(SelectionUiSignal.ToggleActionMode(show = false))
     }
 
-    /**
-     * Updates the selection to include all text on the 0-indexed [pageNum]. [pageSize] is used to
-     * tell [PdfDocument] to select the whole page.
-     */
+    /** Updates the selection to include all text on the 0-indexed [pageNum]. */
     // TODO(b/386398335) Update this to accept a range of pages for select all, once we support
     // multi-page selections
     // TODO(b/386417152) Update this to use index-based selection once that's supported by
     // PdfDocument
-    fun selectAllTextOnPageAsync(pageNum: Int, pageSize: Point) {
-        updateSelectionAsync(
-            PdfPoint(pageNum, PointF(0F, 0F)),
-            PdfPoint(pageNum, PointF(pageSize.x.toFloat(), pageSize.y.toFloat()))
-        )
+    fun selectAllTextOnPageAsync(pageNum: Int) {
+        updateAllSelectionAsync(pageNum)
     }
 
     private fun maybeHandleActionDown(location: PdfPoint, currentZoom: Float): Boolean {
@@ -201,7 +199,7 @@ internal class SelectionStateManager(
         val dx = location.pagePoint.x - prevDraggingState.downPoint.x
         val dy = location.pagePoint.y - prevDraggingState.downPoint.y
         val newEndPoint = prevDraggingState.dragging.location.translateBy(dx, dy)
-        updateSelectionAsync(prevDraggingState.fixed.location, newEndPoint)
+        updateRangeSelectionAsync(prevDraggingState.fixed.location, newEndPoint)
         // Hide the action mode while the user is actively dragging the handles
         _selectionUiSignalBus.tryEmit(SelectionUiSignal.ToggleActionMode(show = false))
         return true
@@ -225,7 +223,20 @@ internal class SelectionStateManager(
         return PdfPoint(this.pageNum, PointF(this.pagePoint.x + dx, this.pagePoint.y + dy))
     }
 
-    private fun updateSelectionAsync(start: PdfPoint, end: PdfPoint) {
+    private fun updateAllSelectionAsync(pageNum: Int) {
+        updateSelectionAsync(pageNum..pageNum) { pdfDocument.getSelectAllSelectionBounds(pageNum) }
+    }
+
+    private fun updateRangeSelectionAsync(start: PdfPoint, end: PdfPoint) {
+        updateSelectionAsync(start.pageNum..end.pageNum) {
+            pdfDocument.getSelectionBounds(start.pageNum, start.pagePoint, end.pagePoint)
+        }
+    }
+
+    private fun updateSelectionAsync(
+        pageRange: IntRange,
+        getNewSelection: suspend () -> PageSelection?
+    ) {
         val prevJob = setSelectionJob
         setSelectionJob =
             backgroundScope
@@ -233,23 +244,34 @@ internal class SelectionStateManager(
                     prevJob?.cancelAndJoin()
                     // TODO(b/386398335) Adapt this logic to support selections that span multiple
                     // pages
-                    val newSelection =
-                        pdfDocument.getSelectionBounds(
-                            start.pageNum,
-                            start.pagePoint,
-                            end.pagePoint
-                        )
-                    if (newSelection != null && newSelection.hasBounds) {
-                        _selectionModel.update {
-                            SelectionModel.fromSinglePageSelection(newSelection)
+
+                    try {
+                        val newSelection = getNewSelection()
+                        if (newSelection != null && newSelection.hasBounds) {
+                            _selectionModel.update {
+                                SelectionModel.fromSinglePageSelection(newSelection)
+                            }
+                            _selectionUiSignalBus.tryEmit(SelectionUiSignal.Invalidate)
+                            // Show the action mode if the user is not actively dragging the handles
+                            if (draggingState == null) {
+                                _selectionUiSignalBus.emit(
+                                    SelectionUiSignal.ToggleActionMode(show = true)
+                                )
+                            }
                         }
-                        _selectionUiSignalBus.tryEmit(SelectionUiSignal.Invalidate)
-                        // Show the action mode if the user is not actively dragging the handles
-                        if (draggingState == null) {
-                            _selectionUiSignalBus.emit(
-                                SelectionUiSignal.ToggleActionMode(show = true)
+                    } catch (e: DeadObjectException) {
+                        val exception =
+                            RequestFailedException(
+                                requestMetadata =
+                                    RequestMetadata(
+                                        requestName = CONTENT_SELECTION_REQUEST_NAME,
+                                        pageRange = pageRange
+                                    ),
+                                throwable = e,
+                                // Non-critical failure, user can retry the operation.
+                                showError = false
                             )
-                        }
+                        errorFlow.emit(exception)
                     }
                 }
                 .also { it.invokeOnCompletion { setSelectionJob = null } }

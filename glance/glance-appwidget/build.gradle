@@ -35,7 +35,7 @@ plugins {
 dependencies {
     api(project(":glance:glance"))
     api("androidx.annotation:annotation:1.8.1")
-    api("androidx.compose.runtime:runtime:1.1.1")
+    api("androidx.compose.runtime:runtime:1.7.8")
     api("androidx.compose.ui:ui-graphics:1.1.1")
     api("androidx.compose.ui:ui-unit:1.1.1")
     api("androidx.collection:collection-ktx:1.4.3")
@@ -111,7 +111,6 @@ androidx {
     description = "Glance-appwidgets allows developers to build layouts for Android AppWidgets " +
             "using a Jetpack Compose-style API."
     legacyDisableKotlinStrictApiMode = true
-    metalavaK2UastEnabled = false
     samples(project(":glance:glance-appwidget:glance-appwidget-samples"))
     addGoldenImageAssets()
 }

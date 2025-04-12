@@ -17,10 +17,12 @@
 package androidx.compose.ui
 
 import android.graphics.Rect
+import android.graphics.Region
 import android.os.Build
 import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES.P
 import android.os.Build.VERSION_CODES.R
+import android.os.Bundle
 import android.text.SpannableString
 import android.view.View
 import android.view.accessibility.AccessibilityEvent
@@ -31,14 +33,26 @@ import android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
 import android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.AndroidComposeView
 import androidx.compose.ui.platform.AndroidComposeViewAccessibilityDelegateCompat
+import androidx.compose.ui.platform.AndroidComposeViewAccessibilityDelegateCompat.Companion.ExtraDataShapeRectCornersKey
+import androidx.compose.ui.platform.AndroidComposeViewAccessibilityDelegateCompat.Companion.ExtraDataShapeRectKey
+import androidx.compose.ui.platform.AndroidComposeViewAccessibilityDelegateCompat.Companion.ExtraDataShapeRegionKey
+import androidx.compose.ui.platform.AndroidComposeViewAccessibilityDelegateCompat.Companion.ExtraDataShapeTypeKey
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testClipEntry
@@ -48,6 +62,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.ScrollAxisRange
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.accessibilityClassName
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collapse
 import androidx.compose.ui.semantics.contentDescription
@@ -77,6 +92,7 @@ import androidx.compose.ui.semantics.semanticsId
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.setSelection
 import androidx.compose.ui.semantics.setText
+import androidx.compose.ui.semantics.shape
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -88,7 +104,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityEventCompat.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION
@@ -101,6 +119,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_PASTE
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat.RANGE_TYPE_FLOAT
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.FlakyTest
 import androidx.test.filters.MediumTest
 import androidx.test.filters.SdkSuppress
 import com.google.common.truth.Correspondence
@@ -610,6 +629,48 @@ class AndroidComposeViewAccessibilityDelegateCompatTest {
     }
 
     @Test
+    fun className_overwrittenBy_explicitaccessibilityClassNameProperty() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics(mergeDescendants = true) {
+                    accessibilityClassName = "asdf"
+                    testTag = tag
+                    role = Role.Image
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+
+        // Act.
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Assert.
+        rule.runOnIdle { assertThat(info.className).isEqualTo("asdf") }
+    }
+
+    @Test
+    fun explicitaccessibilityClassNameProperty_childrenNotMergeable() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(Modifier.size(10.dp).semantics(mergeDescendants = true) { testTag = tag }) {
+                Box(Modifier.size(10.dp).semantics { accessibilityClassName = "a" })
+                Box(Modifier.size(10.dp).semantics { accessibilityClassName = "b" })
+            }
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+
+        // Act.
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.className)
+                .isEqualTo(AndroidComposeViewAccessibilityDelegateCompat.ClassName)
+        }
+    }
+
+    @Test
     fun nodeWithTextAndLayoutResult_className_textView() {
         // Arrange.
         rule.setContentWithAccessibilityEnabled {
@@ -668,6 +729,7 @@ class AndroidComposeViewAccessibilityDelegateCompatTest {
         }
     }
 
+    @FlakyTest(bugId = 403310024)
     @Test
     fun testPopulateAccessibilityNodeInfoProperties_liveRegionUpdate() {
         // Arrange.
@@ -943,6 +1005,538 @@ class AndroidComposeViewAccessibilityDelegateCompatTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_shapeSet_setsAllAvailableShapeExtraKeys() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = RectangleShape
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+
+        // Act.
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.availableExtraData)
+                .containsAtLeast(
+                    ExtraDataShapeTypeKey,
+                    ExtraDataShapeRectKey,
+                    ExtraDataShapeRectCornersKey,
+                    ExtraDataShapeRegionKey
+                )
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_shapeUnset_doesNotSetShapeExtraKeys() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(Modifier.size(10.dp).semantics { testTag = tag })
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+
+        // Act.
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.availableExtraData)
+                .containsNoneOf(
+                    ExtraDataShapeTypeKey,
+                    ExtraDataShapeRectKey,
+                    ExtraDataShapeRectCornersKey,
+                    ExtraDataShapeRegionKey
+                )
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestShapeTypeExtra_rectangle() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = RectangleShape
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeTypeKey,
+                Bundle()
+            )
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeTypeKey)).isTrue()
+            assertThat(info.extras.getInt(ExtraDataShapeTypeKey)).isEqualTo(0)
+
+            assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isTrue()
+            with(rule.density) {
+                @Suppress("DEPRECATION")
+                assertThat(info.extras.getParcelable<Rect>(ExtraDataShapeRectKey))
+                    .isEqualTo(
+                        Rect(
+                            /* left = */ 0,
+                            /* top = */ 0,
+                            /* right = */ 10.dp.roundToPx(),
+                            /* bottom = */ 10.dp.roundToPx()
+                        )
+                    )
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isFalse()
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestShapeExtra_rectangle() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = RectangleShape
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRectKey,
+                Bundle()
+            )
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isTrue()
+            with(rule.density) {
+                @Suppress("DEPRECATION")
+                assertThat(info.extras.getParcelable<Rect>(ExtraDataShapeRectKey))
+                    .isEqualTo(
+                        Rect(
+                            /* left = */ 0,
+                            /* top = */ 0,
+                            /* right = */ 10.dp.roundToPx(),
+                            /* bottom = */ 10.dp.roundToPx()
+                        )
+                    )
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeTypeKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isFalse()
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestShapeTypeExtra_roundedCornerRectangle() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = RoundedCornerShape(1.dp, 2.dp, 3.dp, 4.dp)
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeTypeKey,
+                Bundle()
+            )
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeTypeKey)).isTrue()
+            assertThat(info.extras.getInt(ExtraDataShapeTypeKey)).isEqualTo(1)
+
+            assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isTrue()
+            with(rule.density) {
+                @Suppress("DEPRECATION")
+                assertThat(info.extras.getParcelable<Rect>(ExtraDataShapeRectKey))
+                    .isEqualTo(
+                        Rect(
+                            /* left = */ 0,
+                            /* top = */ 0,
+                            /* right = */ 10.dp.roundToPx(),
+                            /* bottom = */ 10.dp.roundToPx()
+                        )
+                    )
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isTrue()
+            val corners = info.extras.getFloatArray(ExtraDataShapeRectCornersKey)!!
+            with(rule.density) {
+                assertThat(corners)
+                    .isEqualTo(
+                        floatArrayOf(
+                            1.dp.toPx(),
+                            1.dp.toPx(),
+                            2.dp.toPx(),
+                            2.dp.toPx(),
+                            3.dp.toPx(),
+                            3.dp.toPx(),
+                            4.dp.toPx(),
+                            4.dp.toPx()
+                        )
+                    )
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isFalse()
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestShapeExtras_roundedCornerRectangle() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = RoundedCornerShape(1.dp, 2.dp, 3.dp, 4.dp)
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act 1.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRectKey,
+                Bundle()
+            )
+
+        // Assert 1.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isTrue()
+            with(rule.density) {
+                @Suppress("DEPRECATION")
+                assertThat(info.extras.getParcelable<Rect>(ExtraDataShapeRectKey))
+                    .isEqualTo(
+                        Rect(
+                            /* left = */ 0,
+                            /* top = */ 0,
+                            /* right = */ 10.dp.roundToPx(),
+                            /* bottom = */ 10.dp.roundToPx()
+                        )
+                    )
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeTypeKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isFalse()
+        }
+
+        // Act 2.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRectCornersKey,
+                Bundle()
+            )
+
+        // Assert 2.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isTrue()
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isTrue()
+            val corners = info.extras.getFloatArray(ExtraDataShapeRectCornersKey)!!
+            with(rule.density) {
+                assertThat(corners)
+                    .isEqualTo(
+                        floatArrayOf(
+                            1.dp.toPx(),
+                            1.dp.toPx(),
+                            2.dp.toPx(),
+                            2.dp.toPx(),
+                            3.dp.toPx(),
+                            3.dp.toPx(),
+                            4.dp.toPx(),
+                            4.dp.toPx()
+                        )
+                    )
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeTypeKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isFalse()
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestShapeTypeExtra_genericShape() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = TriangleShape()
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeTypeKey,
+                Bundle()
+            )
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeTypeKey)).isTrue()
+            assertThat(info.extras.getInt(ExtraDataShapeTypeKey)).isEqualTo(2)
+
+            assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isTrue()
+            @Suppress("DEPRECATION")
+            val region = info.extras.getParcelable<Region>(ExtraDataShapeRegionKey)!!
+            assertThat(region.isEmpty).isFalse()
+            assertThat(region.isRect).isFalse()
+            assertThat(region.isComplex).isTrue()
+            with(rule.density) {
+                assertThat(region.bounds.left).isEqualTo(0)
+                assertThat(region.bounds.top).isAtMost(1) // Region is an approximation
+                assertThat(region.bounds.right).isEqualTo(10.dp.roundToPx())
+                assertThat(region.bounds.bottom).isEqualTo(10.dp.roundToPx())
+
+                assertThat(region.contains(5.dp.roundToPx(), 5.dp.roundToPx())).isTrue()
+                assertThat(region.contains(3.dp.roundToPx(), 9.dp.roundToPx())).isTrue()
+                assertThat(region.contains(7.dp.roundToPx(), 9.dp.roundToPx())).isTrue()
+                assertThat(region.contains(3.dp.roundToPx(), 1.dp.roundToPx())).isFalse()
+                assertThat(region.contains(7.dp.roundToPx(), 1.dp.roundToPx())).isFalse()
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isFalse()
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestShapeExtra_genericShape() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = TriangleShape()
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRegionKey,
+                Bundle()
+            )
+
+        // Assert.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isTrue()
+            @Suppress("DEPRECATION")
+            val region = info.extras.getParcelable<Region>(ExtraDataShapeRegionKey)!!
+            assertThat(region.isEmpty).isFalse()
+            assertThat(region.isRect).isFalse()
+            assertThat(region.isComplex).isTrue()
+            with(rule.density) {
+                assertThat(region.bounds.left).isEqualTo(0)
+                assertThat(region.bounds.top).isAtMost(1) // Region is an approximation
+                assertThat(region.bounds.right).isEqualTo(10.dp.roundToPx())
+                assertThat(region.bounds.bottom).isEqualTo(10.dp.roundToPx())
+
+                assertThat(region.contains(5.dp.roundToPx(), 5.dp.roundToPx())).isTrue()
+                assertThat(region.contains(3.dp.roundToPx(), 9.dp.roundToPx())).isTrue()
+                assertThat(region.contains(7.dp.roundToPx(), 9.dp.roundToPx())).isTrue()
+                assertThat(region.contains(3.dp.roundToPx(), 1.dp.roundToPx())).isFalse()
+                assertThat(region.contains(7.dp.roundToPx(), 1.dp.roundToPx())).isFalse()
+            }
+
+            assertThat(info.extras.containsKey(ExtraDataShapeTypeKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isFalse()
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isFalse()
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestWrongShapeExtra_rectangle_doesNotSetExtra() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = RectangleShape
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act 1.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRectCornersKey,
+                Bundle()
+            )
+
+        // Assert 1.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isFalse()
+        }
+
+        // Act 2.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRegionKey,
+                Bundle()
+            )
+
+        // Assert 2.
+        rule.runOnIdle { assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isFalse() }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestWrongShapeExtra_roundedCornerRectangle_doesNotSetExtra() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = RoundedCornerShape(1.dp, 2.dp, 3.dp, 4.dp)
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRegionKey,
+                Bundle()
+            )
+
+        // Assert.
+        rule.runOnIdle { assertThat(info.extras.containsKey(ExtraDataShapeRegionKey)).isFalse() }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun testPopulateShapeExtras_requestWrongShapeExtra_genericShape_doesNotSetExtra() {
+        // Arrange.
+        rule.setContentWithAccessibilityEnabled {
+            Box(
+                Modifier.size(10.dp).semantics {
+                    testTag = tag
+                    shape = TriangleShape()
+                }
+            )
+        }
+        val virtualViewId = rule.onNodeWithTag(tag).semanticsId()
+        val info = rule.runOnIdle { androidComposeView.createAccessibilityNodeInfo(virtualViewId) }
+
+        // Act 1.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRectKey,
+                Bundle()
+            )
+
+        // Assert 1.
+        rule.runOnIdle { assertThat(info.extras.containsKey(ExtraDataShapeRectKey)).isFalse() }
+
+        // Act 2.
+        androidComposeView.composeAccessibilityDelegate
+            .getAccessibilityNodeProvider(androidComposeView)
+            .addExtraDataToAccessibilityNodeInfo(
+                virtualViewId,
+                info,
+                ExtraDataShapeRectCornersKey,
+                Bundle()
+            )
+
+        // Assert 2.
+        rule.runOnIdle {
+            assertThat(info.extras.containsKey(ExtraDataShapeRectCornersKey)).isFalse()
+        }
+    }
+
+    private class TriangleShape : Shape {
+        override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) =
+            Outline.Generic(
+                Path().apply {
+                    moveTo(size.width / 2f, 0f)
+                    lineTo(size.width, size.height)
+                    lineTo(0f, size.height)
+                    close()
+                }
+            )
+    }
+
+    @Test
     fun test_PasteAction_ifFocused() {
         // Arrange.
         rule.setContentWithAccessibilityEnabled {
@@ -1045,6 +1639,63 @@ class AndroidComposeViewAccessibilityDelegateCompatTest {
 
         // Assert.
         rule.runOnIdle { assertThat(info.childCount).isEqualTo(1) }
+    }
+
+    @SdkSuppress(maxSdkVersion = 33) // b/321824038
+    @Test
+    fun testGetBoundsInScreen_translation() {
+        rule.setContentWithAccessibilityEnabled { Box(Modifier.width(30.toDp()).height(70.toDp())) }
+        rule.runOnUiThread {
+            androidComposeView.translationX = 2f
+            androidComposeView.translationY = 3f
+        }
+
+        val bounds = Rect(-1, -1, -1, -1)
+        rule.runOnIdle {
+            val info = androidComposeView.createAccessibilityNodeInfo()
+            info.getBoundsInScreen(bounds)
+        }
+
+        rule.runOnIdle { assertThat(bounds).isEqualTo(Rect(2, 3, 30 + 2, 70 + 3)) }
+    }
+
+    @SdkSuppress(maxSdkVersion = 33) // b/321824038
+    @Test
+    fun testGetBoundsInScreen_scale() {
+        rule.setContentWithAccessibilityEnabled { Box(Modifier.width(30.toDp()).height(70.toDp())) }
+        rule.runOnUiThread {
+            androidComposeView.scaleX = 2f
+            androidComposeView.scaleY = 3f
+            androidComposeView.pivotX = 0f
+            androidComposeView.pivotY = 0f
+        }
+
+        val bounds = Rect(-1, -1, -1, -1)
+        rule.runOnIdle {
+            val info = androidComposeView.createAccessibilityNodeInfo()
+            info.getBoundsInScreen(bounds)
+        }
+
+        rule.runOnIdle { assertThat(bounds).isEqualTo(Rect(0, 0, 30 * 2, 70 * 3)) }
+    }
+
+    @SdkSuppress(maxSdkVersion = 33) // b/321824038
+    @Test
+    fun testGetBoundsInScreen_rotation() {
+        rule.setContentWithAccessibilityEnabled { Box(Modifier.width(30.toDp()).height(70.toDp())) }
+        rule.runOnUiThread {
+            androidComposeView.rotation = 90f
+            androidComposeView.pivotX = 0f
+            androidComposeView.pivotY = 0f
+        }
+
+        val bounds = Rect(-1, -1, -1, -1)
+        rule.runOnIdle {
+            val info = androidComposeView.createAccessibilityNodeInfo()
+            info.getBoundsInScreen(bounds)
+        }
+
+        rule.runOnIdle { assertThat(bounds).isEqualTo(Rect(-70, 0, 0, 30)) }
     }
 
     @SdkSuppress(maxSdkVersion = 33) // b/321824038

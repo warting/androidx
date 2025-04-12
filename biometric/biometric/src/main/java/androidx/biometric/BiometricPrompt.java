@@ -33,6 +33,8 @@ import androidx.annotation.RequiresPermission;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.VisibleForTesting;
 import androidx.biometric.BiometricManager.Authenticators;
+import androidx.biometric.utils.AuthenticatorUtils;
+import androidx.biometric.utils.CryptoObjectUtils;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
@@ -67,6 +69,13 @@ import javax.crypto.Mac;
  * ongoing authentication session's callbacks to be received by the new fragment/activity instance.
  * Note that {@code cancelAuthentication()} should not be called, and {@code authenticate()} does
  * not need to be invoked during activity/fragment creation.
+ *
+ * <p>Note that if multiple instances of {@code BiometricPrompt} are created within a single
+ * Fragment or Activity, only the callback registered with the last created instance will be
+ * saved and receive authentication results. This behavior can lead to unexpected results if
+ * multiple independent biometric authentication flows are attempted within the same Fragment or
+ * Activity. It is highly recommended to avoid creating multiple BiometricPrompt instances in
+ * this scenario.
  */
 public class BiometricPrompt {
     private static final String TAG = "BiometricPromptCompat";
@@ -168,6 +177,12 @@ public class BiometricPrompt {
     public static final int ERROR_SECURITY_UPDATE_REQUIRED = 15;
 
     /**
+     * The privacy setting has been enabled and will block use of the sensor.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    public static final int ERROR_SENSOR_PRIVACY_ENABLED = 18;
+
+    /**
      * Identity Check is currently not active.
      *
      * This device either doesn't have this feature enabled, or it's not considered in a
@@ -177,7 +192,10 @@ public class BiometricPrompt {
     public static final int ERROR_IDENTITY_CHECK_NOT_ACTIVE = 20;
 
     /**
-     * Biometrics is not allowed to verify the user in apps.
+     * Biometrics is not allowed to verify the user in apps. It's for internal use only. This
+     * error code, introduced in API 35, was previously covered by ERROR_HW_UNAVAILABLE and
+     * doesn't need to be public. Therefore, for backward compatibility, this error will be
+     * converted to ERROR_HW_UNAVAILABLE.
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     public static final int ERROR_NOT_ENABLED_FOR_APPS = 21;
@@ -205,6 +223,8 @@ public class BiometricPrompt {
         ERROR_HW_NOT_PRESENT,
         ERROR_NEGATIVE_BUTTON,
         ERROR_NO_DEVICE_CREDENTIAL,
+        ERROR_SECURITY_UPDATE_REQUIRED,
+        ERROR_SENSOR_PRIVACY_ENABLED,
         ERROR_IDENTITY_CHECK_NOT_ACTIVE,
         ERROR_NOT_ENABLED_FOR_APPS,
         ERROR_CONTENT_VIEW_MORE_OPTIONS_BUTTON
@@ -245,7 +265,8 @@ public class BiometricPrompt {
         AUTHENTICATION_RESULT_TYPE_BIOMETRIC
     })
     @Retention(RetentionPolicy.SOURCE)
-    @interface AuthenticationResultType {}
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    public @interface AuthenticationResultType {}
 
     /**
      * Tag used to identify the {@link BiometricFragment} attached to the client activity/fragment.
@@ -432,7 +453,8 @@ public class BiometricPrompt {
          * this {@link androidx.biometric.BiometricPrompt.CryptoObject} to
          * {@link android.hardware.biometrics.BiometricPrompt}.
          */
-        long getOperationHandleCryptoObject() {
+        @RestrictTo(RestrictTo.Scope.LIBRARY)
+        public long getOperationHandleCryptoObject() {
             return mOperationHandle;
         }
     }
@@ -445,8 +467,9 @@ public class BiometricPrompt {
         private final CryptoObject mCryptoObject;
         @AuthenticationResultType private final int mAuthenticationType;
 
-        AuthenticationResult(
-                CryptoObject crypto, @AuthenticationResultType int authenticationType) {
+        @RestrictTo(RestrictTo.Scope.LIBRARY)
+        public AuthenticationResult(@Nullable CryptoObject crypto,
+                @AuthenticationResultType int authenticationType) {
             mCryptoObject = crypto;
             mAuthenticationType = authenticationType;
         }
@@ -1191,9 +1214,11 @@ public class BiometricPrompt {
             throw new IllegalArgumentException("CryptoObject cannot be null.");
         }
 
-        // Ensure that all allowed authenticators support crypto auth.
+        // Ensure that all allowed authenticators support crypto auth. |isIdentityCheckAvailable|
+        // is not important for this check.
         @BiometricManager.AuthenticatorTypes final int authenticators =
-                AuthenticatorUtils.getConsolidatedAuthenticators(info, crypto);
+                AuthenticatorUtils.getConsolidatedAuthenticators(info, crypto,
+                        false /*isIdentityCheckAvailable*/);
         if (AuthenticatorUtils.isWeakBiometricAllowed(authenticators)) {
             throw new IllegalArgumentException("Crypto-based authentication is not supported for "
                     + "Class 2 (Weak) biometrics.");

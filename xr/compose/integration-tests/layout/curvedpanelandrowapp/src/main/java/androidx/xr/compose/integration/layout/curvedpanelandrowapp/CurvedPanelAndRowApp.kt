@@ -59,6 +59,7 @@ import androidx.xr.compose.spatial.OrbiterEdge
 import androidx.xr.compose.spatial.Subspace
 import androidx.xr.compose.subspace.MainPanel
 import androidx.xr.compose.subspace.SpatialColumn
+import androidx.xr.compose.subspace.SpatialCurvedRow
 import androidx.xr.compose.subspace.SpatialLayoutSpacer
 import androidx.xr.compose.subspace.SpatialPanel
 import androidx.xr.compose.subspace.SpatialRow
@@ -84,6 +85,7 @@ class CurvedPanelAndRowApp : ComponentActivity() {
         isDebugInspectorInfoEnabled = true
     }
 
+    @SubspaceComposable
     @Composable
     fun PanelGrid() {
         var curvePercent by remember { mutableFloatStateOf(0.625f) }
@@ -105,7 +107,7 @@ class CurvedPanelAndRowApp : ComponentActivity() {
                     }
                 }
             }
-            SpatialRow(
+            SpatialCurvedRow(
                 modifier = SubspaceModifier.width(2000.dp).height(600.dp),
                 alignment = SpatialAlignment.BottomCenter,
                 curveRadius = curveRadius,

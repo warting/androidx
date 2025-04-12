@@ -22,7 +22,6 @@
  * modifying its settings.
  */
 
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 
@@ -30,10 +29,11 @@ plugins {
     id("AndroidXPlugin")
     id("AndroidXComposePlugin")
     id("com.android.library")
+    alias(libs.plugins.kotlinSerialization)
 }
 
 androidXMultiplatform {
-    android()
+    androidTarget()
     jvmStubs()
     linuxX64Stubs()
 
@@ -45,6 +45,7 @@ androidXMultiplatform {
                 implementation(libs.kotlinStdlib)
                 implementation("androidx.collection:collection:1.4.2")
                 api(project(":compose:runtime:runtime"))
+                api(project(":savedstate:savedstate-compose"))
             }
         }
 
@@ -114,7 +115,6 @@ androidx {
     description = "Compose components that allow saving and restoring the local ui state"
     legacyDisableKotlinStrictApiMode = true
     samples(project(":compose:runtime:runtime-saveable:runtime-saveable-samples"))
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
 }
 
 android {

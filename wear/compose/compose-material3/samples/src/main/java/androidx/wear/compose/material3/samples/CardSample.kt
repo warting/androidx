@@ -18,9 +18,12 @@ package androidx.wear.compose.material3.samples
 
 import androidx.annotation.Sampled
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -33,11 +36,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AppCard
 import androidx.wear.compose.material3.Card
@@ -48,6 +53,7 @@ import androidx.wear.compose.material3.OutlinedCard
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TitleCard
 
+@Preview
 @Sampled
 @Composable
 fun CardSample() {
@@ -166,6 +172,7 @@ fun TitleCardWithSubtitleAndTimeSample() {
     )
 }
 
+@Preview
 @Sampled
 @Composable
 fun TitleCardWithMultipleImagesSample() {
@@ -204,21 +211,15 @@ fun TitleCardWithMultipleImagesSample() {
 
 @Sampled
 @Composable
-fun TitleCardWithImageBackgroundSample() {
+fun TitleCardWithImageWithTimeAndTitleSample() {
     TitleCard(
         onClick = { /* Do something */ },
+        containerPainter =
+            CardDefaults.containerPainter(image = painterResource(id = R.drawable.backgroundimage)),
         title = { Text("Card title") },
+        subtitle = { Text("Subtitle") },
         time = { Text("Now") },
-        colors =
-            CardDefaults.imageCardColors(
-                containerPainter =
-                    CardDefaults.imageWithScrimBackgroundPainter(
-                        backgroundImagePainter = painterResource(id = R.drawable.backgroundimage)
-                    ),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                titleColor = MaterialTheme.colorScheme.onSurface
-            ),
-        contentPadding = CardDefaults.ImageContentPadding,
+        contentPadding = CardDefaults.CardWithContainerPainterContentPadding,
         modifier = Modifier.semantics { contentDescription = "Background image" }
     ) {
         Text("Card content")
@@ -232,6 +233,18 @@ fun OutlinedCardSample() {
         onClick = { /* Do something */ },
     ) {
         Text("Outlined card")
+    }
+}
+
+@Sampled
+@Composable
+fun ImageCardSample() {
+    Card(
+        onClick = { /* Do something */ },
+        containerPainter =
+            CardDefaults.containerPainter(image = painterResource(id = R.drawable.backgroundimage)),
+    ) {
+        Text("Image card")
     }
 }
 
@@ -268,5 +281,18 @@ fun OutlinedTitleCardSample() {
         border = CardDefaults.outlinedCardBorder(),
     ) {
         Text("Card content")
+    }
+}
+
+@Sampled
+@Preview
+@Composable
+fun CardFillContentSample() {
+    Card(
+        onClick = { /* Do something */ },
+        // Constrains the card to fill background up to the intrinsic height.
+        modifier = Modifier.height(IntrinsicSize.Min)
+    ) {
+        Text("Card", modifier = Modifier.fillMaxHeight().background(Color.Red))
     }
 }

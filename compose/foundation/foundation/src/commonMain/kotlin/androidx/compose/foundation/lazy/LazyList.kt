@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.lazy.layout.CacheWindowLogic
 import androidx.compose.foundation.lazy.layout.LazyLayout
 import androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScope
 import androidx.compose.foundation.lazy.layout.StickyItemsPlacement
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.offset
+import androidx.compose.ui.util.trace
 import kotlinx.coroutines.CoroutineScope
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -71,7 +73,7 @@ internal fun LazyList(
     /** The overscroll effect to render and dispatch events to */
     overscrollEffect: OverscrollEffect?,
     /** Number of items to layout before and after the visible items */
-    beyondBoundsItemCount: Int = 0,
+    beyondBoundsItemCount: Int = defaultLazyListBeyondBoundsItemCount(),
     /** The alignment to align items horizontally. Required when isVertical is true */
     horizontalAlignment: Alignment.Horizontal? = null,
     /** The vertical arrangement for items. Required when isVertical is true */
@@ -190,6 +192,7 @@ private fun rememberLazyListMeasurePolicy(
         contentPadding,
         reverseLayout,
         isVertical,
+        beyondBoundsItemCount,
         horizontalAlignment,
         verticalAlignment,
         horizontalArrangement,
@@ -384,9 +387,10 @@ private fun rememberLazyListMeasurePolicy(
                         )
                     }
                 )
+
             state.applyMeasureResult(measureResult, isLookingAhead)
             // apply keep around after updating the strategy with measure result.
-            (state.prefetchStrategy as? CacheWindowListPrefetchStrategy)?.keepAroundItems(
+            (state.prefetchStrategy as? CacheWindowLogic)?.keepAroundItems(
                 measureResult.visibleItemsInfo,
                 measuredItemProvider
             )
@@ -395,22 +399,26 @@ private fun rememberLazyListMeasurePolicy(
     }
 
 @OptIn(ExperimentalFoundationApi::class)
-private fun CacheWindowListPrefetchStrategy.keepAroundItems(
+private fun CacheWindowLogic.keepAroundItems(
     visibleItemsList: List<LazyListMeasuredItem>,
     measuredItemProvider: LazyListMeasuredItemProvider
 ) {
-    // only run if window and new layout info is available
-    if (hasValidBounds() && visibleItemsList.isNotEmpty()) {
-        val firstVisibleItemIndex = visibleItemsList.first().index
-        val lastVisibleItemIndex = visibleItemsList.last().index
-        // we must send a message in case of changing directions for items
-        // that were keep around and become prefetch forward
-        for (item in prefetchWindowStartIndex..<firstVisibleItemIndex) {
-            measuredItemProvider.keepAround(item)
-        }
+    trace("compose:lazy:cache_window:keepAroundItems") {
+        // only run if window and new layout info is available
+        if (hasValidBounds() && visibleItemsList.isNotEmpty()) {
+            val firstVisibleItemIndex = visibleItemsList.first().index
+            val lastVisibleItemIndex = visibleItemsList.last().index
+            // we must send a message in case of changing directions for items
+            // that were keep around and become prefetch forward
+            for (item in prefetchWindowStartLine..<firstVisibleItemIndex) {
+                measuredItemProvider.keepAround(item)
+            }
 
-        for (item in (lastVisibleItemIndex + 1)..prefetchWindowEndIndex) {
-            measuredItemProvider.keepAround(item)
+            for (item in (lastVisibleItemIndex + 1)..prefetchWindowEndLine) {
+                measuredItemProvider.keepAround(item)
+            }
         }
     }
 }
+
+@Composable internal expect fun defaultLazyListBeyondBoundsItemCount(): Int

@@ -59,6 +59,10 @@ class ProjectDependencyGraph {
         return allProjects.keySet()
     }
 
+    Map<String, Set<String>> allProjectConsumers() {
+        return projectConsumers
+    }
+
     /**
      * Adds the given pair to the list of known projects
      *
@@ -271,6 +275,10 @@ class ProjectDependencyGraph {
                 if (publishedLibrary.matcher(line).find()) {
                     publishedLibraryProjects.add(projectPath)
                 }
+                Matcher publishProject = publishProjectReference.matcher(line)
+                if (publishProject.find()) {
+                    links.add(publishProject.group(1))
+                }
             }
         } else if (!projectDir.exists()) {
             // Remove file existence checking when https://github.com/gradle/gradle/issues/25531 is
@@ -298,6 +306,7 @@ class ProjectDependencyGraph {
                     "|PUBLISHED_TEST_LIBRARY|PUBLISHED_PROTO_LIBRARY|PUBLISHED_KOTLIN_ONLY_TEST_LIBRARY)|" +
                     "publish = Publish\\.SNAPSHOT_AND_RELEASE)"
     )
+    private static Pattern publishProjectReference = Pattern.compile("\"(.*):publish\"")
     private static List<String> buildFileNames = ["build.gradle", "build.gradle.kts"]
 }
 
@@ -306,3 +315,7 @@ ProjectDependencyGraph createProjectDependencyGraph(Settings settings, boolean c
 }
 // export a function to create ProjectDependencyGraph
 ext.createProjectDependencyGraph = this.&createProjectDependencyGraph
+
+ext.allProjectsConsumers = { ProjectDependencyGraph graph ->
+    graph.allProjectConsumers()
+}

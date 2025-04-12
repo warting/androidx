@@ -16,9 +16,7 @@
 
 package androidx.appfunctions.compiler.processors
 
-import androidx.appfunctions.compiler.AppFunctionCompiler
 import androidx.appfunctions.compiler.testings.CompilationTestHelper
-import com.google.common.truth.Truth.assertThat
 import java.io.File
 import org.junit.Before
 import org.junit.Test
@@ -31,23 +29,152 @@ class AppFunctionSerializableProcessorTest {
     fun setup() {
         compilationTestHelper =
             CompilationTestHelper(
-                testFileSrcDir = File("src/test/test-data/entities"),
+                testFileSrcDir = File("src/test/test-data/input"),
                 goldenFileSrcDir = File("src/test/test-data/output"), // unused
-                symbolProcessorProviders = listOf(AppFunctionCompiler.Provider())
+                proxySourceFileNames =
+                    listOf(
+                        "androidx/appfunctions/internal/serializableproxies/AppFunctionLocalDateTime.KT",
+                        "androidx/appfunctions/internal/serializableproxies/AppFunctionUri.KT",
+                    ),
+                symbolProcessorProviders = listOf(AppFunctionSerializableProcessor.Provider())
             )
     }
 
+    // TODO(b/392587953): break down test by parameter types (e.g. EntityWithPrimitive,
+    //  EntityWithNullablePrimitive) when all types are supported.
     @Test
-    fun testResolveAppFunctionSerializables_validProperties_success() {
+    fun testProcessor_validProperties_success() {
         val report =
             compilationTestHelper.compileAll(
-                sourceFileNames = listOf("EntityWithValidProperties.KT")
+                sourceFileNames = listOf("EntityWithValidProperties.KT", "InputSerializable.KT")
             )
-        assertThat(report.isSuccess).isTrue()
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$EntityWithValidPropertiesFactory.kt",
+            goldenFileName = "\$EntityWithValidPropertiesFactory.KT"
+        )
     }
 
     @Test
-    fun testResolveAppFunctionSerializables_nonPropertyParameter_fails() {
+    fun testProcessor_validNullableProperties_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames =
+                    listOf("EntityWithValidNullableProperties.KT", "InputSerializable.KT")
+            )
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$EntityWithValidNullablePropertiesFactory.kt",
+            goldenFileName = "\$EntityWithValidNullablePropertiesFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_validInheritedProperties_success() {
+        val report =
+            compilationTestHelper.compileAll(sourceFileNames = listOf("DerivedSerializable.KT"))
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$DerivedSerializableFactory.kt",
+            goldenFileName = "\$DerivedSerializableFactory.KT"
+        )
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$LongBaseSerializableFactory.kt",
+            goldenFileName = "\$LongBaseSerializableFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_validNestedInheritedProperties_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("NestedDerivedSerializable.KT")
+            )
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$NestedDerivedSerializableFactory.kt",
+            goldenFileName = "\$NestedDerivedSerializableFactory.KT"
+        )
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$NestedBaseSerializableFactory.kt",
+            goldenFileName = "\$NestedBaseSerializableFactory.KT"
+        )
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$NonNestedChildSerializableFactory.kt",
+            goldenFileName = "\$NonNestedChildSerializableFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_badlyInheritedSerializableProperties_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("SubClassRenamedPropertySerializable.KT")
+            )
+
+        compilationTestHelper.assertErrorWithMessage(
+            report,
+            "All parameters in @AppFunctionSerializable supertypes must be present in subtype"
+        )
+    }
+
+    @Test
+    fun testProcessor_badlyInheritedCapabilityProperties_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("SubClassRenamedCapabilityProperty.KT")
+            )
+
+        compilationTestHelper.assertErrorWithMessage(
+            report,
+            "All Properties in @AppFunctionSchemaCapability supertypes must be present in subtype"
+        )
+    }
+
+    @Test
+    fun testProcessor_differentPackageSerializableProperty_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames =
+                    listOf(
+                        "EntityWithDiffPackageSerializableProperty.KT",
+                        "DiffPackageSerializable.KT"
+                    )
+            )
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$EntityWithDiffPackageSerializablePropertyFactory.kt",
+            goldenFileName = "\$EntityWithDiffPackageSerializablePropertyFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_recursiveSerializable_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames =
+                    listOf(
+                        "RecursiveSerializable.KT",
+                    )
+            )
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$RecursiveSerializableFactory.kt",
+            goldenFileName = "\$RecursiveSerializableFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_nonPropertyParameter_fails() {
         val report =
             compilationTestHelper.compileAll(
                 sourceFileNames = listOf("EntityWithNonPropertyParameter.KT")
@@ -59,34 +186,107 @@ class AppFunctionSerializableProcessorTest {
     }
 
     @Test
-    fun testResolveAppFunctionSerializables_invalidPropertyType_fails() {
+    fun testProcessor_invalidPropertyType_fails() {
         val report =
             compilationTestHelper.compileAll(
                 sourceFileNames = listOf("EntityWithInvalidParameterType.KT")
             )
         compilationTestHelper.assertErrorWithMessage(
             report,
-            "AppFunctionSerializable properties must be one of the following types:\n" +
-                "kotlin.Int,kotlin.Long,kotlin.Float,kotlin.Double,kotlin.Boolean,kotlin.String," +
-                "kotlin.IntArray,kotlin.LongArray,kotlin.FloatArray,kotlin.DoubleArray," +
-                "kotlin.BooleanArray,kotlin.collections.List<kotlin.String>, an @AppFunctionSerializable or a list of @AppFunctionSerializable\n" +
-                "but found kotlin.Any"
+            "AppFunctionSerializable properties must be one of the following types:\n"
         )
     }
 
     @Test
-    fun testResolveAppFunctionSerializables_invalidPropertyListType_fails() {
+    fun testProcessor_invalidPropertyListType_fails() {
         val report =
             compilationTestHelper.compileAll(
                 sourceFileNames = listOf("EntityWithInvalidListParameterType.KT")
             )
         compilationTestHelper.assertErrorWithMessage(
             report,
-            "AppFunctionSerializable properties must be one of the following types:\n" +
-                "kotlin.Int,kotlin.Long,kotlin.Float,kotlin.Double,kotlin.Boolean,kotlin.String," +
-                "kotlin.IntArray,kotlin.LongArray,kotlin.FloatArray,kotlin.DoubleArray," +
-                "kotlin.BooleanArray,kotlin.collections.List<kotlin.String>, an @AppFunctionSerializable or a list of @AppFunctionSerializable\n" +
-                "but found kotlin.collections.List<kotlin.Any>"
+            "AppFunctionSerializable properties must be one of the following types:\n"
+        )
+    }
+
+    @Test
+    fun testProcessor_validAppFunctionSerializableFactory_succeeds() {
+        val report = compilationTestHelper.compileAll(sourceFileNames = listOf())
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$LocalDateTimeFactory.kt",
+            goldenFileName = "\$LocalDateTimeFactory.KT"
+        )
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$UriFactory.kt",
+            goldenFileName = "\$UriFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_validSerializableWithProxyProperties_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("SerializableWithProxyType.KT")
+            )
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "\$SerializableWithProxyTypeFactory.kt",
+            goldenFileName = "\$SerializableWithProxyTypeFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_serializableProxyMissingToMethod_fails() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("SerializableProxyMissingToMethod.KT")
+            )
+        compilationTestHelper.assertErrorWithMessage(
+            report,
+            "Class must have exactly one member function: toLocalDateTime"
+        )
+    }
+
+    @Test
+    fun testProcessor_serializableProxyMissingFromMethod_fails() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("SerializableProxyMissingFromMethod.KT")
+            )
+        compilationTestHelper.assertErrorWithMessage(
+            report,
+            "Companion Class must have exactly one member function: fromLocalDateTime"
+        )
+    }
+
+    @Test
+    fun testProcessor_genericFactory_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("FunctionWithGenericSerializable.KT")
+            )
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "${'$'}SetFieldFactory.kt",
+            goldenFileName = "${'$'}SetFieldFactory.KT"
+        )
+    }
+
+    @Test
+    fun testProcessor_genericSerializableFieldFactory_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("FunctionWithGenericSerializable.KT")
+            )
+
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "${'$'}UpdateNoteParamsFactory.kt",
+            goldenFileName = "${'$'}UpdateNoteParamsFactory.KT"
         )
     }
 }

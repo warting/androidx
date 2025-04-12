@@ -20,17 +20,24 @@ import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
+import android.os.DeadObjectException
 import android.util.Size
 import androidx.annotation.AnyThread
 import androidx.annotation.GuardedBy
 import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
 import androidx.pdf.PdfDocument
+import androidx.pdf.exceptions.RequestFailedException
+import androidx.pdf.exceptions.RequestMetadata
+import androidx.pdf.util.PAGE_BITMAP_REQUEST_NAME
+import androidx.pdf.util.PAGE_BITMAP_TILE_REQUEST_NAME
+import androidx.pdf.util.PAGE_RELEASE_REQUEST_NAME
 import androidx.pdf.util.RectUtils
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -52,7 +59,7 @@ import kotlinx.coroutines.launch
  */
 @MainThread
 internal class BitmapFetcher(
-    pageNum: Int,
+    private val pageNum: Int,
     private val pageSize: Point,
     pdfDocument: PdfDocument,
     private val backgroundScope: CoroutineScope,
@@ -62,6 +69,8 @@ internal class BitmapFetcher(
      */
     private val maxBitmapSizePx: Point,
     private val onPageUpdate: () -> Unit,
+    /** Error flow for propagating error occurred while processing to [PdfView]. */
+    private val errorFlow: MutableSharedFlow<Throwable>
 ) : AutoCloseable {
 
     /**
@@ -186,7 +195,22 @@ internal class BitmapFetcher(
         pageBitmaps = null
         fetchingWorkHandle?.cancel()
         fetchingWorkHandle = null
-        bitmapSource.close()
+        try {
+            bitmapSource.close()
+        } catch (e: DeadObjectException) {
+            val exception =
+                RequestFailedException(
+                    requestMetadata =
+                        RequestMetadata(
+                            requestName = PAGE_RELEASE_REQUEST_NAME,
+                            pageRange = pageNum..pageNum
+                        ),
+                    throwable = e,
+                    // Release page is a fire-and-forget request, no need to show error on UI
+                    showError = false
+                )
+            errorFlow.tryEmit(exception)
+        }
     }
 
     /** Fetch a [FullPageBitmap] */
@@ -240,9 +264,22 @@ internal class BitmapFetcher(
     private fun fetchFullPageBitmap(size: Size, onReady: (Bitmap) -> Unit): Job {
         return backgroundScope.launch {
             ensureActive()
-            val bitmap = bitmapSource.getBitmap(size)
-            ensureActive()
-            onReady(bitmap)
+            try {
+                val bitmap = bitmapSource.getBitmap(size)
+                ensureActive()
+                onReady(bitmap)
+            } catch (e: DeadObjectException) {
+                val exception =
+                    RequestFailedException(
+                        requestMetadata =
+                            RequestMetadata(
+                                requestName = PAGE_BITMAP_REQUEST_NAME,
+                                pageRange = pageNum..pageNum
+                            ),
+                        throwable = e
+                    )
+                errorFlow.emit(exception)
+            }
         }
     }
 
@@ -259,14 +296,32 @@ internal class BitmapFetcher(
             backgroundScope.launch {
                 prevJob?.join()
                 ensureActive()
-                val bitmap =
-                    bitmapSource.getBitmap(
-                        Size((pageSize.x * scale).roundToInt(), (pageSize.y * scale).roundToInt()),
-                        tile.rectPx
-                    )
-                ensureActive()
-                tile.bitmap = bitmap
-                onPageUpdate()
+                try {
+                    val bitmap =
+                        bitmapSource.getBitmap(
+                            Size(
+                                (pageSize.x * scale).roundToInt(),
+                                (pageSize.y * scale).roundToInt()
+                            ),
+                            tile.rectPx
+                        )
+                    ensureActive()
+                    tile.bitmap = bitmap
+                    onPageUpdate()
+                } catch (e: DeadObjectException) {
+                    // Service was disconnected.
+                    val exception =
+                        RequestFailedException(
+                            requestMetadata =
+                                RequestMetadata(
+                                    requestName = PAGE_BITMAP_TILE_REQUEST_NAME,
+                                    pageRange = pageNum..pageNum
+                                ),
+                            throwable = e,
+                        )
+                    errorFlow.emit(exception)
+                    return@launch
+                }
             }
         return job
     }
@@ -343,10 +398,18 @@ internal class TileBoardRequestHandle(
 /** Represents the [Bitmap] or [Bitmap]s used to render this page */
 internal sealed interface PageContents {
     val bitmapScale: Float
+
+    val needsWhiteBackground: Boolean
 }
 
 /** A singular [Bitmap] depicting the full page, when full page rendering is used */
-internal class FullPageBitmap(val bitmap: Bitmap, override val bitmapScale: Float) : PageContents
+internal class FullPageBitmap(val bitmap: Bitmap, override val bitmapScale: Float) : PageContents {
+    /**
+     * A [FullPageBitmap] never requires a white background, as we don't instantiate one without a
+     * [Bitmap] covering the whole page
+     */
+    override val needsWhiteBackground: Boolean = false
+}
 
 /**
  * A set of [Bitmap]s that depict the full page as a rectangular grid of individual bitmap tiles.
@@ -371,6 +434,13 @@ internal class TileBoard(
 
     /** The [Tile]s in this board */
     val tiles = Array(numRows * numCols) { index -> Tile(index) }
+
+    /**
+     * We need to draw a white background behind a [androidx.pdf.view.TileBoard] until we have a
+     * background [Bitmap] covering the full page
+     */
+    override val needsWhiteBackground: Boolean
+        get() = fullPageBitmap == null
 
     /** An individual [Tile] in this [TileBoard] */
     inner class Tile(val index: Int) {

@@ -16,29 +16,33 @@
 
 package androidx.tracing.driver
 
+import androidx.annotation.RestrictTo
+
 internal const val QUEUE_CAPACITY = 64
 
 /** An actual thread safe queue implementation. */
-internal class Queue<T>(capacity: Int = QUEUE_CAPACITY) {
-    private val lock = Lock()
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+public class Queue<T>(capacity: Int = QUEUE_CAPACITY) {
     private val queue: ArrayDeque<T> = ArrayDeque(capacity)
 
-    internal fun isEmpty(): Boolean {
-        return lock.withLock { queue.isEmpty() }
+    public fun isEmpty(): Boolean {
+        return synchronized(queue) { queue.isEmpty() }
     }
 
-    internal fun isNotEmpty(): Boolean {
-        return lock.withLock { queue.isNotEmpty() }
+    public fun isNotEmpty(): Boolean {
+        return synchronized(queue) { queue.isNotEmpty() }
     }
 
-    internal val size
-        get() = { lock.withLock { queue.size } }
+    public val size: Int
+        get() {
+            return synchronized(queue) { queue.size }
+        }
 
-    internal fun addFirst(value: T) {
-        lock.withLock { queue.addFirst(value) }
+    public fun addLast(value: T) {
+        synchronized(queue) { queue.addLast(value) }
     }
 
-    internal fun removeFirstOrNull(): T? {
-        return lock.withLock { queue.removeFirstOrNull() }
+    public fun removeFirstOrNull(): T? {
+        return synchronized(queue) { queue.removeFirstOrNull() }
     }
 }

@@ -16,7 +16,7 @@ plugins {
     id("androidx.baselineprofile")
 }
 androidXMultiplatform {
-    android()
+    androidTarget()
     desktop()
     mac()
     linux()
@@ -43,7 +43,7 @@ androidXMultiplatform {
             }
         }
 
-        jvmCommonMain {
+        jvmMain {
             dependsOn(commonMain)
             dependencies {
                 api("androidx.arch.core:core-common:2.2.0")
@@ -51,7 +51,7 @@ androidXMultiplatform {
         }
 
         desktopMain {
-            dependsOn(jvmCommonMain)
+            dependsOn(jvmMain)
         }
 
         desktopTest {
@@ -62,10 +62,10 @@ androidXMultiplatform {
         }
 
         androidMain {
-            dependsOn(jvmCommonMain)
+            dependsOn(jvmMain)
             dependencies {
                 api(libs.kotlinCoroutinesAndroid)
-                implementation(project(":core:core-viewtree"))
+                implementation("androidx.core:core-viewtree:1.0.0")
                 implementation("androidx.arch.core:core-runtime:2.2.0")
                 implementation("androidx.profileinstaller:profileinstaller:1.4.0")
             }
@@ -82,7 +82,7 @@ androidXMultiplatform {
         androidInstrumentedTest {
             dependsOn(commonTest)
             dependencies {
-                implementation(project(":core:core-viewtree"))
+                implementation("androidx.core:core-viewtree:1.0.0")
                 implementation(libs.junit)
                 implementation(libs.truth)
                 implementation(libs.testExtJunit)
@@ -92,12 +92,12 @@ androidXMultiplatform {
             }
         }
 
-        nonJvmCommonMain {
+        nonJvmMain {
             dependsOn(commonMain)
         }
 
         nativeMain {
-            dependsOn(nonJvmCommonMain)
+            dependsOn(nonJvmMain)
 
             // Required for WeakReference usage
             languageSettings.optIn("kotlin.experimental.ExperimentalNativeApi")

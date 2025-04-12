@@ -22,10 +22,9 @@ import java.io.OutputStream
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 import perfetto.protos.AppendTraceDataResult
 import perfetto.protos.ComputeMetricArgs
 import perfetto.protos.ComputeMetricResult
@@ -34,7 +33,8 @@ import perfetto.protos.StatusResult
 
 @OptIn(ExperimentalTraceProcessorApi::class)
 internal class TraceProcessorHttpServer(
-    private val serverLifecycleManager: ServerLifecycleManager
+    private val serverLifecycleManager: ServerLifecycleManager,
+    private val timeoutMs: Long,
 ) {
     companion object {
         private const val HTTP_ADDRESS = "http://localhost"
@@ -47,7 +47,6 @@ internal class TraceProcessorHttpServer(
         private const val PATH_STATUS = "/status"
         private const val PATH_RESTORE_INITIAL_TABLES = "/restore_initial_tables"
         private val WAIT_INTERVAL = 5.milliseconds
-        private val READ_TIMEOUT = 30.seconds
 
         // Note that trace processor http server has a hard limit of 64Mb for payload size.
         // https://cs.android.com/android/platform/superproject/+/master:external/perfetto/src/base/http/http_server.cc;l=33
@@ -63,7 +62,7 @@ internal class TraceProcessorHttpServer(
      * @throws IllegalStateException if the server is not running by the end of the timeout.
      */
     @Suppress("BanThreadSleep") // needed for awaiting trace processor instance
-    fun startServer(timeout: Duration) {
+    fun startServer() {
         if (hasStarted) {
             log("Tried to start a trace shell processor that is already running.")
         } else {
@@ -73,7 +72,7 @@ internal class TraceProcessorHttpServer(
             while (!isRunning()) {
                 Thread.sleep(WAIT_INTERVAL.toLong(DurationUnit.MILLISECONDS))
                 elapsed += WAIT_INTERVAL
-                if (elapsed >= timeout) {
+                if (elapsed >= timeoutMs.toDuration(DurationUnit.MILLISECONDS)) {
                     throw IllegalStateException(serverLifecycleManager.timeoutMessage())
                 }
             }
@@ -191,18 +190,30 @@ internal class TraceProcessorHttpServer(
     ): T {
         with(URL("$HTTP_ADDRESS:${port}$url").openConnection() as HttpURLConnection) {
             requestMethod = method
-            readTimeout = READ_TIMEOUT.toInt(DurationUnit.MILLISECONDS)
+            readTimeout = timeoutMs.toInt()
             setRequestProperty("Content-Type", contentType)
             if (encodeBlock != null) {
                 doOutput = true
                 encodeBlock(outputStream)
                 outputStream.close()
             }
-            val value = decodeBlock(inputStream)
+
             if (responseCode != 200) {
-                throw IllegalStateException(responseMessage)
+                val exceptionMessage = "${responseCode}:${responseMessage}."
+                if (usingProxy()) {
+                    throw IllegalStateException(
+                        "$exceptionMessage " +
+                            "The request executed with proxying, " +
+                            "perhaps http-proxy are configured on device incorrectly. " +
+                            "Please, try to add ${HTTP_ADDRESS}:${port} to exclusion list, " +
+                            "or to verify other routing rules."
+                    )
+                }
+
+                throw IllegalStateException(exceptionMessage)
             }
-            return value
+
+            return decodeBlock(inputStream)
         }
     }
 }

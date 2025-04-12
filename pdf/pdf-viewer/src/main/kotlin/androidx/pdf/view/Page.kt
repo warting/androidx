@@ -25,13 +25,19 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.DeadObjectException
 import androidx.annotation.MainThread
 import androidx.annotation.RestrictTo
 import androidx.annotation.VisibleForTesting
 import androidx.pdf.PdfDocument
+import androidx.pdf.exceptions.RequestFailedException
+import androidx.pdf.exceptions.RequestMetadata
+import androidx.pdf.util.PAGE_CONTENTS_REQUEST_NAME
+import androidx.pdf.util.PAGE_LINKS_REQUEST_NAME
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
 /** A single PDF page that knows how to render and draw itself */
@@ -56,7 +62,9 @@ internal class Page(
     /** A function to call when the [PdfView] hosting this [Page] ought to invalidate itself */
     private val onPageUpdate: () -> Unit,
     /** A function to call when page text is ready (invoked with page number). */
-    private val onPageTextReady: ((Int) -> Unit)
+    private val onPageTextReady: ((Int) -> Unit),
+    /** Error flow for propagating error occurred while processing to [PdfView]. */
+    private val errorFlow: MutableSharedFlow<Throwable>
 ) {
     init {
         require(pageNum >= 0) { "Invalid negative page" }
@@ -102,7 +110,8 @@ internal class Page(
                     pdfDocument,
                     backgroundScope,
                     maxBitmapSizePx,
-                    onPageUpdate
+                    onPageUpdate,
+                    errorFlow
                 )
         }
         bitmapFetcher?.maybeFetchNewBitmaps(zoom, viewArea)
@@ -141,18 +150,32 @@ internal class Page(
             backgroundScope
                 .launch {
                     ensureActive()
-                    pageText =
-                        pdfDocument.getPageContent(pageNum)?.textContents?.joinToString { it.text }
-                    onPageTextReady.invoke(pageNum)
+                    try {
+                        pageText =
+                            pdfDocument.getPageContent(pageNum)?.textContents?.joinToString {
+                                it.text
+                            }
+                        onPageTextReady.invoke(pageNum)
+                    } catch (e: DeadObjectException) {
+                        val exception =
+                            RequestFailedException(
+                                requestMetadata =
+                                    RequestMetadata(
+                                        requestName = PAGE_CONTENTS_REQUEST_NAME,
+                                        pageRange = pageNum..pageNum
+                                    ),
+                                throwable = e
+                            )
+                        errorFlow.emit(exception)
+                    }
                 }
                 .also { it.invokeOnCompletion { fetchPageTextJob = null } }
     }
 
     fun draw(canvas: Canvas, locationInView: Rect, highlights: List<Highlight>) {
         val pageBitmaps = bitmapFetcher?.pageBitmaps
-        if (pageBitmaps == null) {
+        if (pageBitmaps == null || pageBitmaps.needsWhiteBackground) {
             canvas.drawRect(locationInView, BLANK_PAINT)
-            return
         }
         if (pageBitmaps is FullPageBitmap) {
             draw(pageBitmaps, canvas, locationInView)
@@ -175,7 +198,20 @@ internal class Page(
             backgroundScope
                 .launch {
                     ensureActive()
-                    links = pdfDocument.getPageLinks(pageNum)
+                    try {
+                        links = pdfDocument.getPageLinks(pageNum)
+                    } catch (e: DeadObjectException) {
+                        val exception =
+                            RequestFailedException(
+                                requestMetadata =
+                                    RequestMetadata(
+                                        requestName = PAGE_LINKS_REQUEST_NAME,
+                                        pageRange = pageNum..pageNum
+                                    ),
+                                throwable = e
+                            )
+                        errorFlow.emit(exception)
+                    }
                 }
                 .also { it.invokeOnCompletion { fetchLinksJob = null } }
     }

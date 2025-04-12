@@ -15,7 +15,7 @@
  */
 
 // Impl classes from kotlin.library.abi.impl are necessary to instantiate parsed declarations
-@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE") // b/407928023
 @file:OptIn(ExperimentalLibraryAbiReader::class)
 
 package androidx.binarycompatibilityvalidator
@@ -447,7 +447,7 @@ private val setterNameRegex = Regex("^<set\\-")
 private val classModifierRegex = Regex("^(inner|value|fun|open)")
 private val functionKindRegex = Regex("^(constructor|fun)")
 private val functionModifierRegex = Regex("^(inline|suspend)")
-private val abiQualifiedNameRegex = Regex("^[a-zA-Z0-9\\.]+\\/[a-zA-Z0-9]+(\\.[a-zA-Z0-9]+)?")
+private val abiQualifiedNameRegex = Regex("^[a-zA-Z0-9\\.]+\\/[a-zA-Z0-9]+(\\.[a-zA-Z0-9]+)*")
 private val openAngleBracketRegex = Regex("^<")
 private val closeAngleBracketRegex = Regex("^>")
 private val openCurlyBraceRegex = Regex("^\\{")

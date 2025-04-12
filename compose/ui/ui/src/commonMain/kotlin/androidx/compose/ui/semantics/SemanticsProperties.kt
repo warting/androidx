@@ -20,6 +20,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.autofill.ContentDataType
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -223,6 +224,9 @@ object SemanticsProperties {
     /** @see SemanticsPropertyReceiver.isShowingTextSubstitution */
     val IsShowingTextSubstitution = SemanticsPropertyKey<Boolean>("IsShowingTextSubstitution")
 
+    /** @see SemanticsPropertyReceiver.inputText */
+    val InputText = AccessibilityKey<AnnotatedString>(name = "InputText")
+
     /** @see SemanticsPropertyReceiver.editableText */
     val EditableText = AccessibilityKey<AnnotatedString>(name = "EditableText")
 
@@ -252,6 +256,17 @@ object SemanticsProperties {
 
     /** @see SemanticsPropertyReceiver.maxTextLength */
     val MaxTextLength = SemanticsPropertyKey<Int>("MaxTextLength")
+
+    /** @see SemanticsPropertyReceiver.shape */
+    val Shape =
+        SemanticsPropertyKey<Shape>(
+            name = "Shape",
+            isImportantForAccessibility = false,
+            mergePolicy = { parentValue, _ ->
+                // Never merge shapes
+                parentValue
+            }
+        )
 }
 
 /**
@@ -449,15 +464,17 @@ private fun <T> throwSemanticsGetNotSupported(): T {
     )
 }
 
-internal fun <T> AccessibilityKey(name: String) =
+@Suppress("NOTHING_TO_INLINE")
+// inline to avoid different static initialization order on different targets.
+// See https://youtrack.jetbrains.com/issue/KT-65040 for more information.
+internal inline fun <T> AccessibilityKey(name: String) =
     SemanticsPropertyKey<T>(name = name, isImportantForAccessibility = true)
 
-internal fun <T> AccessibilityKey(name: String, mergePolicy: (T?, T) -> T?) =
-    SemanticsPropertyKey<T>(
-        name = name,
-        isImportantForAccessibility = true,
-        mergePolicy = mergePolicy
-    )
+@Suppress("NOTHING_TO_INLINE")
+// inline to avoid different static initialization order on different targets
+// See https://youtrack.jetbrains.com/issue/KT-65040 for more information.
+internal inline fun <T> AccessibilityKey(name: String, noinline mergePolicy: (T?, T) -> T?) =
+    SemanticsPropertyKey(name = name, isImportantForAccessibility = true, mergePolicy = mergePolicy)
 
 /**
  * Standard accessibility action.
@@ -1022,9 +1039,19 @@ var SemanticsPropertyReceiver.isShowingTextSubstitution by
     SemanticsProperties.IsShowingTextSubstitution
 
 /**
- * Input text of the text field with visual transformation applied to it. It must be a real text
- * entered by the user with visual transformation applied on top of the input text instead of a
- * developer-set content description.
+ * The raw value of the text field after input transformations have been applied.
+ *
+ * This is an actual user input of the fields, e.g. a real password, after any input transformations
+ * that might change or reject that input have been applied. This value is not affected by visual
+ * transformations.
+ */
+var SemanticsPropertyReceiver.inputText by SemanticsProperties.InputText
+
+/**
+ * A visual value of the text field after output transformations that change the visual
+ * representation of the field's state have been applied.
+ *
+ * This is the value displayed to the user, for example "*******" in a password field.
  */
 var SemanticsPropertyReceiver.editableText by SemanticsProperties.EditableText
 
@@ -1103,6 +1130,9 @@ fun SemanticsPropertyReceiver.indexForKey(mapping: (Any) -> Int) {
  * this value is -1, signifying there is no maximum text length limit.
  */
 var SemanticsPropertyReceiver.maxTextLength by SemanticsProperties.MaxTextLength
+
+/** The shape of the UI element if it's different from the bounding rectangle. */
+var SemanticsPropertyReceiver.shape by SemanticsProperties.Shape
 
 /**
  * The node is marked as a collection of horizontally or vertically stacked selectable elements.
@@ -1200,7 +1230,7 @@ fun SemanticsPropertyReceiver.scrollToIndex(label: String? = null, action: (Int)
 /**
  * Action to autofill a TextField.
  *
- * Expected to be used in conjunction with contentType and contentDataType properties.
+ * Expected to be used in conjunction with [contentType] and [contentDataType] properties.
  *
  * @param label Optional label for this action.
  * @param action Action to be performed when the [SemanticsActions.OnAutofillText] is called.

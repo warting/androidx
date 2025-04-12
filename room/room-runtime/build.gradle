@@ -23,7 +23,6 @@
  */
 
 
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -70,7 +69,7 @@ android {
 }
 
 androidXMultiplatform {
-    android()
+    androidTarget()
     ios() {
         // Link to sqlite3 available in iOS
         binaries.configureEach {
@@ -227,9 +226,5 @@ androidx {
     description = "Android Room-Runtime"
     legacyDisableKotlinStrictApiMode = true
     metalavaK2UastEnabled = false
-    kotlinTarget = KotlinTarget.KOTLIN_2_0
 }
 
-ksp {
-    useKsp2 = true
-}

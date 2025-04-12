@@ -82,6 +82,26 @@ class RememberSaveableTest {
     }
 
     @Test
+    fun restoreWithSerializer() {
+        var holder: Holder? = null
+        restorationTester.setContent {
+            holder = rememberSaveable(serializer = HolderSerializer) { Holder(0) }
+        }
+
+        assertThat(holder).isEqualTo(Holder(0))
+
+        rule.runOnUiThread {
+            holder!!.value = 1
+            // we null it to ensure recomposition happened
+            holder = null
+        }
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        assertThat(holder).isEqualTo(Holder(1))
+    }
+
+    @Test
     fun canBeSavedFromRegistryIsUsed() {
         var canBeSavedCalledWith: Any? = null
 
@@ -301,7 +321,9 @@ class RememberSaveableTest {
         rule.setContent {
             WrapRegistry(wrap = wrapRegistryLambda) {
                 if (doEmit) {
-                    rememberSaveable { 1 }
+                    // <Int> prevents coercion to Unit in K2
+                    // https://youtrack.jetbrains.com/issue/KT-76579
+                    rememberSaveable<Int> { 1 }
                 }
             }
         }

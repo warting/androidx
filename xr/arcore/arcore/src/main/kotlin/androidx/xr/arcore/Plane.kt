@@ -17,7 +17,9 @@
 package androidx.xr.arcore
 
 import androidx.annotation.RestrictTo
+import androidx.xr.runtime.PlaneTrackingMode
 import androidx.xr.runtime.Session
+import androidx.xr.runtime.TrackingState
 import androidx.xr.runtime.internal.Anchor as RuntimeAnchor
 import androidx.xr.runtime.internal.AnchorResourcesExhaustedException
 import androidx.xr.runtime.internal.Plane as RuntimePlane
@@ -39,10 +41,18 @@ internal constructor(
 ) : Trackable<Plane.State>, Updatable {
 
     public companion object {
-        /** Emits the planes that are currently being tracked in the [session]. */
+        /**
+         * Emits the planes that are currently being tracked in the [session].
+         *
+         * @throws [IllegalStateException] if [PlaneTrackingMode] is set to Disabled.
+         */
         @JvmStatic
-        public fun subscribe(session: Session): StateFlow<Collection<Plane>> =
-            session.state
+        public fun subscribe(session: Session): StateFlow<Collection<Plane>> {
+            check(session.config.planeTracking != PlaneTrackingMode.Disabled) {
+                "Config.PlaneTrackingMode is set to Disabled."
+            }
+
+            return session.state
                 .transform { state ->
                     state.perceptionState?.let { perceptionState ->
                         emit(perceptionState.trackables.filterIsInstance<Plane>())
@@ -54,6 +64,7 @@ internal constructor(
                     session.state.value.perceptionState?.trackables?.filterIsInstance<Plane>()
                         ?: emptyList(),
                 )
+        }
     }
 
     /**
@@ -64,7 +75,8 @@ internal constructor(
      * @property centerPose The pose of the center of the detected plane.
      * @property extents The dimensions of the detected plane.
      * @property subsumedBy If this plane has been subsumed, returns the plane this plane was merged
-     *   into.
+     *   into. If the subsuming plane is also subsumed by another plane, this plane will continue to
+     *   be subsumed by the former.
      * @property vertices The 2D vertices of a convex polygon approximating the detected plane.
      */
     public class State(
@@ -166,7 +178,19 @@ internal constructor(
     public val type: Type
         get() = typeFromRuntimeType()
 
+    /**
+     * Creates an [Anchor] that is attached to this trackable, using the given initial [pose] in the
+     * world coordinate space.
+     *
+     * @throws [IllegalStateException] if [PlaneTrackingMode] is set to Disabled.
+     */
     override fun createAnchor(pose: Pose): AnchorCreateResult {
+        check(
+            xrResourceManager.lifecycleManager.config.planeTracking != PlaneTrackingMode.Disabled
+        ) {
+            "Config.PlaneTrackingMode is set to Disabled."
+        }
+
         val runtimeAnchor: RuntimeAnchor
         try {
             runtimeAnchor = runtimePlane.createAnchor(pose)

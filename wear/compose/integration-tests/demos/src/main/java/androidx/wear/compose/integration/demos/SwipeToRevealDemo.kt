@@ -41,21 +41,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.ExpandableState
 import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
-import androidx.wear.compose.foundation.RevealActionType
-import androidx.wear.compose.foundation.RevealState
-import androidx.wear.compose.foundation.RevealValue
 import androidx.wear.compose.foundation.SwipeToDismissBoxState
 import androidx.wear.compose.foundation.edgeSwipeToDismiss
 import androidx.wear.compose.foundation.expandableItem
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.rememberExpandableState
 import androidx.wear.compose.foundation.rememberExpandableStateMapping
-import androidx.wear.compose.foundation.rememberRevealState
 import androidx.wear.compose.material.AppCard
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.ExperimentalWearMaterialApi
 import androidx.wear.compose.material.Icon
+import androidx.wear.compose.material.RevealActionType
+import androidx.wear.compose.material.RevealState
+import androidx.wear.compose.material.RevealValue
 import androidx.wear.compose.material.SwipeToRevealCard
 import androidx.wear.compose.material.SwipeToRevealChip
 import androidx.wear.compose.material.SwipeToRevealDefaults
@@ -65,10 +64,11 @@ import androidx.wear.compose.material.SwipeToRevealUndoAction
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.dialog.Alert
 import androidx.wear.compose.material.dialog.Dialog
+import androidx.wear.compose.material.rememberRevealState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalWearFoundationApi::class)
+@OptIn(ExperimentalWearFoundationApi::class, ExperimentalWearMaterialApi::class)
 @Composable
 fun SwipeToRevealChips(
     swipeToDismissBoxState: SwipeToDismissBoxState,

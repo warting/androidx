@@ -16,9 +16,7 @@
 
 package androidx.wear.compose.foundation.lazy
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.lazy.layout.LazyLayoutMeasureScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
@@ -27,6 +25,8 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
+import androidx.compose.ui.util.trace
+import androidx.wear.compose.foundation.lazy.layout.LazyLayoutMeasureScope
 import kotlinx.coroutines.CoroutineScope
 
 internal fun interface MeasuredItemProvider {
@@ -42,7 +42,6 @@ internal fun interface MeasuredItemProvider {
 }
 
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
 internal fun rememberTransformingLazyColumnMeasurePolicy(
     itemProviderLambda: () -> TransformingLazyColumnItemProvider,
     state: TransformingLazyColumnState,
@@ -54,6 +53,7 @@ internal fun rememberTransformingLazyColumnMeasurePolicy(
     remember(
         itemProviderLambda,
         state,
+        coroutineScope,
         horizontalAlignment,
         verticalArrangement,
         measurementStrategy
@@ -105,27 +105,29 @@ internal fun rememberTransformingLazyColumnMeasurePolicy(
             }
 
             Snapshot.withMutableSnapshot {
-                    measurementStrategy.measure(
-                        itemsCount = itemsCount,
-                        keyIndexMap = itemProvider.keyIndexMap,
-                        measuredItemProvider = measuredItemProvider,
-                        itemSpacing = verticalArrangement.spacing.roundToPx(),
-                        containerConstraints = containerConstraints,
-                        scrollToBeConsumed = scrollToBeConsumed,
-                        anchorItemIndex = anchorItemIndex,
-                        anchorItemScrollOffset = anchorItemScrollOffset,
-                        lastMeasuredAnchorItemHeight = lastMeasuredAnchorItemHeight,
-                        coroutineScope = coroutineScope,
-                        density = this,
-                        layout = { width, height, placement ->
-                            layout(
-                                containerConstraints.constrainWidth(width),
-                                containerConstraints.constrainHeight(height),
-                                emptyMap(),
-                                placement
-                            )
-                        }
-                    )
+                    trace("wear-compose:tlc:measure") {
+                        measurementStrategy.measure(
+                            itemsCount = itemsCount,
+                            keyIndexMap = itemProvider.keyIndexMap,
+                            measuredItemProvider = measuredItemProvider,
+                            itemSpacing = verticalArrangement.spacing.roundToPx(),
+                            containerConstraints = containerConstraints,
+                            scrollToBeConsumed = scrollToBeConsumed,
+                            anchorItemIndex = anchorItemIndex,
+                            anchorItemScrollOffset = anchorItemScrollOffset,
+                            lastMeasuredAnchorItemHeight = lastMeasuredAnchorItemHeight,
+                            coroutineScope = coroutineScope,
+                            density = this,
+                            layout = { width, height, placement ->
+                                layout(
+                                    containerConstraints.constrainWidth(width),
+                                    containerConstraints.constrainHeight(height),
+                                    emptyMap(),
+                                    placement
+                                )
+                            }
+                        )
+                    }
                 }
                 .also { state.applyMeasureResult(it) }
         }

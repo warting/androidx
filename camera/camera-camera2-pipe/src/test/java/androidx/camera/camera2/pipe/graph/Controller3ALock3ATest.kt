@@ -54,7 +54,7 @@ import org.robolectric.annotation.Config
 @Config(minSdk = Build.VERSION_CODES.LOLLIPOP)
 internal class Controller3ALock3ATest {
     private val graphTestContext = GraphTestContext()
-    private val graphState3A = graphTestContext.graphProcessor.graphState3A
+    private val graphState3A = GraphState3A()
     private val graphProcessor = graphTestContext.graphProcessor
     private val captureSequenceProcessor = graphTestContext.captureSequenceProcessor
 
@@ -76,17 +76,16 @@ internal class Controller3ALock3ATest {
     @Test
     fun testLock3AFailsImmediatelyWithoutRepeatingRequest() = runTest {
         val graphProcessor2 = FakeGraphProcessor()
-        val controller3A =
-            Controller3A(graphProcessor2, fakeMetadata, graphProcessor2.graphState3A, listener3A)
+        val graphState3A = GraphState3A()
+        val controller3A = Controller3A(graphProcessor2, fakeMetadata, graphState3A, listener3A)
         val result =
             controller3A.lock3A(
                 afLockBehavior = Lock3ABehavior.IMMEDIATE,
                 aeRegions = listOf(MeteringRectangle(0, 0, 100, 200, 10))
             )
         assertThat(result.await().status).isEqualTo(Result3A.Status.SUBMIT_FAILED)
-        assertThat(graphProcessor2.graphState3A.aeRegions).isNotNull()
-        assertThat(graphProcessor2.graphState3A.aeRegions)
-            .containsExactly(MeteringRectangle(0, 0, 100, 200, 10))
+        assertThat(graphState3A.aeRegions).isNotNull()
+        assertThat(graphState3A.aeRegions).containsExactly(MeteringRectangle(0, 0, 100, 200, 10))
     }
 
     @Test
@@ -149,6 +148,9 @@ internal class Controller3ALock3ATest {
         assertThat(result3A.frameMetadata!!.frameNumber.value).isEqualTo(101L)
         assertThat(result3A.status).isEqualTo(Result3A.Status.OK)
 
+        val event0 = captureSequenceProcessor.nextEvent()
+        assertThat(event0.isRepeating).isTrue()
+
         // We not check if the correct sequence of requests were submitted by lock3A call. The
         // request should be a repeating request to lock AE.
         val event1 = captureSequenceProcessor.nextEvent()
@@ -203,6 +205,9 @@ internal class Controller3ALock3ATest {
         val result = lock3AAsyncTask.await()
         // Result of lock3A call shouldn't be complete yet since the AE and AF are not locked yet.
         assertThat(result.isCompleted).isFalse()
+
+        // One repeating request to reset the current 3A parameters and start monitoring.
+        captureSequenceProcessor.nextEvent()
 
         // Check the correctness of the requests submitted by lock3A.
         // One repeating request was sent to monitor the state of AE to get converged.
@@ -284,6 +289,9 @@ internal class Controller3ALock3ATest {
 
         val result = lock3AAsyncTask.await()
         assertThat(result.isCompleted).isFalse()
+
+        val event0 = captureSequenceProcessor.nextEvent()
+        assertThat(event0.isRepeating).isTrue()
 
         // For a new AE scan we first send a request to unlock AE just in case it was
         // previously or internally locked.
@@ -390,8 +398,12 @@ internal class Controller3ALock3ATest {
         assertThat(result3A.frameMetadata!!.frameNumber.value).isEqualTo(101L)
         assertThat(result3A.status).isEqualTo(Result3A.Status.OK)
 
-        // There should be one request to monitor AF to finish it's scan.
+        // One repeating request to reset the current 3A parameters and start monitoring.
         captureSequenceProcessor.nextEvent()
+
+        // There should be one request to monitor AF to finish its scan to be converged.
+        captureSequenceProcessor.nextEvent()
+
         // One request to lock AE
         val event2 = captureSequenceProcessor.nextEvent()
         assertThat(event2.requiredParameters).containsEntry(CaptureRequest.CONTROL_AE_LOCK, true)
@@ -468,22 +480,29 @@ internal class Controller3ALock3ATest {
         assertThat(result3A.frameMetadata!!.frameNumber.value).isEqualTo(101L)
         assertThat(result3A.status).isEqualTo(Result3A.Status.OK)
 
+        val event0 = captureSequenceProcessor.nextEvent()
+        assertThat(event0.isRepeating).isTrue()
+
         // One request to cancel AF to start a new scan.
         val event1 = captureSequenceProcessor.nextEvent()
+        assertThat(event1.isCapture).isTrue()
         assertThat(event1.requiredParameters)
             .containsEntry(
                 CaptureRequest.CONTROL_AF_TRIGGER,
                 CaptureRequest.CONTROL_AF_TRIGGER_CANCEL
             )
-        // There should be one request to monitor AF to finish it's scan.
+
+        // There should be one request to monitor AF to finish its scan.
         captureSequenceProcessor.nextEvent()
 
         // There should be one request to monitor lock AE.
         val event2 = captureSequenceProcessor.nextEvent()
+        assertThat(event2.isRepeating).isTrue()
         assertThat(event2.requiredParameters).containsEntry(CaptureRequest.CONTROL_AE_LOCK, true)
 
         // And one request to lock AF.
         val event3 = captureSequenceProcessor.nextEvent()
+        assertThat(event3.isCapture).isTrue()
         assertThat(event3.requiredParameters).containsEntry(CaptureRequest.CONTROL_AE_LOCK, true)
         assertThat(event3.requiredParameters)
             .containsEntry(
@@ -554,7 +573,10 @@ internal class Controller3ALock3ATest {
         assertThat(result3A.frameMetadata!!.frameNumber.value).isEqualTo(101L)
         assertThat(result3A.status).isEqualTo(Result3A.Status.OK)
 
-        // There should be one request to monitor AF to finish it's scan.
+        // One repeating request to reset the current 3A parameters and start monitoring.
+        captureSequenceProcessor.nextEvent()
+
+        // There should be one request to monitor AF to finish its scan to be converged.
         val event = captureSequenceProcessor.nextEvent()
         assertThat(event.isRepeating).isTrue()
 
@@ -640,8 +662,14 @@ internal class Controller3ALock3ATest {
         assertThat(result3A.frameMetadata!!.frameNumber.value).isEqualTo(101L)
         assertThat(result3A.status).isEqualTo(Result3A.Status.OK)
 
+        // Repeating request is running
+        val event0 = captureSequenceProcessor.nextEvent()
+        assertThat(event0.isCapture).isFalse()
+        assertThat(event0.isRepeating).isTrue()
+
         // One request to cancel AF to start a new scan.
         val event1 = captureSequenceProcessor.nextEvent()
+        assertThat(event1.isCapture)
         assertThat(event1.requiredParameters)
             .containsEntry(
                 CaptureRequest.CONTROL_AF_TRIGGER,
@@ -738,6 +766,9 @@ internal class Controller3ALock3ATest {
         val afRegions = graphState3A.afRegions!!
         assertThat(afRegions.size).isEqualTo(1)
         assertThat(afRegions[0]).isEqualTo(afMeteringRegion)
+
+        val event0 = captureSequenceProcessor.nextEvent()
+        assertThat(event0.isRepeating).isTrue()
 
         // We not check if the correct sequence of requests were submitted by lock3A call. The
         // request should be a repeating request to lock AE.

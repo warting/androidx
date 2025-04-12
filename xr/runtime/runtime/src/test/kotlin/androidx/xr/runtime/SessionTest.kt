@@ -20,6 +20,7 @@ import android.app.Activity
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.xr.runtime.testing.FakeLifecycleManager
+import androidx.xr.runtime.testing.FakeRuntimeFactory
 import androidx.xr.runtime.testing.FakeStateExtender
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.assertFailsWith
@@ -27,7 +28,6 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
@@ -51,7 +51,7 @@ class SessionTest {
     @Before
     fun setUp() {
         activityScenarioRule.scenario.onActivity { this.activity = it }
-        shadowOf(activity).grantPermissions(*Session.SESSION_PERMISSIONS.toTypedArray())
+        shadowOf(activity).grantPermissions(*FakeLifecycleManager.TestPermissions.toTypedArray())
 
         testDispatcher = StandardTestDispatcher()
         testScope = TestScope(testDispatcher)
@@ -84,13 +84,14 @@ class SessionTest {
     }
 
     @Test
-    fun create_permissionNotGranted_returnsPermissionsNotGranted() {
-        val permission = "android.permission.SCENE_UNDERSTANDING"
-        shadowOf(activity).denyPermissions(permission)
+    fun create_permissionException_returnsPermissionsNotGrantedResult() {
+        FakeRuntimeFactory.hasCreatePermission = false
 
-        val result = Session.create(activity) as SessionCreatePermissionsNotGranted
+        val result = Session.create(activity)
+        // Reset the flag to true so other tests are not affected.
+        FakeRuntimeFactory.hasCreatePermission = true
 
-        assertThat(result.permissions).containsExactly(permission)
+        assertThat(result).isInstanceOf(SessionCreatePermissionsNotGranted::class.java)
     }
 
     @Test
@@ -98,7 +99,65 @@ class SessionTest {
         val underTest = (Session.create(activity) as SessionCreateSuccess).session
         underTest.destroy()
 
-        assertFailsWith<IllegalStateException> { underTest.configure() }
+        assertFailsWith<IllegalStateException> { underTest.configure(Config()) }
+    }
+
+    @Test
+    fun configure_returnsSuccessAndChangesConfig() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        check(
+            underTest.config.equals(
+                Config(
+                    PlaneTrackingMode.HorizontalAndVertical,
+                    HandTrackingMode.Enabled,
+                    DepthEstimationMode.Enabled,
+                    AnchorPersistenceMode.Enabled,
+                )
+            )
+        )
+        val config =
+            Config(
+                PlaneTrackingMode.Disabled,
+                HandTrackingMode.Disabled,
+                DepthEstimationMode.Disabled,
+                AnchorPersistenceMode.Disabled,
+            )
+
+        val result = underTest.configure(config)
+
+        assertThat(result).isInstanceOf(SessionConfigureSuccess::class.java)
+        assertThat(underTest.config).isEqualTo(config)
+    }
+
+    @Test
+    fun configure_permissionNotGranted_returnsPermissionNotGrantedResult() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        val lifecycleManager = underTest.runtime.lifecycleManager as FakeLifecycleManager
+        val currentConfig = underTest.config
+        check(currentConfig.depthEstimation == DepthEstimationMode.Enabled)
+        lifecycleManager.hasMissingPermission = true
+
+        val result =
+            underTest.configure(
+                underTest.config.copy(depthEstimation = DepthEstimationMode.Disabled)
+            )
+
+        assertThat(result).isInstanceOf(SessionConfigurePermissionsNotGranted::class.java)
+        assertThat(underTest.config).isEqualTo(currentConfig)
+    }
+
+    @Test
+    fun configure_unsupportedMode_returnsConfigurationNotSupportedResult() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        val lifecycleManager = underTest.runtime.lifecycleManager as FakeLifecycleManager
+        val currentConfig = underTest.config
+
+        lifecycleManager.shouldSupportPlaneTracking = false
+        val result =
+            underTest.configure(Config(planeTracking = PlaneTrackingMode.HorizontalAndVertical))
+
+        assertThat(result).isInstanceOf(SessionConfigureConfigurationNotSupported::class.java)
+        assertThat(underTest.config).isEqualTo(currentConfig)
     }
 
     // TODO(b/349855733): Add a test to verify configure() calls the corresponding LifecycleManager
@@ -121,17 +180,6 @@ class SessionTest {
         underTest.destroy()
 
         assertFailsWith<IllegalStateException> { underTest.resume() }
-    }
-
-    @Test
-    fun resume_permissionNotGranted_returnsPermissionsNotGranted() {
-        val underTest = (Session.create(activity) as SessionCreateSuccess).session
-        val permission = "android.permission.SCENE_UNDERSTANDING"
-        shadowOf(activity).denyPermissions(permission)
-
-        val result = underTest.resume() as SessionResumePermissionsNotGranted
-
-        assertThat(result.permissions).containsExactly(permission)
     }
 
     // TODO(b/349859981): Add a test to verify update() calls the corresponding LifecycleManager

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+
 plugins {
     id("AndroidXPlugin")
     id("AndroidXComposePlugin")
@@ -26,8 +27,8 @@ android {
     defaultConfig {
         applicationId = "androidx.wear.compose.integration.demos"
         minSdk = 25
-        versionCode = 65
-        versionName = "1.65"
+        versionCode = 75
+        versionName = "1.75"
     }
 
     buildTypes {
@@ -74,12 +75,15 @@ dependencies {
     androidTestImplementation("androidx.lifecycle:lifecycle-runtime:2.7.0")
     androidTestImplementation("androidx.lifecycle:lifecycle-common:2.7.0")
     androidTestImplementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    androidTestImplementation(project(":core:core"))
-    androidTestImplementation(project(":core:core-ktx"))
+    androidTestImplementation("androidx.core:core:1.15.0")
+    androidTestImplementation("androidx.core:core-ktx:1.15.0")
     androidTestImplementation(libs.testCore)
     androidTestImplementation(libs.testRules)
     androidTestImplementation(libs.testRunner)
     androidTestImplementation(libs.espressoCore)
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.truth)
+}
+
+androidx {
 }

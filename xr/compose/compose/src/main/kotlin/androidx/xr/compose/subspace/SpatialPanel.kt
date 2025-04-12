@@ -20,6 +20,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
 import android.view.View
+import android.view.View.MeasureSpec
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.RestrictTo
@@ -32,22 +33,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.UiComposable
 import androidx.compose.ui.graphics.Color as UiColor
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.xr.compose.platform.LocalCoreEntity
+import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.util.fastMaxOfOrNull
 import androidx.xr.compose.platform.LocalDialogManager
+import androidx.xr.compose.platform.LocalOpaqueEntity
 import androidx.xr.compose.platform.LocalSession
-import androidx.xr.compose.subspace.layout.CorePanelEntity
+import androidx.xr.compose.platform.getActivity
 import androidx.xr.compose.subspace.layout.SpatialRoundedCornerShape
 import androidx.xr.compose.subspace.layout.SpatialShape
 import androidx.xr.compose.subspace.layout.SubspaceLayout
 import androidx.xr.compose.subspace.layout.SubspaceModifier
-import androidx.xr.compose.unit.IntVolumeSize
 import androidx.xr.compose.unit.Meter.Companion.millimeters
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Vector3
@@ -71,7 +78,6 @@ public object SpatialPanelDefaults {
  *
  * @param view Content view to be displayed within the SpatialPanel.
  * @param modifier SubspaceModifiers to apply to the SpatialPanel.
- * @param name A name for the SpatialPanel, useful for debugging.
  * @param shape The shape of this Spatial Panel.
  */
 @Composable
@@ -80,184 +86,7 @@ public object SpatialPanelDefaults {
 public fun SpatialPanel(
     view: View,
     modifier: SubspaceModifier = SubspaceModifier,
-    name: String = defaultSpatialPanelName(),
     shape: SpatialShape = SpatialPanelDefaults.shape,
-) {
-    SpatialPanel(modifier, name, view, shape) {}
-}
-
-/**
- * Creates a [SpatialPanel] representing a 2D plane in 3D space in which an application can fill
- * content.
- *
- * @param modifier SubspaceModifiers to apply to the SpatialPanel.
- * @param name A name for the SpatialPanel, useful for debugging.
- * @param shape The shape of this Spatial Panel.
- * @param content The composable content to render within the SpatialPanel.
- */
-@Composable
-@SubspaceComposable
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-public fun SpatialPanel(
-    modifier: SubspaceModifier = SubspaceModifier,
-    name: String = defaultSpatialPanelName(),
-    shape: SpatialShape = SpatialPanelDefaults.shape,
-    content: @Composable @UiComposable () -> Unit,
-) {
-    val composeView = rememberComposeView()
-
-    SpatialPanel(
-        modifier = modifier,
-        name = name,
-        view = composeView,
-        shape = shape,
-        onCorePanelEntityCreated = { corePanelEntity ->
-            composeView.setContent {
-                CompositionLocalProvider(
-                    LocalCoreEntity provides corePanelEntity,
-                    content = content
-                )
-            }
-        },
-    )
-}
-
-/**
- * Creates a [SpatialPanel] backed by the main Window content.
- *
- * This panel requires the following specific configuration in the Android Manifest for proper
- * sizing/resizing behavior:
- * ```
- * <activity
- * android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize>
- * <!--suppress AndroidElementNotAllowed -->
- * <layout android:defaultWidth="50dp" android:defaultHeight="50dp" android:minHeight="50dp"
- * android:minWidth="50dp"/>
- * </activity>
- * ```
- *
- * @param modifier SubspaceModifier to apply to the MainPanel.
- * @param shape The shape of this Spatial Panel.
- */
-@Composable
-@SubspaceComposable
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-public fun MainPanel(
-    modifier: SubspaceModifier = SubspaceModifier,
-    shape: SpatialShape = SpatialPanelDefaults.shape,
-) {
-    val session = checkNotNull(LocalSession.current) { "session must be initialized" }
-
-    DisposableEffect(Unit) {
-        session.mainPanelEntity.setHidden(false)
-        onDispose { session.mainPanelEntity.setHidden(true) }
-    }
-
-    LayoutPanelEntity(
-        // Do not use rememberCorePanelEntity since we do not want to dispose the main panel entity.
-        remember { CorePanelEntity(session, session.mainPanelEntity) },
-        "MainPanel",
-        shape,
-        modifier,
-    )
-}
-
-/**
- * Creates a [SpatialPanel] and launches an Activity within it.
- *
- * @param intent The intent of an Activity to launch within this panel.
- * @param modifier SubspaceModifiers to apply to the SpatialPanel.
- * @param name A name for the SpatialPanel, useful for debugging.
- * @param shape The shape of this Spatial Panel.
- */
-@Composable
-@SubspaceComposable
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-public fun SpatialPanel(
-    intent: Intent,
-    modifier: SubspaceModifier = SubspaceModifier,
-    name: String = "ActivityPanel-${intent.action}",
-    shape: SpatialShape = SpatialPanelDefaults.shape,
-) {
-
-    val session = checkNotNull(LocalSession.current) { "session must be initialized" }
-    val dialogManager = LocalDialogManager.current
-
-    val minimumPanelDimension = Dimensions(10f, 10f, 10f)
-    val rect = Rect(0, 0, DEFAULT_SIZE_PX, DEFAULT_SIZE_PX)
-    val activityPanelEntity = rememberCorePanelEntity {
-        ActivityPanelEntity.create(session, rect, name).also { it.launchActivity(intent) }
-    }
-
-    SpatialBox {
-        LayoutPanelEntity(activityPanelEntity, name, shape, modifier)
-
-        if (dialogManager.isSpatialDialogActive.value) {
-            val scrimView = rememberComposeView()
-
-            scrimView.setContent {
-                Box(
-                    modifier =
-                        Modifier.fillMaxSize()
-                            .background(UiColor.Black.copy(alpha = 0.5f))
-                            .pointerInput(Unit) {
-                                detectTapGestures {
-                                    dialogManager.isSpatialDialogActive.value = false
-                                }
-                            }
-                ) {}
-            }
-
-            val scrimPanelEntity = rememberCorePanelEntity {
-                PanelEntity.create(
-                        session = session,
-                        view = scrimView,
-                        surfaceDimensionsPx = minimumPanelDimension,
-                        dimensions = minimumPanelDimension,
-                        name = "scrim view",
-                        pose = Pose.Identity,
-                    )
-                    .also {
-                        it.setParent(activityPanelEntity.entity)
-                        it.setPose(Pose(translation = Vector3(0f, 0f, 3.millimeters.toM())))
-                    }
-            }
-
-            val density = LocalDensity.current
-            LaunchedEffect(activityPanelEntity.size) {
-                val size = activityPanelEntity.size
-                scrimPanelEntity.size = size
-                if (shape is SpatialRoundedCornerShape) {
-                    scrimPanelEntity.setCornerRadius(
-                        shape.computeCornerRadius(
-                            size.width.toFloat(),
-                            size.height.toFloat(),
-                            density
-                        ),
-                        density,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Private [SpatialPanel] implementation that reports its created PanelEntity.
- *
- * @param modifier SubspaceModifiers.
- * @param view content view to render inside the SpatialPanel
- * @param shape The shape of this Spatial Panel.
- * @param onCorePanelEntityCreated callback to consume the [CorePanelEntity] when it is created
- */
-@Composable
-@SubspaceComposable
-private fun SpatialPanel(
-    modifier: SubspaceModifier = SubspaceModifier,
-    name: String,
-    view: View,
-    shape: SpatialShape,
-    onCorePanelEntityCreated: (CorePanelEntity) -> Unit,
 ) {
     val minimumPanelDimension = Dimensions(10f, 10f, 10f)
     val frameLayout = remember {
@@ -272,13 +101,12 @@ private fun SpatialPanel(
     val scrim = remember { View(view.context) }
     val dialogManager = LocalDialogManager.current
     val corePanelEntity =
-        rememberCorePanelEntity(onCorePanelEntityCreated) {
+        rememberCorePanelEntity(shape = shape) {
             PanelEntity.create(
                 session = this,
                 view = frameLayout,
-                surfaceDimensionsPx = minimumPanelDimension,
                 dimensions = minimumPanelDimension,
-                name = name,
+                name = entityName("SpatialPanel"),
                 pose = Pose.Identity,
             )
         }
@@ -302,63 +130,229 @@ private fun SpatialPanel(
         }
     }
 
-    LayoutPanelEntity(corePanelEntity, name, shape, modifier)
-}
-
-/**
- * Lay out the SpatialPanel using the provided [CorePanelEntity].
- *
- * @param coreEntity The [CorePanelEntity] associated with this SpatialPanel. It should be based on
- *   a SceneCore panel entity.
- * @param name The name of the panel for debugging purposes.
- * @param shape The shape of this Spatial Panel.
- * @param modifier The [SubspaceModifier] attached to this compose node.
- */
-@Composable
-private fun LayoutPanelEntity(
-    coreEntity: CorePanelEntity,
-    name: String,
-    shape: SpatialShape,
-    modifier: SubspaceModifier,
-) {
-    val density = LocalDensity.current
-    SubspaceLayout(modifier = modifier, name = name, coreEntity = coreEntity) {
-        measurables,
-        constraints ->
-        val initialWidth = DEFAULT_SIZE_PX.coerceIn(constraints.minWidth, constraints.maxWidth)
-        val initialHeight = DEFAULT_SIZE_PX.coerceIn(constraints.minHeight, constraints.maxHeight)
-        val initialDepth = DEFAULT_SIZE_PX.coerceIn(constraints.minDepth, constraints.maxDepth)
-
-        val placeables = measurables.map { it.measure(constraints) }
-
-        val maxSize =
-            placeables.fold(IntVolumeSize(initialWidth, initialHeight, initialDepth)) {
-                currentMax,
-                placeable ->
-                IntVolumeSize(
-                    width = maxOf(currentMax.width, placeable.measuredWidth),
-                    height = maxOf(currentMax.height, placeable.measuredHeight),
-                    depth = maxOf(currentMax.depth, placeable.measuredDepth),
-                )
-            }
-
-        val maxWidth = maxSize.width
-        val maxHeight = maxSize.height
-
-        if (shape is SpatialRoundedCornerShape) {
-            coreEntity.setCornerRadius(
-                shape.computeCornerRadius(maxWidth.toFloat(), maxHeight.toFloat(), density),
-                density,
-            )
-        }
-
-        // Reserve space in the original composition
-        layout(maxWidth, maxHeight, maxSize.depth) { placeables.forEach { it.place(Pose()) } }
+    SubspaceLayout(modifier = modifier, coreEntity = corePanelEntity) { _, constraints ->
+        view.measure(
+            MeasureSpec.makeMeasureSpec(constraints.maxWidth, MeasureSpec.AT_MOST),
+            MeasureSpec.makeMeasureSpec(constraints.maxHeight, MeasureSpec.AT_MOST),
+        )
+        val width = view.measuredWidth.coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height = view.measuredHeight.coerceIn(constraints.minHeight, constraints.maxHeight)
+        val depth = constraints.minDepth.coerceAtLeast(0)
+        layout(width, height, depth) {}
     }
 }
 
-private var spatialPanelNamePart: Int = 0
+/**
+ * Creates a [SpatialPanel] representing a 2D plane in 3D space in which an application can fill
+ * content.
+ *
+ * @param modifier SubspaceModifiers to apply to the SpatialPanel.
+ * @param shape The shape of this Spatial Panel.
+ * @param content The composable content to render within the SpatialPanel.
+ */
+@Composable
+@SubspaceComposable
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public fun SpatialPanel(
+    modifier: SubspaceModifier = SubspaceModifier,
+    shape: SpatialShape = SpatialPanelDefaults.shape,
+    content: @Composable @UiComposable () -> Unit,
+) {
+    val view = rememberComposeView()
+    val minimumPanelDimension = Dimensions(10f, 10f, 10f)
+    val dialogManager = LocalDialogManager.current
+    val corePanelEntity =
+        rememberCorePanelEntity(shape = shape) {
+            PanelEntity.create(
+                session = this,
+                view = view,
+                dimensions = minimumPanelDimension,
+                name = entityName("SpatialPanel"),
+                pose = Pose.Identity,
+            )
+        }
+    var intrinsicWidth by remember { mutableIntStateOf(DEFAULT_SIZE_PX) }
+    var intrinsicHeight by remember { mutableIntStateOf(DEFAULT_SIZE_PX) }
 
-private fun defaultSpatialPanelName(): String {
-    return "Panel-${spatialPanelNamePart++}"
+    SubspaceLayout(modifier = modifier, coreEntity = corePanelEntity) { _, volumeConstraints ->
+        view.setContent {
+            CompositionLocalProvider(LocalOpaqueEntity provides corePanelEntity) {
+                Layout(content = content, modifier = Modifier) { measurables, constraints ->
+                    intrinsicWidth =
+                        measurables.fastMaxOfOrNull {
+                            try {
+                                it.maxIntrinsicWidth(volumeConstraints.maxHeight)
+                            } catch (e: IllegalStateException) {
+                                0
+                            }
+                        } ?: DEFAULT_SIZE_PX
+                    intrinsicHeight =
+                        measurables.fastMaxOfOrNull {
+                            try {
+                                it.maxIntrinsicHeight(volumeConstraints.maxWidth)
+                            } catch (e: IllegalStateException) {
+                                0
+                            }
+                        } ?: DEFAULT_SIZE_PX
+                    val placeables = measurables.map { it.measure(constraints) }
+                    layout(
+                        placeables.fastMaxOfOrNull { it.measuredWidth } ?: DEFAULT_SIZE_PX,
+                        placeables.fastMaxOfOrNull { it.measuredHeight } ?: DEFAULT_SIZE_PX,
+                    ) {
+                        placeables.fastForEach { placeable -> placeable.place(0, 0) }
+                    }
+                }
+            }
+
+            if (dialogManager.isSpatialDialogActive.value) {
+                Box(
+                    modifier =
+                        Modifier.fillMaxSize()
+                            .background(UiColor.Black.copy(alpha = 0.5f))
+                            .pointerInput(Unit) {
+                                detectTapGestures {
+                                    dialogManager.isSpatialDialogActive.value = false
+                                }
+                            }
+                ) {}
+            }
+        }
+        val width = intrinsicWidth.coerceIn(volumeConstraints.minWidth, volumeConstraints.maxWidth)
+        val height =
+            intrinsicHeight.coerceIn(volumeConstraints.minHeight, volumeConstraints.maxHeight)
+        val depth = volumeConstraints.minDepth.coerceAtLeast(0)
+        layout(width, height, depth) {}
+    }
+}
+
+/**
+ * Creates a [SpatialPanel] backed by the main Window content.
+ *
+ * This panel requires the following specific configuration in the Android Manifest for proper
+ * sizing/resizing behavior:
+ * ```
+ * <activity
+ * android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize>
+ * <!--suppress AndroidElementNotAllowed -->
+ * <layout android:defaultWidth="50dp" android:defaultHeight="50dp" android:minHeight="50dp"
+ * android:minWidth="50dp"/>
+ * </activity>
+ * ```
+ *
+ * To disable Title Bars in the activity add the following to Activity#onCreate:
+ * ```
+ * requestWindowFeature(Window.FEATURE_NO_TITLE)
+ * ```
+ *
+ * Or disable Title Bars in the theme by setting:
+ * ```
+ * <item name="windowNoTitle">true</item>
+ * ```
+ *
+ * @param modifier SubspaceModifier to apply to the MainPanel.
+ * @param shape The shape of this Spatial Panel.
+ */
+@Composable
+@SubspaceComposable
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public fun MainPanel(
+    modifier: SubspaceModifier = SubspaceModifier,
+    shape: SpatialShape = SpatialPanelDefaults.shape,
+) {
+    val mainPanel = rememberCoreMainPanelEntity(shape = shape)
+    val view = LocalContext.current.getActivity().window?.decorView ?: LocalView.current
+
+    DisposableEffect(Unit) {
+        mainPanel.hidden = false
+        onDispose { mainPanel.hidden = true }
+    }
+
+    SubspaceLayout(modifier = modifier, coreEntity = mainPanel) { _, constraints ->
+        val width = view.measuredWidth.coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height = view.measuredHeight.coerceIn(constraints.minHeight, constraints.maxHeight)
+        val depth = constraints.minDepth.coerceAtLeast(0)
+        layout(width, height, depth) {}
+    }
+}
+
+/**
+ * Creates a [SpatialPanel] and launches an Activity within it.
+ *
+ * To disable Title Bars in the activity add the following to Activity#onCreate:
+ * ```
+ * requestWindowFeature(Window.FEATURE_NO_TITLE)
+ * ```
+ *
+ * Or disable Title Bars in the theme by setting:
+ * ```
+ * <item name="windowNoTitle">true</item>
+ * ```
+ *
+ * @param intent The intent of an Activity to launch within this panel.
+ * @param modifier SubspaceModifiers to apply to the SpatialPanel.
+ * @param shape The shape of this Spatial Panel.
+ */
+@Composable
+@SubspaceComposable
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public fun SpatialPanel(
+    intent: Intent,
+    modifier: SubspaceModifier = SubspaceModifier,
+    shape: SpatialShape = SpatialPanelDefaults.shape,
+) {
+    val session = checkNotNull(LocalSession.current) { "session must be initialized" }
+    val dialogManager = LocalDialogManager.current
+
+    val minimumPanelDimension = Dimensions(10f, 10f, 10f)
+    val rect = Rect(0, 0, DEFAULT_SIZE_PX, DEFAULT_SIZE_PX)
+    val activityPanelEntity = rememberCorePanelEntity {
+        ActivityPanelEntity.create(session, rect, entityName("ActivityPanel-${intent.action}"))
+            .also { it.launchActivity(intent) }
+    }
+
+    SpatialBox {
+        SubspaceLayout(modifier = modifier, coreEntity = activityPanelEntity) { _, constraints ->
+            val width = DEFAULT_SIZE_PX.coerceIn(constraints.minWidth, constraints.maxWidth)
+            val height = DEFAULT_SIZE_PX.coerceIn(constraints.minHeight, constraints.maxHeight)
+            val depth = constraints.minDepth.coerceAtLeast(0)
+            layout(width, height, depth) {}
+        }
+
+        if (dialogManager.isSpatialDialogActive.value) {
+            val scrimView = rememberComposeView()
+
+            scrimView.setContent {
+                Box(
+                    modifier =
+                        Modifier.fillMaxSize()
+                            .background(UiColor.Black.copy(alpha = 0.5f))
+                            .pointerInput(Unit) {
+                                detectTapGestures {
+                                    dialogManager.isSpatialDialogActive.value = false
+                                }
+                            }
+                ) {}
+            }
+
+            val scrimPanelEntity =
+                rememberCorePanelEntity(shape = shape) {
+                    PanelEntity.create(
+                            session = session,
+                            view = scrimView,
+                            dimensions = minimumPanelDimension,
+                            name = entityName("ScrimPanel"),
+                            pose = Pose.Identity,
+                        )
+                        .also {
+                            it.setParent(activityPanelEntity.entity)
+                            it.setPose(Pose(translation = Vector3(0f, 0f, 3.millimeters.toM())))
+                        }
+                }
+
+            LaunchedEffect(activityPanelEntity.size) {
+                val size = activityPanelEntity.size
+                scrimPanelEntity.size = size
+            }
+        }
+    }
 }

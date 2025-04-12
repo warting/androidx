@@ -18,13 +18,15 @@ package androidx.xr.scenecore.impl;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.xr.extensions.XrExtensions;
-import androidx.xr.extensions.node.Node;
+import androidx.xr.runtime.internal.SystemSpaceEntity;
 import androidx.xr.runtime.math.Matrix4;
 import androidx.xr.runtime.math.Pose;
 import androidx.xr.runtime.math.Vector3;
-import androidx.xr.scenecore.JxrPlatformAdapter;
+
+import com.android.extensions.xr.XrExtensions;
+import com.android.extensions.xr.node.Node;
 
 import java.io.Closeable;
 import java.util.concurrent.Executor;
@@ -35,8 +37,7 @@ import java.util.concurrent.ScheduledExecutorService;
  *
  * <p>It is expected to be the soft root of its own parent-child entity hierarchy.
  */
-abstract class SystemSpaceEntityImpl extends AndroidXrEntity
-        implements JxrPlatformAdapter.SystemSpaceEntity {
+abstract class SystemSpaceEntityImpl extends AndroidXrEntity implements SystemSpaceEntity {
 
     protected Pose mOpenXrReferenceSpacePose;
     protected Vector3 mWorldSpaceScale = new Vector3(1f, 1f, 1f);
@@ -117,7 +118,7 @@ abstract class SystemSpaceEntityImpl extends AndroidXrEntity
      * @param node The node to subscribe to.
      * @param executor The executor to run the callback on.
      */
-    private void subscribeToNodeTransform(Node node, Executor executor) {
+    private void subscribeToNodeTransform(Node node, ScheduledExecutorService executor) {
         mNodeTransformCloseable =
                 node.subscribeToTransform(
                         (transform) ->
@@ -126,6 +127,7 @@ abstract class SystemSpaceEntityImpl extends AndroidXrEntity
                         executor);
     }
 
+    @NonNull
     @Override
     public Vector3 getWorldSpaceScale() {
         return mWorldSpaceScale;

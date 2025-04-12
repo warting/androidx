@@ -57,22 +57,27 @@ import androidx.xr.scenecore.PixelDimensions
 public object OrbiterDefaults {
 
     /** Default shape for an Orbiter. */
-    public val shape: SpatialShape = SpatialRoundedCornerShape(ZeroCornerSize)
+    public val Shape: SpatialShape = SpatialRoundedCornerShape(ZeroCornerSize)
+
+    /** Default elevation level for an Orbiter. */
+    public val Elevation: SpatialElevationLevel = SpatialElevationLevel.Level1
 
     /** Default settings for an Orbiter */
-    public val orbiterSettings: OrbiterSettings = OrbiterSettings()
+    public val Settings: OrbiterSettings = OrbiterSettings()
 }
 
 /**
  * Settings for an Orbiter.
  *
- * @property shouldRenderInNonSpatial controls whether the orbiter content should be rendered in the
- *   normal flow in non-spatial environments. If `true`, the content is rendered normally;
- *   otherwise, it's removed from the flow.
+ * @property shouldRenderInNonSpatial In a non-spatial environment, if `true` the orbiter content is
+ *   rendered as if the orbiter wrapper was not present and removed from the flow otherwise. In
+ *   spatial environments, this flag is ignored.
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
 public class OrbiterSettings(
-    @get:JvmName("shouldRenderInNonSpatial") public val shouldRenderInNonSpatial: Boolean = true
+    @get:Suppress("GetterSetterNames")
+    @get:JvmName("shouldRenderInNonSpatial")
+    public val shouldRenderInNonSpatial: Boolean = true
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -99,12 +104,21 @@ public class OrbiterSettings(
 /**
  * A composable that creates an orbiter along the top or bottom edges of a view.
  *
+ * Orbiters are floating elements that contain controls for spatial content. They allow the content
+ * to have more space and give users quick access to features like navigation without obstructing
+ * the main content.
+ *
+ * In non-spatial environments, orbiters may be configured using
+ * [OrbiterSettings.shouldRenderInNonSpatial] to render their content as if the orbiter wrapper was
+ * not present or be removed from the flow entirely.
+ *
  * @param position The edge of the orbiter. Use [OrbiterEdge.Top] or [OrbiterEdge.Bottom].
  * @param offset The offset of the orbiter based on the outer edge of the orbiter.
  * @param alignment The alignment of the orbiter. Use [Alignment.CenterHorizontally] or
  *   [Alignment.Start] or [Alignment.End].
  * @param settings The settings for the orbiter.
  * @param shape The shape of this Orbiter when it is rendered in 3D space.
+ * @param elevation The z-direction elevation level of this Orbiter.
  * @param content The content of the orbiter.
  *
  * Example:
@@ -121,8 +135,9 @@ public fun Orbiter(
     position: OrbiterEdge.Horizontal,
     offset: Dp = 0.dp,
     alignment: Alignment.Horizontal = Alignment.CenterHorizontally,
-    settings: OrbiterSettings = OrbiterDefaults.orbiterSettings,
-    shape: SpatialShape = OrbiterDefaults.shape,
+    settings: OrbiterSettings = OrbiterDefaults.Settings,
+    shape: SpatialShape = OrbiterDefaults.Shape,
+    elevation: SpatialElevationLevel = OrbiterDefaults.Elevation,
     content: @Composable @UiComposable () -> Unit,
 ) {
     Orbiter(
@@ -132,6 +147,7 @@ public fun Orbiter(
             offset = outer(offset),
             settings = settings,
             shape = shape,
+            elevation = elevation,
             content = content,
         )
     )
@@ -139,6 +155,14 @@ public fun Orbiter(
 
 /**
  * A composable that creates an orbiter along the top or bottom edges of a view.
+ *
+ * Orbiters are floating elements that contain controls for spatial content. They allow the content
+ * to have more space and give users quick access to features like navigation without obstructing
+ * the main content.
+ *
+ * In non-spatial environments, orbiters may be configured using
+ * [OrbiterSettings.shouldRenderInNonSpatial] to render their content as if the orbiter wrapper was
+ * not present or be removed from the flow entirely.
  *
  * @param position The edge of the orbiter. Use [OrbiterEdge.Top] or [OrbiterEdge.Bottom].
  * @param offset The offset of the orbiter based on the inner or outer edge of the orbiter. Use
@@ -149,6 +173,7 @@ public fun Orbiter(
  *   [Alignment.Start] or [Alignment.End].
  * @param settings The settings for the orbiter.
  * @param shape The shape of this Orbiter when it is rendered in 3D space.
+ * @param elevation The z-direction elevation level of this Orbiter.
  * @param content The content of the orbiter.
  *
  * Example:
@@ -165,8 +190,9 @@ public fun Orbiter(
     position: OrbiterEdge.Horizontal,
     offset: EdgeOffset,
     alignment: Alignment.Horizontal = Alignment.CenterHorizontally,
-    settings: OrbiterSettings = OrbiterDefaults.orbiterSettings,
-    shape: SpatialShape = OrbiterDefaults.shape,
+    settings: OrbiterSettings = OrbiterDefaults.Settings,
+    shape: SpatialShape = OrbiterDefaults.Shape,
+    elevation: SpatialElevationLevel = OrbiterDefaults.Elevation,
     content: @Composable @UiComposable () -> Unit,
 ) {
     Orbiter(
@@ -176,6 +202,7 @@ public fun Orbiter(
             offset = offset,
             settings = settings,
             shape = shape,
+            elevation = elevation,
             content = content,
         )
     )
@@ -184,12 +211,21 @@ public fun Orbiter(
 /**
  * A composable that creates an orbiter along the start or end edges of a view.
  *
+ * Orbiters are floating elements that contain controls for spatial content. They allow the content
+ * to have more space and give users quick access to features like navigation without obstructing
+ * the main content.
+ *
+ * In non-spatial environments, orbiters may be configured using
+ * [OrbiterSettings.shouldRenderInNonSpatial] to render their content as if the orbiter wrapper was
+ * not present or be removed from the flow entirely.
+ *
  * @param position The edge of the orbiter. Use [OrbiterEdge.Start] or [OrbiterEdge.End].
  * @param offset The offset of the orbiter based on the outer edge of the orbiter.
  * @param alignment The alignment of the orbiter. Use [Alignment.CenterVertically] or
  *   [Alignment.Top] or [Alignment.Bottom].
  * @param settings The settings for the orbiter.
  * @param shape The shape of this Orbiter when it is rendered in 3D space.
+ * @param elevation The z-direction elevation level of this Orbiter.
  * @param content The content of the orbiter.
  *
  * Example:
@@ -206,8 +242,9 @@ public fun Orbiter(
     position: OrbiterEdge.Vertical,
     offset: Dp = 0.dp,
     alignment: Alignment.Vertical = Alignment.CenterVertically,
-    settings: OrbiterSettings = OrbiterDefaults.orbiterSettings,
-    shape: SpatialShape = OrbiterDefaults.shape,
+    settings: OrbiterSettings = OrbiterDefaults.Settings,
+    shape: SpatialShape = OrbiterDefaults.Shape,
+    elevation: SpatialElevationLevel = OrbiterDefaults.Elevation,
     content: @Composable @UiComposable () -> Unit,
 ) {
     Orbiter(
@@ -217,6 +254,7 @@ public fun Orbiter(
             offset = outer(offset),
             settings = settings,
             shape = shape,
+            elevation = elevation,
             content = content,
         )
     )
@@ -224,6 +262,14 @@ public fun Orbiter(
 
 /**
  * A composable that creates an orbiter along the start or end edges of a view.
+ *
+ * Orbiters are floating elements that contain controls for spatial content. They allow the content
+ * to have more space and give users quick access to features like navigation without obstructing
+ * the main content.
+ *
+ * In non-spatial environments, orbiters may be configured using
+ * [OrbiterSettings.shouldRenderInNonSpatial] to render their content as if the orbiter wrapper was
+ * not present or be removed from the flow entirely.
  *
  * @param position The edge of the orbiter. Use [OrbiterEdge.Start] or [OrbiterEdge.End].
  * @param offset The offset of the orbiter based on the inner or outer edge of the orbiter. Use
@@ -234,6 +280,7 @@ public fun Orbiter(
  *   [Alignment.Top] or [Alignment.Bottom].
  * @param settings The settings for the orbiter.
  * @param shape The shape of this Orbiter when it is rendered in 3D space.
+ * @param elevation The z-direction elevation level of this Orbiter.
  * @param content The content of the orbiter.
  *
  * Example:
@@ -250,8 +297,9 @@ public fun Orbiter(
     position: OrbiterEdge.Vertical,
     offset: EdgeOffset,
     alignment: Alignment.Vertical = Alignment.CenterVertically,
-    settings: OrbiterSettings = OrbiterDefaults.orbiterSettings,
-    shape: SpatialShape = OrbiterDefaults.shape,
+    settings: OrbiterSettings = OrbiterDefaults.Settings,
+    shape: SpatialShape = OrbiterDefaults.Shape,
+    elevation: SpatialElevationLevel = OrbiterDefaults.Elevation,
     content: @Composable @UiComposable () -> Unit,
 ) {
     Orbiter(
@@ -261,6 +309,7 @@ public fun Orbiter(
             offset = offset,
             settings = settings,
             shape = shape,
+            elevation = elevation,
             content = content,
         )
     )
@@ -296,7 +345,7 @@ internal fun PositionedOrbiter(data: OrbiterData) {
                     ),
                     panelSize.run { IntSize(width, height) },
                     it,
-                    SpatialElevationLevel.Level1.level,
+                    data.elevation.level,
                 )
             },
         shape = data.shape,
@@ -449,9 +498,10 @@ internal data class OrbiterData(
     public val verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
     public val horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
     public val offset: EdgeOffset,
-    public val settings: OrbiterSettings = OrbiterDefaults.orbiterSettings,
+    public val settings: OrbiterSettings = OrbiterDefaults.Settings,
     public val content: @Composable () -> Unit,
     public val shape: SpatialShape,
+    public val elevation: SpatialElevationLevel = OrbiterDefaults.Elevation,
 )
 
 /**

@@ -22,7 +22,6 @@
  * modifying its settings.
  */
 
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 
 plugins {
@@ -38,6 +37,7 @@ dependencies {
 
     implementation("androidx.annotation:annotation:1.8.1")
     implementation(libs.truth)
+    implementation("com.google.ar:impress:0.0.3")
 
     testImplementation(libs.kotlinCoroutinesTest)
     testImplementation(libs.junit)
@@ -48,6 +48,9 @@ dependencies {
 }
 
 android {
+    defaultConfig {
+        minSdkVersion 23
+    }
     namespace = "androidx.xr.runtime.testing"
     sourceSets.main.resources.srcDirs += "src/main/resources"
 }
@@ -57,7 +60,6 @@ androidx {
     type = SoftwareType.PUBLISHED_TEST_LIBRARY
     inceptionYear = "2024"
     description = "A fake implementation of the XR runtime used in unit tests."
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
     // TODO: b/326456246
     optOutJSpecify = true
 }

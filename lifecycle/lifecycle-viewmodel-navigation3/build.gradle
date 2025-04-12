@@ -22,7 +22,6 @@
  * modifying its settings.
  */
 
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 
@@ -33,7 +32,7 @@ plugins {
 }
 
 androidXMultiplatform {
-    android()
+    androidTarget()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -103,9 +102,9 @@ android {
 
 androidx {
     name = "Androidx Lifecycle Navigation3 ViewModel"
+    mavenVersion = LibraryVersions.LIFECYCLE_VIEWMODEL_NAV3
     type = SoftwareType.PUBLISHED_LIBRARY_ONLY_USED_BY_KOTLIN_CONSUMERS
     inceptionYear = "2024"
     description = "Provides the ViewModel wrapper for nav3."
     doNotDocumentReason = "Not published to maven"
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
 }

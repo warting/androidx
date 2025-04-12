@@ -16,30 +16,49 @@
 
 package androidx.privacysandbox.ui.integration.sdkproviderutils
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.annotation.RequiresApi
+import androidx.privacysandbox.ui.core.ExperimentalFeatures
+import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.AdFormat
 import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.AdType
-import androidx.privacysandbox.ui.integration.testaidl.IMediateeSdkApi
+import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.MediationOption
 import androidx.privacysandbox.ui.provider.AbstractSandboxedUiAdapter
 import androidx.privacysandbox.ui.provider.toCoreLibInfo
 
-class MediateeSdkApiImpl(private val sdkContext: Context) : IMediateeSdkApi.Stub() {
-    override fun loadBannerAd(
-        @AdType adType: Int,
-        waitInsideOnDraw: Boolean,
-        drawViewability: Boolean
-    ): Bundle {
-        return loadBannerAdUtil(adType, waitInsideOnDraw, drawViewability, sdkContext)
-    }
-
+@SuppressLint("NullAnnotationGroup")
+@OptIn(ExperimentalFeatures.SharedUiPresentationApi::class)
+class MediateeSdkApiImpl() {
     companion object {
+        fun loadAdUtil(
+            @AdFormat adFormat: Int,
+            @AdType adType: Int,
+            withSlowDraw: Boolean,
+            drawViewability: Boolean,
+            sdkContext: Context,
+            automatedTestCallbackProxy: IAutomatedTestCallbackProxy? = null
+        ): Bundle =
+            when (adFormat) {
+                AdFormat.BANNER_AD ->
+                    loadBannerAdUtil(
+                        adType,
+                        withSlowDraw,
+                        drawViewability,
+                        sdkContext,
+                        automatedTestCallbackProxy
+                    )
+                AdFormat.NATIVE_AD -> loadNativeAdUtil(adType, sdkContext)
+                else -> Bundle()
+            }
+
         fun loadBannerAdUtil(
             @AdType adType: Int,
             waitInsideOnDraw: Boolean,
             drawViewability: Boolean,
-            sdkContext: Context
+            sdkContext: Context,
+            automatedTestCallbackProxy: IAutomatedTestCallbackProxy? = null
         ): Bundle {
             val testAdapters = TestAdapters(sdkContext)
             val mediationDescription =
@@ -53,10 +72,25 @@ class MediateeSdkApiImpl(private val sdkContext: Context) : IMediateeSdkApi.Stub
                         loadWebViewBannerAdFromLocalAssets(testAdapters)
                     AdType.NON_WEBVIEW_VIDEO -> loadVideoAd(testAdapters)
                     else ->
-                        loadNonWebViewBannerAd(testAdapters, mediationDescription, waitInsideOnDraw)
+                        loadNonWebViewBannerAd(
+                            testAdapters,
+                            mediationDescription,
+                            waitInsideOnDraw,
+                            automatedTestCallbackProxy
+                        )
                 }
             ViewabilityHandler.addObserverFactoryToAdapter(adapter, drawViewability)
             return adapter.toCoreLibInfo(sdkContext)
+        }
+
+        private fun loadNativeAdUtil(@AdType adType: Int, sdkContext: Context): Bundle {
+            val nativeAdGenerator =
+                NativeAdGenerator(
+                    sdkContext,
+                    if (CompatImpl.isAppOwnedMediatee()) MediationOption.IN_APP_MEDIATEE
+                    else MediationOption.SDK_RUNTIME_MEDIATEE
+                )
+            return nativeAdGenerator.generateAdBundleWithAssets(adType)
         }
 
         private fun loadWebViewBannerAd(testAdapters: TestAdapters): AbstractSandboxedUiAdapter {
@@ -79,9 +113,10 @@ class MediateeSdkApiImpl(private val sdkContext: Context) : IMediateeSdkApi.Stub
         private fun loadNonWebViewBannerAd(
             testAdapters: TestAdapters,
             text: String,
-            waitInsideOnDraw: Boolean
+            waitInsideOnDraw: Boolean,
+            automatedTestCallbackProxy: IAutomatedTestCallbackProxy?
         ): AbstractSandboxedUiAdapter {
-            return testAdapters.TestBannerAd(text, waitInsideOnDraw)
+            return testAdapters.TestBannerAd(text, waitInsideOnDraw, automatedTestCallbackProxy)
         }
     }
 

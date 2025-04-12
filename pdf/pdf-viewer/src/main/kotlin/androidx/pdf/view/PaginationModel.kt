@@ -37,7 +37,11 @@ import kotlin.math.max
 @MainThread
 @Suppress("BanParcelableUsage")
 @RestrictTo(RestrictTo.Scope.LIBRARY)
-internal class PaginationModel(val pageSpacingPx: Int, val numPages: Int) : Parcelable {
+internal class PaginationModel(
+    val pageSpacingPx: Int,
+    val numPages: Int,
+    val topPageMarginPx: Int = 0
+) : Parcelable {
 
     init {
         require(numPages >= 0) { "Empty PDF!" }
@@ -61,7 +65,7 @@ internal class PaginationModel(val pageSpacingPx: Int, val numPages: Int) : Parc
     private val pages = Array(numPages) { UNKNOWN_SIZE }
 
     /** The top position of each page known to this model */
-    private val pagePositions = IntArray(numPages) { -1 }.apply { this[0] = 0 }
+    private val pagePositions = IntArray(numPages) { -1 }.apply { this[0] = topPageMarginPx }
 
     /**
      * The estimated height of any page not known to this model, i.e. the average height of all
@@ -160,7 +164,14 @@ internal class PaginationModel(val pageSpacingPx: Int, val numPages: Int) : Parc
         viewportTop: Int,
         viewportBottom: Int,
         includePartial: Boolean = true
-    ): Range<Int> {
+    ): PagesInViewport {
+        // If the top of the viewport exceeds the bottom of the last page whose dimensions are
+        // known, return an empty range at the bottom of this model, and indicate that layout is
+        // still in progress.
+        val index = max(0, reach)
+        if (viewportTop > pageBottoms[index]) {
+            return PagesInViewport(Range(index, index), layoutInProgress = true)
+        }
         val startList = if (includePartial) pageBottoms else pageTops
         val endList = if (includePartial) pageTops else pageBottoms
 
@@ -172,10 +183,10 @@ internal class PaginationModel(val pageSpacingPx: Int, val numPages: Int) : Parc
             val midPoint = (viewportTop + viewportBottom) / 2
             val midResult = pageTops.binarySearch(midPoint)
             val page = maxOf(abs(midResult + 1) - 1, 0)
-            return Range(page, page)
+            return PagesInViewport(Range(page, page))
         }
 
-        return Range(rangeStart, rangeEnd)
+        return PagesInViewport(Range(rangeStart, rangeEnd))
     }
 
     /** Returns the location of the page in content coordinates */
@@ -239,3 +250,21 @@ internal class PaginationModel(val pageSpacingPx: Int, val numPages: Int) : Parc
         return 0
     }
 }
+
+/**
+ * Encapsulates our understanding of the currently-visible PDF pages, including whether this is a
+ * best guess during layout or the accurate set of pages.
+ */
+internal data class PagesInViewport(
+    /** The set of pages that are currently visible */
+    val pages: Range<Int>,
+    /**
+     * True if we're actively laying out pages to reach the current scroll position, and [pages]
+     * represents a best guess at the set of pages that are currently visible (i.e. instead of
+     * precisely the pages that we know are visible).
+     *
+     * This will be false in most cases except those that involve jumping far ahead in the PDF (e.g.
+     * fast scroll or programmatic changes in position)
+     */
+    val layoutInProgress: Boolean = false,
+)

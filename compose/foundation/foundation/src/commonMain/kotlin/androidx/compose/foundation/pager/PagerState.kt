@@ -453,7 +453,7 @@ internal constructor(
 
     internal val prefetchState =
         LazyLayoutPrefetchState(prefetchScheduler) {
-            Snapshot.withoutReadObservation { schedulePrefetch(firstVisiblePage) }
+            Snapshot.withoutReadObservation { schedulePrecomposition(firstVisiblePage) }
         }
 
     internal val beyondBoundsInfo = LazyLayoutBeyondBoundsInfo()
@@ -672,6 +672,10 @@ internal constructor(
         isLookingAhead: Boolean,
         visibleItemsStayedTheSame: Boolean = false
     ) {
+        // update the prefetch state with the number of nested prefetch items this layout
+        // should use.
+        prefetchState.idealNestedPrefetchCount = result.visiblePagesInfo.size
+
         if (!isLookingAhead && hasLookaheadOccurred) {
             debugLog { "Applying Approach Measure Result" }
             // If there was already a lookahead pass, record this result as Approach result
@@ -759,7 +763,10 @@ internal constructor(
                     this.wasPrefetchingForward = isPrefetchingForward
                     this.indexToPrefetch = indexToPrefetch
                     currentPrefetchHandle =
-                        prefetchState.schedulePrefetch(indexToPrefetch, premeasureConstraints)
+                        prefetchState.schedulePrecompositionAndPremeasure(
+                            indexToPrefetch,
+                            premeasureConstraints
+                        )
                 }
                 if (isPrefetchingForward) {
                     val lastItem = info.visiblePagesInfo.last()

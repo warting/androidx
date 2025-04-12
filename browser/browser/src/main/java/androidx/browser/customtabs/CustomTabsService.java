@@ -32,7 +32,6 @@ import android.support.customtabs.ICustomTabsService;
 import androidx.annotation.IntDef;
 import androidx.annotation.RestrictTo;
 import androidx.browser.auth.AuthTabSessionToken;
-import androidx.browser.auth.ExperimentalAuthTab;
 import androidx.collection.SimpleArrayMap;
 
 import org.jspecify.annotations.NonNull;
@@ -337,7 +336,6 @@ public abstract class CustomTabsService extends Service {
             }
         }
 
-        @ExperimentalAuthTab
         @Override
         public boolean newAuthTabSession(IAuthTabCallback callback, Bundle extras) {
             PendingIntent sessionId = getSessionIdFromBundle(extras);
@@ -348,7 +346,7 @@ public abstract class CustomTabsService extends Service {
                     callback.asBinder().linkToDeath(deathRecipient, 0);
                     mDeathRecipientMap.put(callback.asBinder(), deathRecipient);
                 }
-                return CustomTabsService.this.newAuthTabSession(sessionToken);
+                return CustomTabsService.this.registerAuthTabSession(sessionToken);
             } catch (RemoteException e) {
                 return false;
             }
@@ -390,10 +388,9 @@ public abstract class CustomTabsService extends Service {
      *
      * @param sessionToken The session token for which the {@link DeathRecipient} call has been
      *                     received.
-     * @return Whether the clean up was successful. Multiple calls with two tokens holdings the
-     * same binder will return false.
+     * @return True if the provided session was cleaned up as a result of this call, false if the
+     * session doesn't exist or has already been cleaned up.
      */
-    @ExperimentalAuthTab
     protected boolean cleanUpSession(@NonNull AuthTabSessionToken sessionToken) {
         try {
             synchronized (mDeathRecipientMap) {
@@ -678,8 +675,7 @@ public abstract class CustomTabsService extends Service {
      *                     {@link AuthTabSessionToken#getCallback()}.
      * @return Whether a new session was successfully created.
      */
-    @ExperimentalAuthTab
-    protected boolean newAuthTabSession(@NonNull AuthTabSessionToken sessionToken) {
+    protected boolean registerAuthTabSession(@NonNull AuthTabSessionToken sessionToken) {
         return false;
     }
 }
