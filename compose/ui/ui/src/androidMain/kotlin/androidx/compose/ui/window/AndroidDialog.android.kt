@@ -32,6 +32,8 @@ import android.view.Window
 import android.view.WindowManager
 import androidx.activity.ComponentDialog
 import androidx.activity.addCallback
+import androidx.annotation.DoNotInline
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionContext
 import androidx.compose.runtime.DisposableEffect
@@ -96,6 +98,7 @@ import kotlin.math.roundToInt
  *   [WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE] on [Build.VERSION_CODES.R] and below and
  *   [WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING] on [Build.VERSION_CODES.S] and above.
  *   [Window.isFloating] will be `false` when `decorFitsSystemWindows` is `false`.
+ * @property dialogContentTitle Title to be set on the dialog's window.
  */
 @Immutable
 actual class DialogProperties(
@@ -103,7 +106,8 @@ actual class DialogProperties(
     actual val dismissOnClickOutside: Boolean = true,
     val securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
     actual val usePlatformDefaultWidth: Boolean = true,
-    val decorFitsSystemWindows: Boolean = true
+    val decorFitsSystemWindows: Boolean = true,
+    val dialogContentTitle: String = "",
 ) {
     actual constructor(
         dismissOnBackPress: Boolean,
@@ -115,6 +119,22 @@ actual class DialogProperties(
         securePolicy = SecureFlagPolicy.Inherit,
         usePlatformDefaultWidth = usePlatformDefaultWidth,
         decorFitsSystemWindows = true
+    )
+
+    @Deprecated("Maintained for binary compatibility", level = DeprecationLevel.HIDDEN)
+    constructor(
+        dismissOnBackPress: Boolean = true,
+        dismissOnClickOutside: Boolean = true,
+        securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
+        usePlatformDefaultWidth: Boolean = true,
+        decorFitsSystemWindows: Boolean = true,
+    ) : this(
+        dismissOnBackPress = dismissOnBackPress,
+        dismissOnClickOutside = dismissOnClickOutside,
+        securePolicy = SecureFlagPolicy.Inherit,
+        usePlatformDefaultWidth = usePlatformDefaultWidth,
+        decorFitsSystemWindows = true,
+        dialogContentTitle = ""
     )
 
     @Deprecated("Maintained for binary compatibility", level = DeprecationLevel.HIDDEN)
@@ -188,9 +208,6 @@ actual fun Dialog(
             DialogWrapper(onDismissRequest, properties, view, layoutDirection, density, dialogId)
                 .apply {
                     setContent(composition) {
-                        // TODO(b/159900354): draw a scrim and add margins around the Compose
-                        // Dialog, and
-                        //  consume clicks so they can't pass through to the underlying UI
                         DialogLayout(Modifier.semantics { dialog() }, currentContent)
                     }
                 }
@@ -337,14 +354,17 @@ private class DialogLayout(context: Context, override val window: Window) :
         setMeasuredDimension(measuredWidth, measuredHeight)
 
         if (
-            !usePlatformDefaultWidth &&
-                !decorFitsSystemWindows &&
+            !decorFitsSystemWindows &&
                 child.measuredHeight + verticalPadding > height &&
                 window.attributes.height == WRAP_CONTENT
         ) {
-            // The size of the window is too small with WRAP_CONTENT for height. Change it
-            // to use MATCH_PARENT to give as much room as possible
-            window.setLayout(MATCH_PARENT, MATCH_PARENT)
+            // We're going to use the full screen, so don't put a background behind the system bars
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            if (!usePlatformDefaultWidth) {
+                // The size of the window is too small with WRAP_CONTENT for height. Change it
+                // to use MATCH_PARENT to give as much room as possible
+                window.setLayout(MATCH_PARENT, MATCH_PARENT)
+            }
         }
     }
 
@@ -444,6 +464,8 @@ private class DialogWrapper(
     // elevation, so high values of maxSupportedElevation break accessibility services: b/232788477.
     private val maxSupportedElevation = 8.dp
 
+    private var isPressOutside = false
+
     override val subCompositionView: AbstractComposeView
         get() = dialogLayout
 
@@ -453,9 +475,24 @@ private class DialogWrapper(
         window.setBackgroundDrawableResource(android.R.color.transparent)
         WindowCompat.setDecorFitsSystemWindows(window, properties.decorFitsSystemWindows)
         window.setGravity(Gravity.CENTER)
+        if (!properties.decorFitsSystemWindows) {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+            )
+            val attrs = window.attributes
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Api30Impl.setFitInsetsSides(attrs, 0)
+                Api30Impl.setFitInsetsTypes(attrs, 0)
+            }
+            window.attributes = attrs
+        }
 
         dialogLayout =
             DialogLayout(context, window).apply {
+                // Set window title.
+                setTitle(properties.dialogContentTitle)
                 // Set unique id for AbstractComposeView. This allows state restoration for the
                 // state
                 // defined inside the Dialog via rememberSaveable()
@@ -538,8 +575,6 @@ private class DialogWrapper(
             }
     }
 
-    // TODO(b/159900354): Make the Android Dialog full screen and the scrim fully transparent
-
     fun setContent(parentComposition: CompositionContext, children: @Composable () -> Unit) {
         dialogLayout.setContent(parentComposition, children)
     }
@@ -593,8 +628,25 @@ private class DialogWrapper(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         var result = super.onTouchEvent(event)
         if (properties.dismissOnClickOutside && !dialogLayout.isInsideContent(event)) {
-            onDismissRequest()
-            result = true
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    isPressOutside = true
+                    result = true
+                }
+                MotionEvent.ACTION_UP ->
+                    if (isPressOutside) {
+                        onDismissRequest()
+                        result = true
+                        isPressOutside = false
+                    }
+                MotionEvent.ACTION_CANCEL -> isPressOutside = false
+            }
+        } else {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN,
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> isPressOutside = false
+            }
         }
 
         return result
@@ -623,5 +675,18 @@ private fun DialogLayout(modifier: Modifier = Modifier, content: @Composable () 
             maxHeight = constraints.minHeight
         }
         layout(maxWidth, maxHeight) { placeables.fastForEach { it.placeRelative(0, 0) } }
+    }
+}
+
+@RequiresApi(30)
+private object Api30Impl {
+    @DoNotInline
+    fun setFitInsetsSides(attrs: WindowManager.LayoutParams, sides: Int) {
+        attrs.setFitInsetsSides(sides)
+    }
+
+    @DoNotInline
+    fun setFitInsetsTypes(attrs: WindowManager.LayoutParams, types: Int) {
+        attrs.setFitInsetsTypes(types)
     }
 }

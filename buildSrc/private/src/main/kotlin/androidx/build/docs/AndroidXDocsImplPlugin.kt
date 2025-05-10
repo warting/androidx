@@ -475,7 +475,7 @@ abstract class AndroidXDocsImplPlugin : Plugin<Project> {
             project.configurations.create("docs-runtime-classpath") {
                 it.setResolveClasspathForUsage(Usage.JAVA_RUNTIME)
             }
-        val kotlinDefaultCatalogVersion = androidx.build.KotlinTarget.DEFAULT.catalogVersion
+        val kotlinDefaultCatalogVersion = androidx.build.KotlinTarget.LATEST.catalogVersion
         val kotlinLatest = project.versionCatalog.findVersion(kotlinDefaultCatalogVersion).get()
         listOf(docsCompileClasspath, docsRuntimeClasspath).forEach { config ->
             config.resolutionStrategy {
@@ -566,7 +566,7 @@ abstract class AndroidXDocsImplPlugin : Plugin<Project> {
 
                     description =
                         "Generates reference documentation using a Google devsite Dokka" +
-                            " plugin. Places docs in $generatedDocsDir"
+                            " plugin. Places docs in ${generatedDocsDir.get()}"
                     group = JavaBasePlugin.DOCUMENTATION_GROUP
 
                     dackkaClasspath.from(project.files(dackkaConfiguration))
@@ -582,7 +582,9 @@ abstract class AndroidXDocsImplPlugin : Plugin<Project> {
                     )
                     dependenciesClasspath.from(
                         dependencyClasspath +
-                            project.getAndroidJar() +
+                            project.getAndroidJar(
+                                project.defaultAndroidConfig.latestStableCompileSdk
+                            ) +
                             project.getExtraCommonDependencies()
                     )
                     excludedPackages.set(hiddenPackages.toSet())
@@ -928,6 +930,10 @@ abstract class MergeMultiplatformMetadataTask : DefaultTask() {
                 mergedMetadata.merge(metadata)
             }
         val gson = GsonBuilder().setPrettyPrinting().create()
+        // Sort sourceSets to ensure that child sourceSets come after their parents, b/404784813
+        // Also ensure deterministic order--mergedMetadata.merge() uses .toSet() to deduplicate.
+        mergedMetadata.sourceSets =
+            mergedMetadata.sourceSets.sortedWith(compareBy({ it.dependencies.size }, { it.name }))
         val json = gson.toJson(mergedMetadata)
         mergedProjectMetadata.get().asFile.apply {
             parentFile.mkdirs()
@@ -968,7 +974,12 @@ private fun Project.getExtraCommonDependencies(): FileCollection =
                 getPrebuiltsExternalPath(),
                 "org/jetbrains/kotlinx/atomicfu/0.17.0/atomicfu-0.17.0.jar"
             ),
-            File(getPrebuiltsExternalPath(), "com/squareup/okio/okio-jvm/3.1.0/okio-jvm-3.1.0.jar")
+            File(getPrebuiltsExternalPath(), "com/squareup/okio/okio-jvm/3.1.0/okio-jvm-3.1.0.jar"),
+            // TODO(b/409256436): Remove when KMP classes (.knm) in Kotlin 2.1 can be loaded
+            File(
+                getPrebuiltsExternalPath(),
+                "org/jetbrains/kotlin/kotlin-stdlib/2.0.20/kotlin-stdlib-2.0.20-common.jar"
+            )
         ) +
             PLATFORMS.map {
                 File(

@@ -256,6 +256,11 @@ internal class TransformingLazyColumnContentPaddingMeasurementStrategy(
         )
 
         actuallyVisibleItems.fastForEach { it.isInMeasure = false }
+        val childConstraints =
+            Constraints(
+                maxHeight = Constraints.Infinity,
+                maxWidth = containerConstraints.maxWidth - leftContentPadding - rightContentPadding
+            )
 
         return TransformingLazyColumnMeasureResult(
             anchorItemIndex = anchorItem.index,
@@ -273,6 +278,7 @@ internal class TransformingLazyColumnContentPaddingMeasurementStrategy(
             itemSpacing = itemSpacing,
             beforeContentPadding = beforeContentPadding,
             afterContentPadding = afterContentPadding,
+            childConstraints = childConstraints,
             measureResult =
                 layout(containerConstraints.maxWidth, containerConstraints.maxHeight) {
                     actuallyVisibleItems.fastForEach { it.place(this) }
@@ -304,7 +310,7 @@ internal class TransformingLazyColumnContentPaddingMeasurementStrategy(
                 )
             visibleItems.addFirst(additionalItem)
             topOffset -= additionalItem.transformedHeight + itemSpacing
-            topPassIndex -= 1
+            topPassIndex -= 1 // Indexes must be incremental.
         }
     }
 
@@ -330,7 +336,7 @@ internal class TransformingLazyColumnContentPaddingMeasurementStrategy(
                 )
             bottomOffset += additionalItem.transformedHeight + itemSpacing
             visibleItems.add(additionalItem)
-            bottomPassIndex += 1
+            bottomPassIndex += 1 // Indexes must be incremental.
         }
     }
 
@@ -363,8 +369,7 @@ internal class TransformingLazyColumnContentPaddingMeasurementStrategy(
         visibleItems.fastForEachIndexed { idx, item ->
             item.measureScrollProgress =
                 bottomItemScrollProgress(
-                    // TODO: artemiy - Investigate why this is needed.
-                    if (idx == 0) previousOffset - itemSpacing else previousOffset,
+                    previousOffset,
                     item.measuredHeight,
                     containerConstraints.maxHeight
                 )
@@ -382,8 +387,7 @@ internal class TransformingLazyColumnContentPaddingMeasurementStrategy(
         for (idx in visibleItems.indices.reversed()) {
             visibleItems[idx].measureScrollProgress =
                 topItemScrollProgress(
-                    // TODO: artemiy - Investigate why this is needed.
-                    if (idx == 0) bottomLineOffset + 2 * itemSpacing else bottomLineOffset,
+                    bottomLineOffset,
                     visibleItems[idx].measuredHeight,
                     containerConstraints.maxHeight
                 )

@@ -44,6 +44,7 @@ import androidx.camera.camera2.pipe.integration.impl.ComboRequestListener
 import androidx.camera.camera2.pipe.integration.impl.EvCompControl
 import androidx.camera.camera2.pipe.integration.impl.FlashControl
 import androidx.camera.camera2.pipe.integration.impl.FocusMeteringControl
+import androidx.camera.camera2.pipe.integration.impl.LowLightBoostControl
 import androidx.camera.camera2.pipe.integration.impl.State3AControl
 import androidx.camera.camera2.pipe.integration.impl.StillCaptureRequestControl
 import androidx.camera.camera2.pipe.integration.impl.TorchControl
@@ -58,7 +59,9 @@ import androidx.camera.core.impl.CameraInternal
 import androidx.camera.core.impl.CameraThreadConfig
 import androidx.camera.core.impl.EncoderProfilesProvider
 import androidx.camera.core.impl.Quirks
+import androidx.camera.core.internal.StreamSpecsCalculator
 import dagger.Binds
+import dagger.BindsInstance
 import dagger.Module
 import dagger.Provides
 import dagger.Subcomponent
@@ -84,6 +87,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
             State3AControl.Bindings::class,
             StillCaptureRequestControl.Bindings::class,
             TorchControl.Bindings::class,
+            LowLightBoostControl.Bindings::class,
             VideoUsageControl.Bindings::class,
             ZoomCompat.Bindings::class,
             ZoomControl.Bindings::class,
@@ -210,6 +214,9 @@ public interface CameraComponent {
     @Subcomponent.Builder
     public interface Builder {
         public fun config(config: CameraConfig): Builder
+
+        @BindsInstance
+        public fun streamSpecsCalculator(streamSpecsCalculator: StreamSpecsCalculator): Builder
 
         public fun build(): CameraComponent
     }

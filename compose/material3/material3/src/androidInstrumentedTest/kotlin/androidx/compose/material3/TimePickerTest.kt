@@ -298,7 +298,11 @@ class TimePickerTest {
             TimePicker(state)
         }
 
-        rule.onNodeWithContentDescription(contentDescription).onChildren().assertAll(isSelectable())
+        rule
+            .onNodeWithContentDescription(contentDescription)
+            .onChildren()
+            .filter(expectValue(SemanticsProperties.Role, Role.Button))
+            .assertAll(isSelectable())
     }
 
     @Test
@@ -404,6 +408,41 @@ class TimePickerTest {
         rule.onNodeWithText("23").assertContentDescriptionContains("for minutes")
     }
 
+    @Test
+    fun timeInput_userOverride_updates() {
+        val state = TimePickerState(initialHour = 14, initialMinute = 0, is24Hour = true)
+
+        rule.setMaterialContent(lightColorScheme()) { TimeInput(state) }
+
+        rule.onNodeWithText("14").assert(isFocusable()).assertContentDescriptionContains("for hour")
+
+        rule.runOnIdle {
+            state.hour = 20
+            state.minute = 12
+        }
+
+        rule.waitForIdle()
+
+        rule.onNodeWithText("20").assertContentDescriptionContains("for hour")
+
+        rule.onAllNodesWithText("12").assertCountEquals(2)
+    }
+
+    @Test
+    fun timePicker_userOverride_updates() {
+        val state = TimePickerState(initialHour = 14, initialMinute = 0, is24Hour = true)
+
+        rule.setMaterialContent(lightColorScheme()) { TimePicker(state) }
+
+        rule.onNodeWithText("14").assertIsSelected()
+
+        rule.runOnIdle { state.hour = 20 }
+
+        rule.waitForIdle()
+
+        rule.onNodeWithText("20").assertIsSelected()
+    }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun timeInput_keyboardInput_valid() {
@@ -488,6 +527,22 @@ class TimePickerTest {
         rule.onNodeWithText("11").performKeyInput { pressKey(Key.Four) }
 
         assertThat(state.isPm).isTrue()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun timeInput_input12_maintainsAm() {
+        val state = TimePickerState(initialHour = 10, initialMinute = 0, is24Hour = false)
+
+        rule.setMaterialContent(lightColorScheme()) { TimeInput(state) }
+
+        rule.onNodeWithText("10").performKeyInput {
+            pressKey(Key.One)
+            pressKey(Key.Two)
+        }
+
+        assertThat(state.isPm).isFalse()
+        assertThat(state.hour).isEqualTo(0)
     }
 
     @OptIn(ExperimentalTestApi::class)

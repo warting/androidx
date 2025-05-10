@@ -51,6 +51,8 @@ import androidx.camera.core.impl.QuirkSettingsLoader;
 import androidx.camera.core.impl.UseCaseConfigFactory;
 import androidx.camera.core.impl.utils.ContextUtil;
 import androidx.camera.core.impl.utils.futures.Futures;
+import androidx.camera.core.internal.StreamSpecsCalculator;
+import androidx.camera.core.internal.StreamSpecsCalculatorImpl;
 import androidx.concurrent.futures.CallbackToFutureAdapter;
 import androidx.core.os.HandlerCompat;
 import androidx.core.util.Preconditions;
@@ -88,6 +90,7 @@ public final class CameraX {
     private CameraFactory mCameraFactory;
     private CameraDeviceSurfaceManager mSurfaceManager;
     private UseCaseConfigFactory mDefaultConfigFactory;
+    private StreamSpecsCalculator mStreamSpecsCalculator;
     private final RetryPolicy mRetryPolicy;
     private final ListenableFuture<Void> mInitInternalFuture;
 
@@ -96,6 +99,7 @@ public final class CameraX {
     @GuardedBy("mInitializeLock")
     private ListenableFuture<Void> mShutdownInternalFuture = Futures.immediateFuture(null);
     private final Integer mMinLogLevel;
+    private final @CameraXConfig.ImplType int mConfigImplType;
 
     private static final Object MIN_LOG_LEVEL_LOCK = new Object();
     @GuardedBy("MIN_LOG_LEVEL_LOCK")
@@ -125,6 +129,7 @@ public final class CameraX {
         }
         // Update quirks settings as early as possible since device quirks are loaded statically.
         updateQuirkSettings(context, mCameraXConfig.getQuirkSettings(), quirkSettingsLoader);
+        mConfigImplType = mCameraXConfig.getConfigImplType();
 
         Executor executor = mCameraXConfig.getCameraExecutor(null);
         Handler schedulerHandler = mCameraXConfig.getSchedulerHandler(null);
@@ -255,6 +260,14 @@ public final class CameraX {
     }
 
     /**
+     * Returns the config impl type of the instance.
+     */
+    @RestrictTo(Scope.LIBRARY_GROUP)
+    public @CameraXConfig.ImplType int getConfigImplType() {
+        return mConfigImplType;
+    }
+
+    /**
      * Returns the {@link CameraDeviceSurfaceManager} instance.
      *
      * @throws IllegalStateException if the {@link CameraDeviceSurfaceManager} has not been set, due
@@ -289,6 +302,19 @@ public final class CameraX {
         }
 
         return mDefaultConfigFactory;
+    }
+
+    /**
+     * Returns the {@link StreamSpecsCalculator} instance.
+     *
+     */
+    @RestrictTo(Scope.LIBRARY_GROUP)
+    public @NonNull StreamSpecsCalculator getStreamSpecsCalculator() {
+        if (mStreamSpecsCalculator == null) {
+            throw new IllegalStateException("CameraX not initialized yet.");
+        }
+
+        return mStreamSpecsCalculator;
     }
 
     /**
@@ -351,10 +377,24 @@ public final class CameraX {
                         mCameraXConfig.getAvailableCamerasLimiter(null);
                 long cameraOpenRetryMaxTimeoutInMillis =
                         mCameraXConfig.getCameraOpenRetryMaxTimeoutInMillisWhileResuming();
+
+                UseCaseConfigFactory.Provider configFactoryProvider =
+                        mCameraXConfig.getUseCaseConfigFactoryProvider(null);
+                if (configFactoryProvider == null) {
+                    throw new InitializationException(new IllegalArgumentException(
+                            "Invalid app configuration provided. Missing "
+                                    + "UseCaseConfigFactory."));
+                }
+
+                mDefaultConfigFactory = configFactoryProvider.newInstance(appContext);
+
+                mStreamSpecsCalculator = new StreamSpecsCalculatorImpl(mDefaultConfigFactory, null);
+
                 mCameraFactory = cameraFactoryProvider.newInstance(appContext,
                         cameraThreadConfig,
                         availableCamerasLimiter,
-                        cameraOpenRetryMaxTimeoutInMillis);
+                        cameraOpenRetryMaxTimeoutInMillis,
+                        mStreamSpecsCalculator);
                 CameraDeviceSurfaceManager.Provider surfaceManagerProvider =
                         mCameraXConfig.getDeviceSurfaceManagerProvider(null);
                 if (surfaceManagerProvider == null) {
@@ -365,15 +405,7 @@ public final class CameraX {
                 mSurfaceManager = surfaceManagerProvider.newInstance(appContext,
                         mCameraFactory.getCameraManager(),
                         mCameraFactory.getAvailableCameraIds());
-
-                UseCaseConfigFactory.Provider configFactoryProvider =
-                        mCameraXConfig.getUseCaseConfigFactoryProvider(null);
-                if (configFactoryProvider == null) {
-                    throw new InitializationException(new IllegalArgumentException(
-                            "Invalid app configuration provided. Missing "
-                                    + "UseCaseConfigFactory."));
-                }
-                mDefaultConfigFactory = configFactoryProvider.newInstance(appContext);
+                mStreamSpecsCalculator.setCameraDeviceSurfaceManager(mSurfaceManager);
 
                 if (cameraExecutor instanceof CameraExecutor) {
                     CameraExecutor executor = (CameraExecutor) cameraExecutor;

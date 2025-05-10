@@ -33,7 +33,7 @@ import androidx.compose.ui.UiComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.xr.compose.platform.SessionCallbackProvider
+import androidx.xr.compose.platform.LocalSpatialCapabilities
 import androidx.xr.compose.spatial.Orbiter
 import androidx.xr.compose.spatial.OrbiterEdge
 import androidx.xr.compose.spatial.SpatialElevation
@@ -44,38 +44,25 @@ import androidx.xr.compose.subspace.SpatialRow
 import androidx.xr.compose.subspace.layout.SubspaceModifier
 import androidx.xr.compose.subspace.layout.height
 import androidx.xr.compose.subspace.layout.width
-import androidx.xr.scenecore.Session
+import androidx.xr.runtime.Session
+import androidx.xr.runtime.SessionCreateSuccess
+import androidx.xr.scenecore.scene
 
 class ModeChangeApp : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContent { PanelContent("Unknown mode", "Text not shown", false) {} }
-
-        SessionCallbackProvider.default.get(Session.create(this)).also {
-            @Suppress("UNUSED_VARIABLE") val unused = it.onFullSpaceMode { fullSpaceModeContent() }
-        }
-
-        SessionCallbackProvider.default.get(Session.create(this)).also {
-            @Suppress("UNUSED_VARIABLE")
-            val unused = it.onHomeSpaceMode { _ -> homeSpaceModeContent() }
-        }
-    }
-
-    private fun fullSpaceModeContent() {
-        setContent { SpatialContent() }
-    }
-
-    private fun homeSpaceModeContent() {
         setContent {
-            PanelContent("HomeSpace Mode", "Transition to FullSpace Mode", true) {
-                Session.create(this@ModeChangeApp).spatialEnvironment.requestFullSpaceMode()
+            if (LocalSpatialCapabilities.current.isSpatialUiEnabled) {
+                FullSpaceModeContent()
+            } else {
+                HomeSpaceModeContent()
             }
         }
     }
 
     @Composable
-    private fun SpatialContent() {
+    private fun FullSpaceModeContent() {
         Subspace {
             SpatialRow {
                 SpatialPanel(modifier = SubspaceModifier.width(300.dp).height(300.dp)) {
@@ -83,7 +70,11 @@ class ModeChangeApp : ComponentActivity() {
                 }
                 SpatialPanel(modifier = SubspaceModifier.width(600.dp).height(400.dp)) {
                     PanelContent("FullSpace Mode", "Transition to HomeSpace Mode", true) {
-                        Session.create(this@ModeChangeApp).spatialEnvironment.requestHomeSpaceMode()
+                        (Session.create(this@ModeChangeApp) as SessionCreateSuccess)
+                            .session
+                            .scene
+                            .spatialEnvironment
+                            .requestHomeSpaceMode()
                     }
                 }
                 SpatialPanel(modifier = SubspaceModifier.width(300.dp).height(300.dp)) {
@@ -93,9 +84,20 @@ class ModeChangeApp : ComponentActivity() {
         }
     }
 
+    @Composable
+    private fun HomeSpaceModeContent() {
+        PanelContent("HomeSpace Mode", "Transition to FullSpace Mode", true) {
+            (Session.create(this@ModeChangeApp) as SessionCreateSuccess)
+                .session
+                .scene
+                .spatialEnvironment
+                .requestFullSpaceMode()
+        }
+    }
+
     @UiComposable
     @Composable
-    fun PanelContent(
+    private fun PanelContent(
         orbiterText: String,
         buttonText: String,
         showButton: Boolean,

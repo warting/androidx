@@ -114,7 +114,6 @@ abstract class CombineObjectFilesTask : DefaultTask() {
                     Architecture.X64 -> "x86_64"
                     Architecture.ARM32 -> "armeabi-v7a"
                     Architecture.ARM64 -> "arm64-v8a"
-                    else -> error("add this architecture for android ${konanTarget.architecture}")
                 }
             }
             val familyPrefix =
@@ -142,10 +141,10 @@ fun TaskProvider<CombineObjectFilesTask>.configureFrom(
         task.objectFiles.addAll(
             multiTargetNativeCompilation.targetsProvider(filter).map { nativeTargetCompilations ->
                 nativeTargetCompilations.map { nativeTargetCompilation ->
-                    nativeTargetCompilation.sharedLibTask.map { sharedLibraryTask ->
+                    nativeTargetCompilation.linkerTask.map { linkerTask ->
                         ObjectFile(
-                            konanTarget = sharedLibraryTask.clangParameters.konanTarget,
-                            file = sharedLibraryTask.clangParameters.outputFile
+                            konanTarget = linkerTask.clangParameters.konanTarget,
+                            file = linkerTask.clangParameters.outputFile
                         )
                     }
                 }

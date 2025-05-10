@@ -49,6 +49,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -102,6 +104,8 @@ import androidx.wear.compose.materialcore.animateSelectionColor
  *   emitting [Interaction]s for this radio button. You can use this to change the radio button's
  *   appearance or preview the radio button in different states. Note that if `null` is provided,
  *   interactions will still happen internally.
+ * @param transformation Transformation to be used when button appears inside a container that needs
+ *   to dynamically change its content separately from the background.
  * @param icon An optional slot for providing an icon to indicate the purpose of the button. The
  *   contents are expected to be center-aligned, both horizontally and vertically, and should be an
  *   icon of size 24.dp.
@@ -120,6 +124,7 @@ public fun RadioButton(
     colors: RadioButtonColors = RadioButtonDefaults.radioButtonColors(),
     contentPadding: PaddingValues = RadioButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource? = null,
+    transformation: SurfaceTransformation? = null,
     icon: @Composable (BoxScope.() -> Unit)? = null,
     secondaryLabel: @Composable (RowScope.() -> Unit)? = null,
     label: @Composable RowScope.() -> Unit
@@ -131,10 +136,15 @@ public fun RadioButton(
         modifier =
             modifier
                 .defaultMinSize(minHeight = MIN_HEIGHT)
-                .height(IntrinsicSize.Min)
                 .width(IntrinsicSize.Max)
-                .clip(shape = shape)
-                .background(colors.containerColor(enabled = enabled, selected = selected).value)
+                .surface(
+                    painter =
+                        ColorPainter(
+                            colors.containerColor(enabled = enabled, selected = selected).value
+                        ),
+                    shape = shape,
+                    transformation = transformation
+                )
                 .selectable(
                     enabled = enabled,
                     selected = selected,
@@ -260,6 +270,8 @@ public fun RadioButton(
  *   and emitting [Interaction]s for this button's "clickable" tap area. You can use this to change
  *   the button's appearance or preview the button in different states. Note that if `null` is
  *   provided, interactions will still happen internally.
+ * @param transformation Transformation to be used when button appears inside a container that needs
+ *   to dynamically change its content separately from the background.
  * @param containerClickLabel Optional click label on the main body of the button for accessibility.
  * @param secondaryLabel A slot for providing the button's secondary label. The contents are
  *   expected to be "start" aligned.
@@ -278,6 +290,7 @@ public fun SplitRadioButton(
     colors: SplitRadioButtonColors = RadioButtonDefaults.splitRadioButtonColors(),
     selectionInteractionSource: MutableInteractionSource? = null,
     containerInteractionSource: MutableInteractionSource? = null,
+    transformation: SurfaceTransformation? = null,
     containerClickLabel: String? = null,
     contentPadding: PaddingValues = RadioButtonDefaults.ContentPadding,
     secondaryLabel: @Composable (RowScope.() -> Unit)? = null,
@@ -292,7 +305,12 @@ public fun SplitRadioButton(
                 .defaultMinSize(minHeight = MIN_HEIGHT)
                 .height(IntrinsicSize.Min)
                 .width(IntrinsicSize.Max)
-                .clip(shape = shape)
+                .graphicsLayer {
+                    this.shape = shape
+                    clip = true
+                    val transformation = transformation ?: return@graphicsLayer
+                    with(transformation) { applyContainerTransformation() }
+                }
     ) {
         Row(
             modifier =
@@ -588,7 +606,7 @@ public object RadioButtonDefaults {
             disabledUnselectedControlColor = disabledUnselectedControlColor,
         )
 
-    internal val LabelSpacerSize = 2.dp
+    internal val LabelSpacerSize = 1.dp
     private val HorizontalPadding = 14.dp
     private val VerticalPadding = 8.dp
 

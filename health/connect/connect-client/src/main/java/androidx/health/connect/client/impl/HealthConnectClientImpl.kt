@@ -28,7 +28,6 @@ import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.aggregate.AggregationResult
 import androidx.health.connect.client.aggregate.AggregationResultGroupedByDuration
 import androidx.health.connect.client.aggregate.AggregationResultGroupedByPeriod
-import androidx.health.connect.client.feature.ExperimentalFeatureAvailabilityApi
 import androidx.health.connect.client.feature.HealthConnectFeaturesApkImpl
 import androidx.health.connect.client.feature.HealthConnectFeaturesUnavailableImpl
 import androidx.health.connect.client.impl.converters.aggregate.retrieveAggregateDataRow
@@ -70,7 +69,6 @@ import kotlinx.coroutines.guava.await
  * Kotlin extension implementation that exposes kotlin coroutines rather than guava
  * ListenableFutures.
  */
-@OptIn(ExperimentalFeatureAvailabilityApi::class)
 class HealthConnectClientImpl
 @VisibleForTesting
 internal constructor(
@@ -194,7 +192,6 @@ internal constructor(
                 .await()
         }
         val changeToken = proto.changesToken
-        Logger.debug(HEALTH_CONNECT_CLIENT_TAG, "Retrieved change token $changeToken.")
         return changeToken
     }
 
@@ -208,11 +205,6 @@ internal constructor(
                 )
                 .await()
         }
-        val nextToken = proto.nextChangesToken
-        Logger.debug(
-            HEALTH_CONNECT_CLIENT_TAG,
-            "Retrieved changes successful with $changesToken, next token $nextToken."
-        )
         return toChangesResponse(proto)
     }
 

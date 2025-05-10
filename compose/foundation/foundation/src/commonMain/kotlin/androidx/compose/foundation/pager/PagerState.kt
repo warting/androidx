@@ -453,7 +453,7 @@ internal constructor(
 
     internal val prefetchState =
         LazyLayoutPrefetchState(prefetchScheduler) {
-            Snapshot.withoutReadObservation { schedulePrefetch(firstVisiblePage) }
+            Snapshot.withoutReadObservation { schedulePrecomposition(firstVisiblePage) }
         }
 
     internal val beyondBoundsInfo = LazyLayoutBeyondBoundsInfo()
@@ -672,6 +672,10 @@ internal constructor(
         isLookingAhead: Boolean,
         visibleItemsStayedTheSame: Boolean = false
     ) {
+        // update the prefetch state with the number of nested prefetch items this layout
+        // should use.
+        prefetchState.idealNestedPrefetchCount = result.visiblePagesInfo.size
+
         if (!isLookingAhead && hasLookaheadOccurred) {
             debugLog { "Applying Approach Measure Result" }
             // If there was already a lookahead pass, record this result as Approach result
@@ -703,11 +707,11 @@ internal constructor(
 
     private fun tryRunPrefetch(result: PagerMeasureResult) =
         Snapshot.withoutReadObservation {
-            if (abs(previousPassDelta) > 0.5f) {
-                if (prefetchingEnabled && isGestureActionMatchesScroll(previousPassDelta)) {
-                    notifyPrefetch(previousPassDelta, result)
-                }
-            }
+            if (!prefetchingEnabled) return
+            if (result.beyondViewportPageCount >= pageCount) return
+            if (abs(previousPassDelta) <= 0.5f) return
+            if (!isGestureActionMatchesScroll(previousPassDelta)) return
+            notifyPrefetch(previousPassDelta, result)
         }
 
     private fun Int.coerceInPageRange() =
@@ -737,16 +741,7 @@ internal constructor(
 
         if (info.visiblePagesInfo.isNotEmpty()) {
             val isPrefetchingForward = delta > 0
-            val indexToPrefetch =
-                if (isPrefetchingForward) {
-                    info.visiblePagesInfo.last().index +
-                        info.beyondViewportPageCount +
-                        PagesToPrefetch
-                } else {
-                    info.visiblePagesInfo.first().index -
-                        info.beyondViewportPageCount -
-                        PagesToPrefetch
-                }
+            val indexToPrefetch = calculatePrefetchIndex(isPrefetchingForward, info)
             if (indexToPrefetch in 0 until pageCount) {
                 if (indexToPrefetch != this.indexToPrefetch) {
                     if (wasPrefetchingForward != isPrefetchingForward) {
@@ -759,7 +754,10 @@ internal constructor(
                     this.wasPrefetchingForward = isPrefetchingForward
                     this.indexToPrefetch = indexToPrefetch
                     currentPrefetchHandle =
-                        prefetchState.schedulePrefetch(indexToPrefetch, premeasureConstraints)
+                        prefetchState.schedulePrecompositionAndPremeasure(
+                            indexToPrefetch,
+                            premeasureConstraints
+                        )
                 }
                 if (isPrefetchingForward) {
                     val lastItem = info.visiblePagesInfo.last()
@@ -784,21 +782,26 @@ internal constructor(
 
     private fun cancelPrefetchIfVisibleItemsChanged(info: PagerLayoutInfo) {
         if (indexToPrefetch != -1 && info.visiblePagesInfo.isNotEmpty()) {
-            val expectedPrefetchIndex =
-                if (wasPrefetchingForward) {
-                    info.visiblePagesInfo.last().index +
-                        info.beyondViewportPageCount +
-                        PagesToPrefetch
-                } else {
-                    info.visiblePagesInfo.first().index -
-                        info.beyondViewportPageCount -
-                        PagesToPrefetch
-                }
+            val expectedPrefetchIndex = calculatePrefetchIndex(wasPrefetchingForward, info)
             if (indexToPrefetch != expectedPrefetchIndex) {
                 indexToPrefetch = -1
                 currentPrefetchHandle?.cancel()
                 currentPrefetchHandle = null
             }
+        }
+    }
+
+    /** Calculate the farthest page index that should be prefetched when scrolling. */
+    private fun calculatePrefetchIndex(forward: Boolean, info: PagerLayoutInfo): Int {
+        return if (forward) {
+            val offset = info.beyondViewportPageCount + PagesToPrefetch
+            if (offset < 0) { // Detect overflow from large beyondViewportPageCount
+                Int.MAX_VALUE
+            } else {
+                info.visiblePagesInfo.last().index + offset
+            }
+        } else {
+            info.visiblePagesInfo.first().index - info.beyondViewportPageCount - PagesToPrefetch
         }
     }
 

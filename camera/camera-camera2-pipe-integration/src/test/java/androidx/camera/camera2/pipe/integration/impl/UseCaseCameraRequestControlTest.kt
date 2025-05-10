@@ -19,6 +19,7 @@ package androidx.camera.camera2.pipe.integration.impl
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CaptureRequest
 import android.os.Build
+import android.util.Range
 import androidx.camera.camera2.pipe.FrameInfo
 import androidx.camera.camera2.pipe.FrameNumber
 import androidx.camera.camera2.pipe.Request
@@ -33,6 +34,7 @@ import androidx.camera.camera2.pipe.integration.testing.FakeCameraGraph
 import androidx.camera.camera2.pipe.integration.testing.FakeCameraProperties
 import androidx.camera.camera2.pipe.integration.testing.FakeCapturePipeline
 import androidx.camera.camera2.pipe.integration.testing.FakeSurface
+import androidx.camera.camera2.pipe.integration.testing.FakeUseCaseSurfaceManager
 import androidx.camera.camera2.pipe.testing.FakeFrameInfo
 import androidx.camera.camera2.pipe.testing.FakeRequestMetadata
 import androidx.camera.core.impl.CameraCaptureCallback
@@ -88,6 +90,7 @@ class UseCaseCameraRequestControlTest {
             capturePipeline = FakeCapturePipeline(),
             state = fakeUseCaseCameraState,
             useCaseGraphConfig = fakeUseCaseGraphConfig,
+            useCaseSurfaceManager = FakeUseCaseSurfaceManager(threads = useCaseThreads),
             threads = useCaseThreads,
         )
 
@@ -350,6 +353,26 @@ class UseCaseCameraRequestControlTest {
             .isEqualTo(RequestTemplate(CameraDevice.TEMPLATE_RECORD).value)
     }
 
+    @Test
+    fun sessionConfigExpectedFrameRateRangeShouldSetToRequest(): Unit = runBlocking {
+        // Arrange
+        val expectedFrameRateRange = Range(60, 60)
+
+        val sessionConfigBuilder =
+            SessionConfig.Builder().also { sessionConfigBuilder ->
+                sessionConfigBuilder.setExpectedFrameRateRange(expectedFrameRateRange)
+                sessionConfigBuilder.addSurface(surface)
+            }
+
+        // Act
+        requestControl.setSessionConfigAsync(sessionConfigBuilder.build()).await()
+
+        // Assert.
+        val lastRequest = fakeCameraGraph.fakeCameraGraphSession.repeatingRequests.last()
+        assertThat(lastRequest[CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE])
+            .isEqualTo(expectedFrameRateRange)
+    }
+
     private fun UseCaseCameraRequestControl.setSessionConfigAsync(
         sessionConfig: SessionConfig
     ): Deferred<Unit> =
@@ -368,7 +391,8 @@ class UseCaseCameraRequestControlTest {
             streams =
                 fakeUseCaseGraphConfig.getStreamIdsFromSurfaces(
                     sessionConfig.repeatingCaptureConfig.surfaces
-                )
+                ),
+            sessionConfig = sessionConfig
         )
 }
 

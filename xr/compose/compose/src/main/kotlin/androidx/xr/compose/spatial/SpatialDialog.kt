@@ -16,9 +16,9 @@
 
 package androidx.xr.compose.spatial
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.RestrictTo
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.updateTransition
@@ -32,7 +32,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,14 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.xr.compose.platform.LocalDialogManager
-import androidx.xr.compose.platform.LocalSession
 import androidx.xr.compose.platform.LocalSpatialCapabilities
-import androidx.xr.compose.unit.Meter
 import androidx.xr.compose.unit.Meter.Companion.meters
+import androidx.xr.compose.unit.toMeter
 import androidx.xr.runtime.math.Pose
-import androidx.xr.runtime.math.Vector3
-import androidx.xr.scenecore.Session
-import kotlinx.coroutines.launch
 
 /**
  * Properties for configuring a [SpatialDialog].
@@ -59,10 +54,15 @@ import kotlinx.coroutines.launch
  * @property dismissOnClickOutside whether the dialog should be dismissed when the user touches
  *   outside of it. Defaults to `true`.
  * @property usePlatformDefaultWidth whether the dialog should use the platform's default width.
- *   Defaults to `true`.
- * @property restingLevelAnimationSpec the animation specification for the resting level.
+ *   Defaults to `true`. This is only used in non-spatial environments.
+ * @property restingLevelAnimationSpec the animation specification for the depth offset of the app
+ *   content as it animates away from the user towards its recessed resting level when a spatial
+ *   dialog is shown. The same specification is used when the app content animates back towards the
+ *   user to its original resting level when the dialog is dismissed. This is only used in spatial
+ *   environments.
  * @property spatialElevationLevel the elevation level of the dialog. Defaults to
  *   [SpatialElevationLevel.DialogDefault].
+ * @see [SpatialDialog]
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
 public class SpatialDialogProperties(
@@ -124,6 +124,11 @@ private fun SpatialDialogProperties.toBaseDialogProperties() =
 /**
  * [SpatialDialog] is a dialog that is elevated above the activity.
  *
+ * When spatial dialogs are displayed the existing app content is pushed back and the dialog appears
+ * on top of the content at the base elevation level. When the dialog is dismissed the reverse
+ * happens with the dialog going away and the app content elevating back into place towards the
+ * user.
+ *
  * @param onDismissRequest a callback to be invoked when the dialog should be dismissed.
  * @param properties the dialog properties.
  * @param content the content of the dialog.
@@ -153,27 +158,16 @@ private fun LayoutSpatialDialog(
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
-    val scope = rememberCoroutineScope()
-    val session = checkNotNull(LocalSession.current) { "session must be initialized" }
     // Start elevation at Level0 to prevent effects where the dialog flashes behind its parent.
     var spatialElevationLevel by remember { mutableStateOf(SpatialElevationLevel.Level0) }
     val dialogManager = LocalDialogManager.current
-
+    BackHandler {
+        // TODO(b/401028662) Investigate if we need the animation inside of this scope.
+        dialogManager.isSpatialDialogActive.value = false
+    }
     DisposableEffect(Unit) {
-        scope.launch {
-            animate(
-                initialValue = SpatialElevationLevel.ActivityDefault.level,
-                targetValue = -properties.spatialElevationLevel.level,
-                animationSpec = properties.restingLevelAnimationSpec,
-            ) { value, _ ->
-                session.setActivitySpaceZDepth(value.meters)
-            }
-        }
         dialogManager.isSpatialDialogActive.value = true
-        onDispose {
-            session.resetActivitySpaceZDepth()
-            dialogManager.isSpatialDialogActive.value = false
-        }
+        onDispose { dialogManager.isSpatialDialogActive.value = false }
     }
 
     LaunchedEffect(Unit) { spatialElevationLevel = properties.spatialElevationLevel }
@@ -186,18 +180,7 @@ private fun LayoutSpatialDialog(
 
     // Paint the scrim on the parent panel and capture dismiss events.
     Dialog(
-        onDismissRequest = {
-            scope.launch {
-                animate(
-                    initialValue = -properties.spatialElevationLevel.level,
-                    targetValue = SpatialElevationLevel.ActivityDefault.level,
-                    animationSpec = properties.restingLevelAnimationSpec,
-                ) { value, _ ->
-                    session.setActivitySpaceZDepth(value.meters)
-                }
-            }
-            dialogManager.isSpatialDialogActive.value = false
-        },
+        onDismissRequest = { dialogManager.isSpatialDialogActive.value = false },
         properties = properties.toBaseDialogProperties(),
     ) {
         // We need a very small (non-zero) content to fill the remaining space with the scrim.
@@ -212,7 +195,7 @@ private fun LayoutSpatialDialog(
                 transitionSpec = { properties.restingLevelAnimationSpec },
                 label = "zDepth"
             ) { state ->
-                state.level
+                state.level.toMeter().toM()
             }
 
     ElevatedPanel(
@@ -223,12 +206,4 @@ private fun LayoutSpatialDialog(
             Box(modifier = Modifier.onSizeChanged { contentSize = it }) { content() }
         }
     }
-}
-
-private fun Session.setActivitySpaceZDepth(value: Meter) {
-    activitySpace.setPose(Pose(translation = Vector3(0f, 0f, value.toM())))
-}
-
-private fun Session.resetActivitySpaceZDepth() {
-    setActivitySpaceZDepth(SpatialElevationLevel.ActivityDefault.level.meters)
 }

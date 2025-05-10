@@ -28,10 +28,12 @@ import androidx.compose.foundation.gestures.DragScope
 import androidx.compose.foundation.gestures.Draggable2DState
 import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.Scrollable2DState
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.draggable2D
 import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.gestures.scrollable2D
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.InteractionSource
@@ -90,11 +92,12 @@ class ModifiersBenchmark(val name: String, val count: Int, val modifierFn: (Bool
             listOf(
                 *modifier("Modifier") { Modifier },
                 *modifier("emptyElement", true) { Modifier.emptyElement() },
-                // (discouraged) composed overload that defaults to LocalIndication. Since we don't
-                // provide MaterialTheme in this benchmark, it will just be the debug indication
+                // clickable with no explicit indication parameter - this will internally query
+                // LocalIndication.current (which should be the default debug indication in this
+                // benchmark - practically since the indication will be created lazily the
+                // indication itself won't show up in the cost)
                 *modifier("clickable", true) { Modifier.clickable { capture(it) } },
-                // overload with explicit InteractionSource parameter and a ripple - this more
-                // accurately models how clickable is used in common components like Button.
+                // overload with explicit indication parameter and a ripple
                 *modifier("clickableWithRipple", true) {
                     Modifier.clickable(
                         // null interactionSource for lazy indication creation
@@ -138,6 +141,9 @@ class ModifiersBenchmark(val name: String, val count: Int, val modifierFn: (Bool
                         scrollableState,
                         if (it) Orientation.Vertical else Orientation.Horizontal
                     )
+                },
+                *modifier("scrollable2D") {
+                    Modifier.scrollable2D(scrollable2DState, enabled = it)
                 },
                 *modifier("toggleable") { Modifier.toggleable(it) { capture(it) } },
                 *modifier("onFocusEvent") { Modifier.onFocusEvent { capture(it) } },
@@ -209,6 +215,7 @@ class ModifiersBenchmark(val name: String, val count: Int, val modifierFn: (Bool
                 override fun dispatchRawDelta(delta: Offset) {}
             }
         private val scrollableState = ScrollableState { it }
+        private val scrollable2DState = Scrollable2DState { it }
 
         fun modifier(
             name: String,

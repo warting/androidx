@@ -36,8 +36,10 @@ import androidx.camera.camera2.pipe.integration.compat.workaround.OutputSizesCor
 import androidx.camera.camera2.pipe.integration.config.CameraConfig
 import androidx.camera.camera2.pipe.integration.impl.CameraCallbackMap
 import androidx.camera.camera2.pipe.integration.impl.CameraProperties
+import androidx.camera.camera2.pipe.integration.impl.ComboRequestListener
 import androidx.camera.camera2.pipe.integration.impl.EvCompControl
 import androidx.camera.camera2.pipe.integration.impl.FocusMeteringControl
+import androidx.camera.camera2.pipe.integration.impl.LowLightBoostControl
 import androidx.camera.camera2.pipe.integration.impl.State3AControl
 import androidx.camera.camera2.pipe.integration.impl.TorchControl
 import androidx.camera.camera2.pipe.integration.impl.UseCaseThreads
@@ -46,6 +48,7 @@ import androidx.camera.camera2.pipe.integration.internal.CameraFovInfo
 import androidx.camera.camera2.pipe.testing.FakeCameraDevices
 import androidx.camera.camera2.pipe.testing.FakeCameraMetadata
 import androidx.camera.core.impl.ImageFormatConstants
+import androidx.camera.core.internal.StreamSpecsCalculator.Companion.NO_OP_STREAM_SPECS_CALCULATOR
 import androidx.camera.testing.impl.fakes.FakeEncoderProfilesProvider
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.CoroutineName
@@ -138,6 +141,12 @@ object FakeCameraInfoAdapterCreator {
                 zoomControl,
                 EvCompControl(FakeEvCompCompat()),
                 TorchControl(cameraProperties, state3AControl, useCaseThreads),
+                LowLightBoostControl(
+                    cameraProperties.metadata,
+                    state3AControl,
+                    useCaseThreads,
+                    ComboRequestListener()
+                ),
             ),
             CameraCallbackMap(),
             FocusMeteringControl(
@@ -154,6 +163,7 @@ object FakeCameraInfoAdapterCreator {
             fakeEncoderProfilesProvider,
             fakeStreamConfigurationMap,
             CameraFovInfo(cameraDevices, cameraProperties),
+            NO_OP_STREAM_SPECS_CALCULATOR
         )
     }
 }

@@ -35,3 +35,32 @@ public class AnchorCreateSuccess(public val anchor: Anchor) : AnchorCreateResult
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
 public class AnchorCreateResourcesExhausted() : AnchorCreateResult()
+
+/** Result of an unsuccessful [Anchor.create] call. Required tracking is not available. */
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public class AnchorCreateNotTracking() : AnchorCreateResult()
+
+/** Result of an unsuccessful [Anchor.load] call. The anchor was loaded from an invalid UUID. */
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public class AnchorLoadInvalidUuid() : AnchorCreateResult()
+
+/**
+ * Result of an unsuccessful [Anchor.create] call. The anchor create call was made when the session
+ * state was invalid.
+ */
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public class AnchorCreateIllegalState() : AnchorCreateResult()
+
+/**
+ * Result of an unsuccessful [Anchor.create] call. The anchor was not created due to an
+ * authorization error.
+ */
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public class AnchorCreateNotAuthorized() : AnchorCreateResult()
+
+/**
+ * Result of an unsuccessful [Anchor.create] call. The anchor was not created due to an unsupported
+ * location.
+ */
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public class AnchorCreateUnsupportedLocation() : AnchorCreateResult()

@@ -21,8 +21,9 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Density
 
-/** Base Spatial shape. */
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public abstract class SpatialShape
+/** Base type for shapes that could be applied to spatial elements. */
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+public abstract class SpatialShape internal constructor()
 
 /** A shape describing a rectangle with rounded corners in 3D space. */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)

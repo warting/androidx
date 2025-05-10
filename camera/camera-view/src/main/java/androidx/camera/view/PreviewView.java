@@ -192,6 +192,7 @@ public final class PreviewView extends FrameLayout {
 
         @Override
         @AnyThread
+        @SuppressWarnings("WrongThread") // View.getContext()
         public void onSurfaceRequested(@NonNull SurfaceRequest surfaceRequest) {
             if (!Threads.isMainThread()) {
                 // Post on main thread to ensure thread safety.
@@ -205,7 +206,7 @@ public final class PreviewView extends FrameLayout {
             // PreviewViewMeteringPointFactory will convert the coordinates from previewView (x,y)
             // to sensor coordinates and then to normalized coordinates. Thus sensor rect is needed.
             mPreviewViewMeteringPointFactory.setSensorRect(
-                    camera.getCameraControlInternal().getSensorRect());
+                    camera.getCameraInfoInternal().getSensorRect());
             surfaceRequest.setTransformationInfoListener(
                     getMainExecutor(getContext()),
                     transformationInfo -> {

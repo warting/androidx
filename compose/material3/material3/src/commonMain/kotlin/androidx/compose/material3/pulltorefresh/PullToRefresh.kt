@@ -38,6 +38,8 @@ import androidx.compose.material3.LoadingIndicatorDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.internal.FloatProducer
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.IndicatorBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator
 import androidx.compose.material3.tokens.ElevationTokens
 import androidx.compose.material3.tokens.MotionSchemeKeyTokens
 import androidx.compose.material3.value
@@ -70,16 +72,14 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScrollModifierNode
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
-import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.node.requireDensity
 import androidx.compose.ui.platform.InspectorInfo
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -253,7 +253,7 @@ internal class PullToRefreshModifierNode(
     var enabled: Boolean,
     var state: PullToRefreshState,
     var threshold: Dp,
-) : DelegatingNode(), CompositionLocalConsumerModifierNode, NestedScrollConnection {
+) : DelegatingNode(), NestedScrollConnection {
 
     override val shouldAutoInvalidate: Boolean
         get() = false
@@ -271,7 +271,7 @@ internal class PullToRefreshModifierNode(
         get() = distancePulled * DragMultiplier
 
     private val thresholdPx
-        get() = with(currentValueOf(LocalDensity)) { threshold.roundToPx() }
+        get() = with(requireDensity()) { threshold.roundToPx() }
 
     private val progress
         get() = adjustedDistancePulled / thresholdPx
@@ -307,7 +307,11 @@ internal class PullToRefreshModifierNode(
             // Swiping down
             source == NestedScrollSource.UserInput -> {
                 val newOffset = consumeAvailableOffset(available)
-                coroutineScope.launch { state.snapTo(verticalOffset / thresholdPx) }
+                coroutineScope.launch {
+                    if (!state.isAnimating) {
+                        state.snapTo(verticalOffset / thresholdPx)
+                    }
+                }
 
                 newOffset
             }
@@ -387,15 +391,25 @@ internal class PullToRefreshModifierNode(
         }
 
     private suspend fun animateToThreshold() {
-        state.animateToThreshold()
-        distancePulled = thresholdPx.toFloat()
-        verticalOffset = thresholdPx.toFloat()
+        try {
+            state.animateToThreshold()
+        } finally {
+            if (isAttached) {
+                // Don't read density if the node is not attached. This will get updated next
+                // time the node is attached
+                distancePulled = thresholdPx.toFloat()
+                verticalOffset = thresholdPx.toFloat()
+            }
+        }
     }
 
     private suspend fun animateToHidden() {
-        state.animateToHidden()
-        distancePulled = 0f
-        verticalOffset = 0f
+        try {
+            state.animateToHidden()
+        } finally {
+            distancePulled = 0f
+            verticalOffset = 0f
+        }
     }
 }
 
@@ -740,11 +754,15 @@ private fun CircularArrowProgressIndicator(
             targetValue = targetAlpha,
             animationSpec = MotionSchemeKeyTokens.DefaultEffects.value()
         )
+
     Canvas(
-        Modifier.semantics(mergeDescendants = true) {
-                progressBarRangeInfo = ProgressBarRangeInfo(progress(), 0f..1f, 0)
-            }
-            .size(SpinnerSize)
+        modifier =
+            Modifier.clearAndSetSemantics {
+                    if (progress() > 0f) {
+                        progressBarRangeInfo = ProgressBarRangeInfo(progress(), 0f..1f, 0)
+                    }
+                }
+                .size(SpinnerSize)
     ) {
         val values = ArrowValues(progress())
         val alpha = alphaState.value

@@ -35,7 +35,6 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
-import kotlin.time.Duration.Companion.milliseconds
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
@@ -314,31 +313,23 @@ class TraceProcessorTest {
     }
 
     @Test
-    fun runServerWithNegativeTimeoutShouldStartAndStopServer() {
+    fun startSessionNotReentrant() {
         assumeTrue(isAbiSupported())
 
-        // Check server is not running
-        assertTrue(!isRunning())
-
-        TraceProcessor.runServer((-1).milliseconds) {
-            // Check server is running
-            assertTrue(isRunning())
-        }
-
-        // Check server is not running
-        assertTrue(!isRunning())
-    }
-
-    @Test
-    fun runServerWithZeroTimeoutShouldStartAndStopServer() {
-        assumeTrue(isAbiSupported())
+        val traceFile = createTempFileFromAsset("api31_startup_cold", ".perfetto-trace")
+        val trace = PerfettoTrace(traceFile.absolutePath)
 
         // Check server is not running
         assertTrue(!isRunning())
 
-        TraceProcessor.runServer((0).milliseconds) {
-            // Check server is running
-            assertTrue(isRunning())
+        TraceProcessor.runServer {
+            val traceProcessor = this
+            startSession(trace).use {
+                assertFailsWith<java.lang.IllegalStateException> {
+                    // fails to load since session already started
+                    traceProcessor.loadTrace(trace) {}
+                }
+            }
         }
 
         // Check server is not running

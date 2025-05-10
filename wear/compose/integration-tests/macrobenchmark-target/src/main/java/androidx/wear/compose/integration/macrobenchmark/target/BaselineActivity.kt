@@ -47,7 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -60,17 +59,17 @@ import androidx.wear.compose.foundation.CurvedLayout
 import androidx.wear.compose.foundation.CurvedModifier
 import androidx.wear.compose.foundation.CurvedTextStyle
 import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
-import androidx.wear.compose.foundation.HierarchicalFocusCoordinator
 import androidx.wear.compose.foundation.SwipeToReveal
 import androidx.wear.compose.foundation.basicCurvedText
 import androidx.wear.compose.foundation.expandableButton
 import androidx.wear.compose.foundation.expandableItem
 import androidx.wear.compose.foundation.expandableItems
+import androidx.wear.compose.foundation.hierarchicalFocusGroup
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.padding
-import androidx.wear.compose.foundation.rememberActiveFocusRequester
 import androidx.wear.compose.foundation.rememberExpandableState
 import androidx.wear.compose.foundation.rememberRevealState
+import androidx.wear.compose.foundation.requestFocusOnHierarchyActive
 import androidx.wear.compose.material.AppCard
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.Card
@@ -478,25 +477,23 @@ fun FocusCoordinator() {
         Row(Modifier.fillMaxWidth()) {
             repeat(5) { ix ->
                 var focused by remember { mutableStateOf(false) }
-                HierarchicalFocusCoordinator(requiresFocus = { selected == ix }) {
-                    val focusRequester = rememberActiveFocusRequester()
-                    Text(
-                        text = "$ix",
-                        modifier =
-                            Modifier.weight(1f)
-                                .clickable { selected = ix }
-                                .onFocusChanged { focused = it.isFocused }
-                                .focusRequester(focusRequester)
-                                .focusable()
-                                .then(
-                                    if (focused) {
-                                        Modifier.border(BorderStroke(2.dp, Color.Red))
-                                    } else {
-                                        Modifier
-                                    }
-                                )
-                    )
-                }
+                Text(
+                    text = "$ix",
+                    modifier =
+                        Modifier.weight(1f)
+                            .clickable { selected = ix }
+                            .onFocusChanged { focused = it.isFocused }
+                            .hierarchicalFocusGroup(selected == ix)
+                            .requestFocusOnHierarchyActive()
+                            .focusable()
+                            .then(
+                                if (focused) {
+                                    Modifier.border(BorderStroke(2.dp, Color.Red))
+                                } else {
+                                    Modifier
+                                }
+                            )
+                )
             }
         }
     }
@@ -634,6 +631,7 @@ fun Stepper() {
     }
 }
 
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalWearFoundationApi::class)
 @Composable
 fun SwipeToReveal() {
@@ -644,7 +642,7 @@ fun SwipeToReveal() {
             Box(
                 modifier = Modifier.fillMaxSize().clickable { /* Add the primary action */ },
             ) {
-                if (abs(state.offset) > revealOffset) {
+                if (abs(state.offset) > state.revealThreshold) {
                     Spacer(Modifier.size(5.dp))
                     Text("Clear")
                 }

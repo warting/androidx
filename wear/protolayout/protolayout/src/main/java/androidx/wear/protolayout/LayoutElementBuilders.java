@@ -71,7 +71,6 @@ import androidx.wear.protolayout.proto.DimensionProto;
 import androidx.wear.protolayout.proto.FingerprintProto;
 import androidx.wear.protolayout.proto.FingerprintProto.TreeFingerprint;
 import androidx.wear.protolayout.proto.LayoutElementProto;
-import androidx.wear.protolayout.proto.TypesProto;
 import androidx.wear.protolayout.protobuf.ByteString;
 import androidx.wear.protolayout.protobuf.InvalidProtocolBufferException;
 
@@ -1060,6 +1059,10 @@ public final class LayoutElementBuilders {
              * with the variable fonts on renderers supporting 1.4, {@link FontSetting#weight} and
              * {@link FontSetting#width} setting will always be available.
              *
+             * <p>Consider providing a fallback values with {@link #setWeight} for devices that
+             * don't support variable fonts. For example, using {@link #FONT_WEIGHT_MEDIUM} for
+             * weight axis with value greater or equal to {@code 500}.
+             *
              * @throws IllegalArgumentException if the number of the given Setting is larger than
              *     10.
              */
@@ -1150,7 +1153,7 @@ public final class LayoutElementBuilders {
          * href="https://fonts.google.com/knowledge/glossary/rond_axis">here</a>.
          *
          * @param value roundness, usually in 0..100, but actual range and availability can depend
-         *  on the font used
+         *     on the font used
          */
         @RequiresSchemaVersion(major = 1, minor = 400)
         static @NonNull FontSetting roundness(int value) {
@@ -1604,11 +1607,6 @@ public final class LayoutElementBuilders {
          *
          * <p>While this field is statically accessible from 1.0, it's only bindable since version
          * 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-         *
-         * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-         * affected layout element through {@code
-         * setLayoutConstraintsForDynamicText(StringLayoutConstraint)} otherwise {@code build()}
-         * fails.
          */
         public @Nullable StringProp getText() {
             if (mImpl.hasText()) {
@@ -1785,11 +1783,6 @@ public final class LayoutElementBuilders {
              *
              * <p>While this field is statically accessible from 1.0, it's only bindable since
              * version 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-             *
-             * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-             * affected layout element through {@code
-             * setLayoutConstraintsForDynamicText(StringLayoutConstraint)} otherwise {@code build()}
-             * fails.
              */
             @RequiresSchemaVersion(major = 1, minor = 0)
             public @NonNull Builder setText(@NonNull StringProp text) {
@@ -1950,12 +1943,6 @@ public final class LayoutElementBuilders {
 
             @Override
             public @NonNull Text build() {
-                TypesProto.StringProp text = mImpl.getText();
-                if (text.hasDynamicValue() && !text.hasValueForLayout()) {
-                    throw new IllegalStateException(
-                            "text with dynamic value requires "
-                                    + "layoutConstraintsForDynamicText to be present.");
-                }
                 return new Text(mImpl.build(), mFingerprint);
             }
         }
@@ -2375,11 +2362,6 @@ public final class LayoutElementBuilders {
          *
          * <p>While this field is statically accessible from 1.0, it's only bindable since version
          * 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-         *
-         * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-         * affected layout element through {@code
-         * setLayoutConstraintsForDynamicWidth(HorizontalLayoutConstraint)} otherwise {@code
-         * build()} fails.
          */
         public @Nullable SpacerDimension getWidth() {
             if (mImpl.hasWidth()) {
@@ -2394,11 +2376,6 @@ public final class LayoutElementBuilders {
          *
          * <p>While this field is statically accessible from 1.0, it's only bindable since version
          * 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-         *
-         * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-         * affected layout element through {@code
-         * setLayoutConstraintsForDynamicWidth(HorizontalLayoutConstraint)} otherwise {@code
-         * build()} fails.
          */
         public @Nullable SpacerDimension getHeight() {
             if (mImpl.hasHeight()) {
@@ -2499,11 +2476,6 @@ public final class LayoutElementBuilders {
              *
              * <p>While this field is statically accessible from 1.0, it's only bindable since
              * version 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-             *
-             * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-             * affected layout element through {@code
-             * setLayoutConstraintsForDynamicWidth(HorizontalLayoutConstraint)} otherwise {@code
-             * build()} fails.
              */
             @RequiresSchemaVersion(major = 1, minor = 0)
             public @NonNull Builder setWidth(@NonNull SpacerDimension width) {
@@ -2540,11 +2512,6 @@ public final class LayoutElementBuilders {
              *
              * <p>While this field is statically accessible from 1.0, it's only bindable since
              * version 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-             *
-             * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-             * affected layout element through {@code
-             * setLayoutConstraintsForDynamicWidth(HorizontalLayoutConstraint)} otherwise {@code
-             * build()} fails.
              */
             @RequiresSchemaVersion(major = 1, minor = 0)
             public @NonNull Builder setHeight(@NonNull SpacerDimension height) {
@@ -2589,18 +2556,6 @@ public final class LayoutElementBuilders {
 
             @Override
             public @NonNull Spacer build() {
-                DimensionProto.DpProp width = mImpl.getWidth().getLinearDimension();
-                if (width.hasDynamicValue() && !width.hasValueForLayout()) {
-                    throw new IllegalStateException(
-                            "width with dynamic value requires "
-                                    + "layoutConstraintsForDynamicWidth to be present.");
-                }
-                DimensionProto.DpProp height = mImpl.getHeight().getLinearDimension();
-                if (height.hasDynamicValue() && !height.hasValueForLayout()) {
-                    throw new IllegalStateException(
-                            "height with dynamic value requires "
-                                    + "layoutConstraintsForDynamicHeight to be present.");
-                }
                 return new Spacer(mImpl.build(), mFingerprint);
             }
         }
@@ -4427,11 +4382,6 @@ public final class LayoutElementBuilders {
          *
          * <p>While this field is statically accessible from 1.0, it's only bindable since version
          * 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-         *
-         * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-         * affected layout element through {@code
-         * setLayoutConstraintsForDynamicLength(AngularLayoutConstraint)} otherwise {@code build()}
-         * fails.
          */
         public @Nullable DegreesProp getLength() {
             if (mImpl.hasLength()) {
@@ -4581,11 +4531,6 @@ public final class LayoutElementBuilders {
              *
              * <p>While this field is statically accessible from 1.0, it's only bindable since
              * version 1.2 and renderers supporting version 1.2 will use the dynamic value (if set).
-             *
-             * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-             * affected layout element through {@code
-             * setLayoutConstraintsForDynamicLength(AngularLayoutConstraint)} otherwise {@code
-             * build()} fails.
              */
             @RequiresSchemaVersion(major = 1, minor = 0)
             public @NonNull Builder setLength(@NonNull DegreesProp length) {
@@ -4711,13 +4656,6 @@ public final class LayoutElementBuilders {
 
             @Override
             public @NonNull ArcLine build() {
-                DimensionProto.DegreesProp length = mImpl.getLength();
-                if (length.hasDynamicValue() && !length.hasValueForLayout()) {
-                    throw new IllegalStateException(
-                            "length with dynamic value requires "
-                                    + "layoutConstraintsForDynamicLength to be present.");
-                }
-
                 String onlyOpaqueMsg = "Only opaque colors are supported";
                 String alphaChangeMsg =
                         "Any transparent colors will have their alpha component set to 0xFF"
@@ -4983,10 +4921,6 @@ public final class LayoutElementBuilders {
             /**
              * Sets the length of this line in degrees, including gaps. If not defined, defaults to
              * 0.
-             *
-             * <p>When using a dynamic value, make sure to specify the bounding constraints for the
-             * affected layout element through {@code setLayoutConstraintsForDynamicLength
-             * (AngularLayoutConstraint)} otherwise {@code build()} fails.
              */
             @RequiresSchemaVersion(major = 1, minor = 500)
             public @NonNull Builder setLength(@NonNull DegreesProp length) {
@@ -5078,13 +5012,6 @@ public final class LayoutElementBuilders {
             @SuppressLint("ProtoLayoutMinSchema")
             @Override
             public @NonNull DashedArcLine build() {
-                DimensionProto.DegreesProp length = mImpl.getLength();
-                if (length.hasDynamicValue() && !length.hasValueForLayout()) {
-                    throw new IllegalStateException(
-                            "length with dynamic value requires "
-                                    + "layoutConstraintsForDynamicLength to be present.");
-                }
-
                 return new DashedArcLine(mImpl.build(), mFingerprint);
             }
         }
@@ -5414,9 +5341,9 @@ public final class LayoutElementBuilders {
                 DimensionProto.AngularDimension angularDimensionProto =
                         angularLength.toAngularDimensionProto();
                 if ((angularDimensionProto.hasDegrees()
-                        && angularDimensionProto.getDegrees().hasDynamicValue())
+                                && angularDimensionProto.getDegrees().hasDynamicValue())
                         || (angularDimensionProto.hasDp()
-                        && angularDimensionProto.getDp().hasDynamicValue())) {
+                                && angularDimensionProto.getDp().hasDynamicValue())) {
                     throw new IllegalArgumentException(
                             "ArcSpacer.Builder.setAngularLength doesn't support dynamic values.");
                 }
@@ -6728,7 +6655,7 @@ public final class LayoutElementBuilders {
                 return content.getArc().hasModifiers()
                         && content.getArc().getModifiers().hasTransformation();
             case EXTENSION:
-            // fall through
+                // fall through
             case INNER_NOT_SET:
                 return false;
         }

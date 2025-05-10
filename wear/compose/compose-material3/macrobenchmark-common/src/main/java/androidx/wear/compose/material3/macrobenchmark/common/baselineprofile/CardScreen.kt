@@ -72,17 +72,14 @@ val CardScreen =
                     ) {
                         Text("AppCard")
                     }
-                    TitleCard(
+                    Card(
                         onClick = {},
-                        title = { Text("Title") },
-                        subtitle = { Text("Subtitle") },
+                        containerPainter =
+                            CardDefaults.containerPainter(
+                                image = painterResource(id = R.drawable.backgroundimage)
+                            ),
                         colors =
-                            CardDefaults.imageCardColors(
-                                containerPainter =
-                                    CardDefaults.imageWithScrimBackgroundPainter(
-                                        backgroundImagePainter =
-                                            painterResource(id = R.drawable.backgroundimage)
-                                    ),
+                            CardDefaults.cardWithContainerPainterColors(
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                                 titleColor = MaterialTheme.colorScheme.onSurface
                             ),
@@ -93,17 +90,7 @@ val CardScreen =
                         onClick = { /* Do something */ },
                         title = { Text("Card title") },
                         time = { Text("now") },
-                        colors =
-                            CardDefaults.imageCardColors(
-                                containerPainter =
-                                    CardDefaults.imageWithScrimBackgroundPainter(
-                                        backgroundImagePainter =
-                                            painterResource(id = R.drawable.backgroundimage)
-                                    ),
-                                contentColor = MaterialTheme.colorScheme.onSurface,
-                                titleColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                        contentPadding = CardDefaults.ImageContentPadding,
+                        contentPadding = CardDefaults.CardWithContainerPainterContentPadding,
                         modifier = Modifier.semantics { contentDescription = "Background image" }
                     ) {
                         Text("Card content")

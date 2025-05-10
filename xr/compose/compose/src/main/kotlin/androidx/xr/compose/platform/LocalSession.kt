@@ -17,11 +17,14 @@
 package androidx.xr.compose.platform
 
 import androidx.annotation.RestrictTo
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalWithComputedDefaultOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.xr.compose.subspace.layout.CoreMainPanelEntity
-import androidx.xr.scenecore.Session
+import androidx.xr.runtime.Session
+import androidx.xr.runtime.SessionCreateSuccess
 
 /**
  * A composition local that provides the current Jetpack XR [Session].
@@ -32,7 +35,8 @@ import androidx.xr.scenecore.Session
 public val LocalSession: ProvidableCompositionLocal<Session?> =
     compositionLocalWithComputedDefaultOf {
         if (SpatialConfiguration.hasXrSpatialFeature(LocalContext.currentValue)) {
-            Session.create(LocalContext.currentValue.getActivity())
+            val sessionResult = Session.create(LocalContext.currentValue.getActivity())
+            (sessionResult as? SessionCreateSuccess)?.session
         } else {
             null
         }
@@ -48,4 +52,5 @@ private val mainPanelEntityMap: MutableMap<Session, CoreMainPanelEntity> = mutab
  * makes it so we don't have to worry about disposing the instance every time it is used.
  */
 internal val Session.coreMainPanelEntity: CoreMainPanelEntity
-    get() = mainPanelEntityMap.getOrPut(this) { CoreMainPanelEntity(this) }
+    @Composable
+    get() = mainPanelEntityMap.getOrPut(this) { CoreMainPanelEntity(this, LocalDensity.current) }

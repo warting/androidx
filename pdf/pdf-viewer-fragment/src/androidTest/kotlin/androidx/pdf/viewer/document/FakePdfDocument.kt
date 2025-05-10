@@ -31,6 +31,8 @@ import androidx.pdf.PdfDocument
 import androidx.pdf.content.PageMatchBounds
 import androidx.pdf.content.PageSelection
 import androidx.pdf.content.SelectionBoundary
+import androidx.pdf.models.FormEditRecord
+import androidx.pdf.models.FormWidgetInfo
 import kotlin.random.Random
 
 /**
@@ -63,6 +65,18 @@ internal open class FakePdfDocument(
         return FakeBitmapSource(pageNumber)
     }
 
+    override suspend fun getFormWidgetInfos(pageNum: Int): List<FormWidgetInfo> {
+        return listOf()
+    }
+
+    override suspend fun getFormWidgetInfos(pageNum: Int, types: IntArray): List<FormWidgetInfo> {
+        return listOf()
+    }
+
+    override suspend fun applyEdit(pageNum: Int, record: FormEditRecord): List<Rect> {
+        return listOf()
+    }
+
     override suspend fun getPageLinks(pageNumber: Int): PdfDocument.PdfPageLinks {
         return if (pageNumber < pageLinks.size) {
             pageLinks[pageNumber]
@@ -87,6 +101,10 @@ internal open class FakePdfDocument(
         return PageSelection(0, SelectionBoundary(0), SelectionBoundary(0), listOf())
     }
 
+    override suspend fun getSelectAllSelectionBounds(pageNumber: Int): PageSelection? {
+        return PageSelection(0, SelectionBoundary(0), SelectionBoundary(Int.MAX_VALUE), listOf())
+    }
+
     override suspend fun searchDocument(
         query: String,
         pageRange: IntRange
@@ -98,7 +116,21 @@ internal open class FakePdfDocument(
         return pageRange.map { getPageInfo(it) }
     }
 
+    override suspend fun getPageInfos(
+        pageRange: IntRange,
+        pageInfoFlags: PdfDocument.PageInfoFlags
+    ): List<PdfDocument.PageInfo> {
+        return listOf()
+    }
+
     override suspend fun getPageInfo(pageNumber: Int): PdfDocument.PageInfo {
+        return getPageInfo(pageNumber, PdfDocument.PageInfoFlags.of(0))
+    }
+
+    override suspend fun getPageInfo(
+        pageNumber: Int,
+        pageInfoFlags: PdfDocument.PageInfoFlags
+    ): PdfDocument.PageInfo {
         val size = pages[pageNumber]
         return PdfDocument.PageInfo(pageNumber, size.y, size.x)
     }

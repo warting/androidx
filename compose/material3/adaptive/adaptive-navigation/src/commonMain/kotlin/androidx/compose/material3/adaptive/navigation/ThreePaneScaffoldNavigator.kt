@@ -117,8 +117,9 @@ interface ThreePaneScaffoldNavigator<T> {
     var isDestinationHistoryAware: Boolean
 
     /**
-     * Navigates to a new destination. The new destination is supposed to have the highest priority
-     * when calculating the new [scaffoldValue].
+     * Navigates to a new destination, possibly with an animation, and suspends until the animation
+     * is complete. The new destination is supposed to have the highest priority when calculating
+     * the new [scaffoldValue].
      *
      * Implementors of this interface should ensure the new destination pane will be expanded or
      * adapted in a reasonable way so it provides users the sense that the new destination is the
@@ -144,8 +145,8 @@ interface ThreePaneScaffoldNavigator<T> {
     ): Boolean
 
     /**
-     * Navigates to the previous destination. Returns `true` if there is a previous destination to
-     * navigate back to.
+     * Navigates to the previous destination, possibly with an animation, and suspends until the
+     * animation is complete. Returns `true` if there is a previous destination to navigate back to.
      *
      * Implementors of this interface should ensure the logic of this function is consistent with
      * [canNavigateBack].
@@ -456,21 +457,24 @@ internal class DefaultThreePaneScaffoldNavigator<T>(
     private fun calculateScaffoldValue(destinationIndex: Int) =
         if (destinationIndex == -1) {
             calculateThreePaneScaffoldValue(
-                scaffoldDirective.maxHorizontalPartitions,
-                adaptStrategies,
-                null
+                maxHorizontalPartitions = scaffoldDirective.maxHorizontalPartitions,
+                maxVerticalPartitions = scaffoldDirective.maxVerticalPartitions,
+                adaptStrategies = adaptStrategies,
+                currentDestination = null
             )
         } else if (isDestinationHistoryAware) {
             calculateThreePaneScaffoldValue(
-                scaffoldDirective.maxHorizontalPartitions,
-                adaptStrategies,
-                destinationHistory.subList(0, destinationIndex + 1)
+                maxHorizontalPartitions = scaffoldDirective.maxHorizontalPartitions,
+                maxVerticalPartitions = scaffoldDirective.maxVerticalPartitions,
+                adaptStrategies = adaptStrategies,
+                destinationHistory = destinationHistory.subList(0, destinationIndex + 1)
             )
         } else {
             calculateThreePaneScaffoldValue(
-                scaffoldDirective.maxHorizontalPartitions,
-                adaptStrategies,
-                destinationHistory[destinationIndex]
+                maxHorizontalPartitions = scaffoldDirective.maxHorizontalPartitions,
+                maxVerticalPartitions = scaffoldDirective.maxVerticalPartitions,
+                adaptStrategies = adaptStrategies,
+                currentDestination = destinationHistory[destinationIndex]
             )
         }
 

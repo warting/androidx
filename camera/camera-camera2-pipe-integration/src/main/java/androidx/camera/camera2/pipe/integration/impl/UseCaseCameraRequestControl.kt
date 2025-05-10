@@ -38,6 +38,7 @@ import androidx.camera.core.impl.CaptureConfig.TEMPLATE_TYPE_NONE
 import androidx.camera.core.impl.Config
 import androidx.camera.core.impl.MutableTagBundle
 import androidx.camera.core.impl.SessionConfig
+import androidx.camera.core.impl.StreamSpec.FRAME_RATE_RANGE_UNSPECIFIED
 import androidx.camera.core.impl.TagBundle
 import dagger.Binds
 import dagger.Module
@@ -208,6 +209,14 @@ public interface UseCaseCameraRequestControl {
         awbRegions: List<MeteringRectangle>? = null,
     ): Deferred<Result3A>
 
+    /**
+     * Waits for any ongoing surface setup to be completed and returns a boolean value to indicate
+     * if a successful setup exists.
+     *
+     * @see UseCaseSurfaceManager.awaitSetupCompletion
+     */
+    public suspend fun awaitSurfaceSetup(): Boolean
+
     public fun close()
 }
 
@@ -218,6 +227,7 @@ constructor(
     private val capturePipeline: CapturePipeline,
     private val state: UseCaseCameraState,
     private val useCaseGraphConfig: UseCaseGraphConfig,
+    private val useCaseSurfaceManager: UseCaseSurfaceManager,
     private val threads: UseCaseThreads,
 ) : UseCaseCameraRequestControl {
     private val graph = useCaseGraphConfig.graph
@@ -269,7 +279,18 @@ constructor(
                 }
                 infoBundleMap[type] =
                     InfoBundle(
-                        Camera2ImplConfig.Builder().apply { config?.let { insertAllOptions(it) } },
+                        Camera2ImplConfig.Builder().apply {
+                            sessionConfig
+                                ?.expectedFrameRateRange
+                                .takeIf { it != FRAME_RATE_RANGE_UNSPECIFIED }
+                                ?.let { fpsRange ->
+                                    setCaptureRequestOption(
+                                        CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                                        fpsRange
+                                    )
+                                }
+                            config?.let { insertAllOptions(it) }
+                        },
                         tags.toMutableMap(),
                         listeners.toMutableSet(),
                         template,
@@ -403,6 +424,8 @@ constructor(
                 }
             }
         } ?: submitFailedResult
+
+    override suspend fun awaitSurfaceSetup(): Boolean = useCaseSurfaceManager.awaitSetupCompletion()
 
     override fun close() {
         closed = true

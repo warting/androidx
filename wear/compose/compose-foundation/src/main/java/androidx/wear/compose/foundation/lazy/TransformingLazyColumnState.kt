@@ -20,43 +20,128 @@ import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.OnGloballyPositionedModifier
 import androidx.compose.ui.layout.Remeasurement
 import androidx.compose.ui.layout.RemeasurementModifier
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.wear.compose.foundation.lazy.layout.LazyLayoutItemAnimator
+import androidx.wear.compose.foundation.lazy.layout.LazyLayoutPrefetchState
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.abs
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** Creates a [TransformingLazyColumnState] that is remembered across compositions. */
+/**
+ * Creates a [TransformingLazyColumnState] that is remembered across compositions.
+ *
+ * @param initialAnchorItemIndex the index of an item that is going to be placed in the center of
+ *   the screen (if possible). This correlates with [TransformingLazyColumnState.anchorItemIndex].
+ * @param initialAnchorItemScrollOffset the offset of an item to be used when placing the item in
+ *   the center of the screen (if possible). This correlates with
+ *   [TransformingLazyColumnState.anchorItemScrollOffset].
+ */
 @Composable
-public fun rememberTransformingLazyColumnState(): TransformingLazyColumnState =
-    rememberSaveable(saver = TransformingLazyColumnState.Saver) { TransformingLazyColumnState() }
+public fun rememberTransformingLazyColumnState(
+    initialAnchorItemIndex: Int = 0,
+    initialAnchorItemScrollOffset: Int = 0
+): TransformingLazyColumnState =
+    rememberSaveable(saver = TransformingLazyColumnState.Saver) {
+        TransformingLazyColumnState(
+            initialAnchorItemIndex = initialAnchorItemIndex,
+            initialAnchorItemScrollOffset = initialAnchorItemScrollOffset,
+        )
+    }
+
+/**
+ * Creates a [TransformingLazyColumnState] that is remembered across compositions.
+ *
+ * @param initialAnchorItemIndex the index of an item that is going to be placed in the center of
+ *   the screen (if possible). This correlates with [TransformingLazyColumnState.anchorItemIndex].
+ * @param initialAnchorItemScrollOffset the offset of an item to be used when placing the item in
+ *   the center of the screen (if possible). This correlates with
+ *   [TransformingLazyColumnState.anchorItemScrollOffset].
+ * @param prefetchStrategy The prefetching strategy to use.
+ */
+@Composable
+internal fun rememberTransformingLazyColumnState(
+    initialAnchorItemIndex: Int = 0,
+    initialAnchorItemScrollOffset: Int = 0,
+    prefetchStrategy: TransformingLazyColumnPrefetchStrategy = remember {
+        DefaultTransformingLazyColumnPrefetchStrategy()
+    },
+): TransformingLazyColumnState =
+    rememberSaveable(saver = TransformingLazyColumnState.Saver) {
+        TransformingLazyColumnState(
+            initialAnchorItemIndex = initialAnchorItemIndex,
+            initialAnchorItemScrollOffset = initialAnchorItemScrollOffset,
+            prefetchStrategy = prefetchStrategy
+        )
+    }
 
 /**
  * A state object that can be hoisted to control and observe scrolling.
  *
  * In most cases, this will be created via [rememberTransformingLazyColumnState].
  */
-public class TransformingLazyColumnState() : ScrollableState {
+@Stable
+public class TransformingLazyColumnState
+internal constructor(
+    initialAnchorItemIndex: Int,
+    initialAnchorItemScrollOffset: Int,
+    private val prefetchStrategy: TransformingLazyColumnPrefetchStrategy =
+        DefaultTransformingLazyColumnPrefetchStrategy(),
+) : ScrollableState {
+
+    /**
+     * @param initialAnchorItemIndex the index of an item that is going to be placed in the center
+     *   of the screen (if possible). This correlates with
+     *   [TransformingLazyColumnState.anchorItemIndex].
+     * @param initialAnchorItemScrollOffset the offset of an item to be used when placing the item
+     *   in the center of the screen (if possible). This correlates with
+     *   [TransformingLazyColumnState.anchorItemScrollOffset].
+     */
+    public constructor(
+        initialAnchorItemIndex: Int = 0,
+        initialAnchorItemScrollOffset: Int = 0,
+    ) : this(
+        initialAnchorItemIndex = initialAnchorItemIndex,
+        initialAnchorItemScrollOffset = initialAnchorItemScrollOffset,
+        prefetchStrategy = DefaultTransformingLazyColumnPrefetchStrategy()
+    )
+
+    public constructor() :
+        this(
+            initialAnchorItemIndex = 0,
+            initialAnchorItemScrollOffset = 0,
+            prefetchStrategy = DefaultTransformingLazyColumnPrefetchStrategy()
+        )
+
     override val isScrollInProgress: Boolean
         get() = scrollableState.isScrollInProgress
 
-    internal constructor(initialAnchorItemIndex: Int, initialAnchorItemScrollOffset: Int) : this() {
-        anchorItemIndex = initialAnchorItemIndex
-        anchorItemScrollOffset = initialAnchorItemScrollOffset
-    }
+    @get:Suppress("GetterSetterNames")
+    override val lastScrolledForward: Boolean
+        get() = scrollableState.lastScrolledForward
+
+    @get:Suppress("GetterSetterNames")
+    override val lastScrolledBackward: Boolean
+        get() = scrollableState.lastScrolledBackward
 
     override fun dispatchRawDelta(delta: Float): Float = scrollableState.dispatchRawDelta(delta)
 
@@ -64,6 +149,7 @@ public class TransformingLazyColumnState() : ScrollableState {
         scrollPriority: MutatePriority,
         block: suspend ScrollScope.() -> Unit
     ) {
+        awaitLayoutModifier.waitForFirstLayout()
         scrollableState.scroll(scrollPriority, block)
     }
 
@@ -108,9 +194,9 @@ public class TransformingLazyColumnState() : ScrollableState {
      * If you need to use it in the composition then consider wrapping the calculation into a
      * derived state in order to only have recompositions when the derived value changes:
      *
-     * @sample androidx.wear.compose.foundation.samples.UsingListAnchorItemPositionInCompositionSample
+     * @sample androidx.wear.compose.foundation.samples.TransformingLazyColumnScrollToItemSample
      */
-    public var anchorItemIndex: Int by mutableIntStateOf(0)
+    public var anchorItemIndex: Int by mutableIntStateOf(initialAnchorItemIndex)
         private set
 
     /**
@@ -122,15 +208,22 @@ public class TransformingLazyColumnState() : ScrollableState {
      *
      * @see anchorItemIndex for samples with the recommended usage patterns.
      */
-    public var anchorItemScrollOffset: Int by mutableIntStateOf(0)
+    public var anchorItemScrollOffset: Int by mutableIntStateOf(initialAnchorItemScrollOffset)
         private set
 
     internal var nearestRange: IntRange by
-        mutableStateOf(calculateNearestItemsRange(0), structuralEqualityPolicy())
+        mutableStateOf(
+            calculateNearestItemsRange(initialAnchorItemIndex),
+            structuralEqualityPolicy()
+        )
         private set
 
     internal var lastMeasuredAnchorItemHeight: Int = Int.MIN_VALUE
         private set
+
+    /** Only used for testing to disable prefetching when needed to test the main logic. */
+    /*@VisibleForTesting*/
+    internal var prefetchingEnabled: Boolean = true
 
     internal var remeasurement: Remeasurement? = null
         private set
@@ -142,6 +235,40 @@ public class TransformingLazyColumnState() : ScrollableState {
                 this@TransformingLazyColumnState.remeasurement = remeasurement
             }
         }
+
+    internal val prefetchState =
+        LazyLayoutPrefetchState(prefetchStrategy.prefetchScheduler) {
+            with(prefetchStrategy) {
+                onNestedPrefetch(Snapshot.withoutReadObservation { anchorItemIndex })
+            }
+        }
+
+    private val prefetchScope: TransformingLazyColumnPrefetchScope =
+        object : TransformingLazyColumnPrefetchScope {
+            override fun schedulePrefetch(index: Int): LazyLayoutPrefetchState.PrefetchHandle {
+                // Without read observation since this can be triggered from scroll - this will then
+                // cause us to recompose when the measure result changes. We don't care since the
+                // prefetch is best effort.
+                val constraints =
+                    Snapshot.withoutReadObservation { layoutInfoState.value.childConstraints }
+                return prefetchState.schedulePrefetch(index, constraints)
+            }
+        }
+
+    private fun notifyPrefetchOnScroll(
+        delta: Float,
+        measureResult: TransformingLazyColumnMeasureResult
+    ) {
+        if (prefetchingEnabled) {
+            with(prefetchStrategy) { prefetchScope.onScroll(delta, measureResult) }
+        }
+    }
+
+    /**
+     * Provides a modifier which allows to delay some interactions (e.g. scroll) until layout is
+     * ready.
+     */
+    internal val awaitLayoutModifier = AwaitFirstLayoutModifier()
 
     internal val animator = LazyLayoutItemAnimator<TransformingLazyColumnMeasuredItem>()
 
@@ -155,6 +282,9 @@ public class TransformingLazyColumnState() : ScrollableState {
         canScrollBackward = measureResult.canScrollBackward
         canScrollForward = measureResult.canScrollForward
         nearestRange = calculateNearestItemsRange(measureResult.anchorItemIndex)
+        if (prefetchingEnabled) {
+            with(prefetchStrategy) { prefetchScope.onVisibleItemsUpdated(measureResult) }
+        }
     }
 
     internal companion object {
@@ -190,10 +320,10 @@ public class TransformingLazyColumnState() : ScrollableState {
                     )
                 },
                 restore = {
-                    val scalingLazyColumnState = TransformingLazyColumnState()
-                    scalingLazyColumnState.anchorItemIndex = it[0]
-                    scalingLazyColumnState.anchorItemScrollOffset = it[1]
-                    scalingLazyColumnState
+                    TransformingLazyColumnState(
+                        initialAnchorItemIndex = it[0],
+                        initialAnchorItemScrollOffset = it[1]
+                    )
                 }
             )
     }
@@ -207,6 +337,8 @@ public class TransformingLazyColumnState() : ScrollableState {
      * into account the new layout. There is no guarantee that [index] will become the new
      * [anchorItemIndex] since requested [scrollOffset] may position item with another index closer
      * to the anchor point.
+     *
+     * @sample androidx.wear.compose.foundation.samples.TransformingLazyColumnScrollToItemSample
      *
      * This operation happens instantly without animation.
      *
@@ -260,6 +392,7 @@ public class TransformingLazyColumnState() : ScrollableState {
      * [anchorItemIndex] since requested [scrollOffset] may position item with another index closer
      * to the anchor point.
      *
+     * @sample androidx.wear.compose.foundation.samples.TransformingLazyColumnScrollToItemSample
      * @param index the index to which to scroll. Must be non-negative.
      * @param scrollOffset The offset between the center of the screen and item's center. Positive
      *   offset means the item will be scrolled up.
@@ -295,8 +428,14 @@ public class TransformingLazyColumnState() : ScrollableState {
 
         scrollToBeConsumed += distance
         if (abs(scrollToBeConsumed) > 0.5f) {
+            val preScrollToBeConsumed = scrollToBeConsumed
             animator.releaseAnimations()
             remeasurement?.forceRemeasure()
+
+            notifyPrefetchOnScroll(
+                preScrollToBeConsumed - scrollToBeConsumed,
+                layoutInfoState.value
+            )
         }
 
         // here scrollToBeConsumed is already consumed during the forceRemeasure invocation
@@ -330,6 +469,7 @@ private val EmptyTransformingLazyColumnMeasureResult =
         itemSpacing = 0,
         beforeContentPadding = 0,
         afterContentPadding = 0,
+        childConstraints = Constraints(),
         measureResult =
             object : MeasureResult {
                 override val width: Int = 0
@@ -341,3 +481,16 @@ private val EmptyTransformingLazyColumnMeasureResult =
                 override fun placeChildren() {}
             }
     )
+
+/** A modifier that allows to delay some interactions (e.g. scroll) until layout is ready. */
+internal class AwaitFirstLayoutModifier : OnGloballyPositionedModifier {
+    private val firstLayoutDeferred = CompletableDeferred<Unit>()
+
+    suspend fun waitForFirstLayout() {
+        firstLayoutDeferred.await()
+    }
+
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
+        firstLayoutDeferred.complete(Unit)
+    }
+}

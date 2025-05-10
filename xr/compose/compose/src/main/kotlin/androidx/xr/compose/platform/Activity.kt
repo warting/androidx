@@ -33,7 +33,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.xr.compose.subspace.SubspaceComposable
-import androidx.xr.scenecore.Session
+import androidx.xr.runtime.Session
+import androidx.xr.runtime.SessionCreateSuccess
+import androidx.xr.scenecore.scene
 
 private val activityToSpatialComposeScene = mutableMapOf<Activity, SpatialComposeScene>()
 
@@ -72,16 +74,11 @@ public fun ComponentActivity.setSubspaceContent(
     session: Session,
     content: @Composable @SubspaceComposable () -> Unit,
 ) {
-    val spatialComposeScene = getOrCreateSpatialSceneForActivity(session)
-
-    spatialComposeScene.setContent {
+    getOrCreateSpatialSceneForActivity(session).setContent {
         DisposableEffect(session) {
-            session.mainPanelEntity.setHidden(true)
-            onDispose { session.mainPanelEntity.setHidden(false) }
+            session.scene.mainPanelEntity.setHidden(true)
+            onDispose { session.scene.mainPanelEntity.setHidden(false) }
         }
-
-        // TODO(b/354009078) Why does rendering content in full space mode break presubmits.
-
         // We need to emulate the composition locals that setContent provides
         CompositionLocalProvider(
             LocalConfiguration provides resources.configuration,
@@ -126,7 +123,7 @@ private fun ComponentActivity.setUpSubspace(spatialComposeScene: SpatialComposeS
 
 /** Get the default [Session] for this [ComponentActivity]. */
 private val ComponentActivity.defaultSession
-    get() = Session.create(this)
+    get() = (Session.create(this) as SessionCreateSuccess).session
 
 /** Utility extension function to fetch the current [Activity] based on the [Context] object. */
 internal tailrec fun Context.getActivity(): Activity {

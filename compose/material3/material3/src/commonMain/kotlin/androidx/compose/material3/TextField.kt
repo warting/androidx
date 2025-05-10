@@ -134,8 +134,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * <a href="https://m3.material.io/components/text-fields/overview" class="external"
- * target="_blank">Material Design filled text field</a>.
+ * [Material Design filled text field](https://m3.material.io/components/text-fields/overview)
  *
  * Text fields allow users to enter text into a UI. They typically appear in forms and dialogs.
  * Filled text fields have more visual emphasis than outlined text fields, making them stand out
@@ -352,8 +351,7 @@ fun TextField(
 }
 
 /**
- * <a href="https://m3.material.io/components/text-fields/overview" class="external"
- * target="_blank">Material Design filled text field</a>.
+ * [Material Design filled text field](https://m3.material.io/components/text-fields/overview)
  *
  * Text fields allow users to enter text into a UI. They typically appear in forms and dialogs.
  * Filled text fields have more visual emphasis than outlined text fields, making them stand out
@@ -502,8 +500,7 @@ fun TextField(
 }
 
 /**
- * <a href="https://m3.material.io/components/text-fields/overview" class="external"
- * target="_blank">Material Design filled text field</a>.
+ * [Material Design filled text field](https://m3.material.io/components/text-fields/overview)
  *
  * Text fields allow users to enter text into a UI. They typically appear in forms and dialogs.
  * Filled text fields have more visual emphasis than outlined text fields, making them stand out
@@ -1603,7 +1600,7 @@ internal class IndicatorLineNode(
                 targetValue = colors.indicatorColor(enabled, isError, focused),
                 animationSpec =
                     if (enabled) {
-                        currentValueOf(LocalMotionScheme)
+                        currentValueOf(MaterialTheme.LocalMotionScheme)
                             .fromToken(MotionSchemeKeyTokens.FastEffects)
                     } else {
                         snap()
@@ -1616,7 +1613,7 @@ internal class IndicatorLineNode(
                     if (focused && enabled) focusedIndicatorWidth else unfocusedIndicatorWidth,
                 animationSpec =
                     if (enabled) {
-                        currentValueOf(LocalMotionScheme)
+                        currentValueOf(MaterialTheme.LocalMotionScheme)
                             .fromToken(MotionSchemeKeyTokens.FastSpatial)
                     } else {
                         snap()

@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.IntrinsicMeasurable
 import androidx.compose.ui.layout.IntrinsicMeasureScope
@@ -208,7 +209,7 @@ public fun EdgeButton(
                 )
                 .clip(shape = shape)
                 .paint(
-                    painter = colors.containerPainter(enabled = enabled),
+                    painter = ColorPainter(colors.containerColor(enabled = enabled)),
                     contentScale = ContentScale.Crop
                 )
                 .graphicsLayer {
@@ -261,7 +262,7 @@ public fun EdgeButton(
                     TextConfiguration(
                         TextAlign.Center,
                         TextOverflow.Ellipsis,
-                        maxLines = 3, // TODO(): Change according to buttonHeight
+                        maxLines = buttonSize.maxLines()
                     ),
                 content
             )
@@ -283,6 +284,15 @@ public value class EdgeButtonSize internal constructor(internal val maximumHeigh
      * offset a bit, which works better on the asymmetrical shape of the Edge Button
      */
     internal fun verticalContentPadding() = 6.dp to 8.dp
+
+    internal fun maxLines(): Int =
+        when (this) {
+            ExtraSmall -> 1
+            Small -> 2
+            Medium -> 2
+            // Large
+            else -> 3
+        }
 
     public companion object {
         /** The Size to be applied for an extra small [EdgeButton]. */
@@ -400,7 +410,7 @@ internal class ShapeHelper(private val density: Density) {
     fun contentWidthDp() = with(density) { contentWindow.width.toDp() }
 
     fun updateIfNeeded(size: Size) {
-        if (size == lastSize || size.height == 0f) return
+        if (size == lastSize || size.height == 0f || size.height.isNaN()) return
 
         lastSize = size
 

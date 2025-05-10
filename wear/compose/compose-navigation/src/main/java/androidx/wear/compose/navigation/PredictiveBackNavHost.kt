@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,13 +60,16 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.Navigator
 import androidx.navigation.compose.LocalOwnersProvider
 import androidx.navigation.get
+import androidx.wear.compose.foundation.LocalScreenIsActive
 import androidx.wear.compose.foundation.LocalSwipeToDismissBackgroundScrimColor
+import androidx.wear.compose.foundation.hierarchicalFocusGroup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -220,35 +224,39 @@ internal fun PredictiveBackNavHost(
             }
 
         if (currentEntry != null) {
-            Box(
-                modifier =
-                    Modifier.background(
-                            scrimColor,
-                            if (isRoundDevice) CircleShape else RectangleShape
-                        )
-                        .fillMaxSize()
+            val parentScreenActive = LocalScreenIsActive.current
+            CompositionLocalProvider(
+                LocalScreenIsActive provides (currentEntry == current && parentScreenActive)
             ) {
-                // while in the scope of the composable, we provide the navBackStackEntry as the
-                // ViewModelStoreOwner and LifecycleOwner
-                if (currentEntry.lifecycle.currentState != Lifecycle.State.DESTROYED) {
-                    currentEntry.LocalOwnersProvider(stateHolder) {
-                        (currentEntry.destination as WearNavigator.Destination).content(
-                            currentEntry
+                Box(
+                    modifier =
+                        Modifier.background(
+                                scrimColor,
+                                if (isRoundDevice) CircleShape else RectangleShape
+                            )
+                            .fillMaxSize()
+                            .hierarchicalFocusGroup(currentEntry == current)
+                ) {
+                    // while in the scope of the composable, we provide the navBackStackEntry as the
+                    // ViewModelStoreOwner and LifecycleOwner
+                    if (currentEntry.lifecycle.currentState != Lifecycle.State.DESTROYED) {
+                        currentEntry.LocalOwnersProvider(stateHolder) {
+                            DestinationContent(backStackEntry = currentEntry)
+                        }
+                    }
+                    if (currentEntry != current) {
+                        Box(
+                            modifier =
+                                Modifier.clickable(
+                                        enabled = false,
+                                        indication = null,
+                                        interactionSource = remember { MutableInteractionSource() }
+                                    ) {
+                                        // Ignore taps on previous backstack entries
+                                    }
+                                    .fillMaxSize()
                         )
                     }
-                }
-                if (currentEntry != current) {
-                    Box(
-                        modifier =
-                            Modifier.clickable(
-                                    enabled = false,
-                                    indication = null,
-                                    interactionSource = remember { MutableInteractionSource() }
-                                ) {
-                                    // Ignore taps on previous backstack entries
-                                }
-                                .fillMaxSize()
-                    )
                 }
             }
         }
@@ -261,6 +269,17 @@ internal fun PredictiveBackNavHost(
             }
         }
     }
+}
+
+// Using this @Composable function instead of an inline lambda in `NavGraphBuilder.composable` helps
+// prevent unnecessary continuous recomposition of the lambda block during predictive back swipe
+// animations. Once strong skipping is enabled in the Compose compiler, inline composable lambdas
+// are expected to be automatically memoized, providing similar behavior to this explicit function.
+// This change ensures the optimization is in place regardless of the current compiler
+// configuration. This approach may be reverted once strong skipping becomes a standard feature.
+@Composable
+private fun DestinationContent(backStackEntry: NavBackStackEntry) {
+    (backStackEntry.destination as WearNavigator.Destination).content(backStackEntry)
 }
 
 private val ENTER_TRANSITION =

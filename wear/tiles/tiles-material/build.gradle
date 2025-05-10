@@ -26,7 +26,7 @@ import androidx.build.SoftwareType
 
 plugins {
     id("AndroidXPlugin")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
     id("com.android.library")
     id("com.google.protobuf")
 }
@@ -48,7 +48,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.mockitoCore4)
-    testImplementation(libs.robolectric)
     testImplementation(libs.testExtJunit)
     testImplementation(libs.testExtTruth)
     testImplementation(libs.testCore)
@@ -73,4 +72,5 @@ androidx {
     description = "Material components library for Android Wear Tiles."
     legacyDisableKotlinStrictApiMode = true
     addGoldenImageAssets()
+    enableRobolectric()
 }

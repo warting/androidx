@@ -37,10 +37,11 @@ import androidx.camera.core.impl.utils.futures.Futures
 import androidx.camera.integration.view.util.takePictureOnDisk
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.testing.impl.AndroidUtil.isEmulator
-import androidx.camera.testing.impl.AndroidUtil.skipVideoRecordingTestIfNotSupportedByEmulator
+import androidx.camera.testing.impl.CameraAvailabilityUtil.assumeDeviceHasFrontCamera
 import androidx.camera.testing.impl.CameraPipeConfigTestRule
 import androidx.camera.testing.impl.CameraUtil
 import androidx.camera.testing.impl.CoreAppTestUtil
+import androidx.camera.testing.impl.IgnoreVideoRecordingProblematicDeviceRule.Companion.skipVideoRecordingTestIfNotSupportedByEmulator
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.CameraController.TAP_TO_FOCUS_FAILED
 import androidx.camera.view.CameraController.TAP_TO_FOCUS_FOCUSED
@@ -163,12 +164,20 @@ class CameraControllerFragmentTest(
                     started = true
                     return@observe
                 }
-                if (started) {
+
+                // The FOCUS_FAILED state can occur before FOCUS_STARTED if none of the provided
+                // AF/AE/AWB MeteringPoints are supported by the device. In such cases, we can
+                // consider the focus operation to be finished.
+                if (started || it.focusState == TAP_TO_FOCUS_FAILED) {
                     finalState = it.focusState
                     focused.release()
                 }
             }
         }
+
+        // Disables auto-cancellation as that would reset the focus state and interfere with the
+        // the test in timeout cases.
+        fragment.cameraController.setTapToFocusAutoCancelDuration(0, TimeUnit.SECONDS)
 
         // Act: click PreviewView.
         val previewViewId = "androidx.camera.integration.view:id/preview_view"
@@ -420,12 +429,16 @@ class CameraControllerFragmentTest(
 
     @Test
     fun cameraToggled_previewIsStreaming() {
+        assumeDeviceHasFrontCamera()
+
         onView(withId(R.id.camera_toggle)).perform(click())
         fragment.assertPreviewIsStreaming()
     }
 
     @Test
     fun cameraToggled_canTakePicture() {
+        assumeDeviceHasFrontCamera()
+
         onView(withId(R.id.camera_toggle)).perform(click())
         fragment.assertPreviewIsStreaming()
         fragment.assertCanTakePicture()
@@ -465,6 +478,8 @@ class CameraControllerFragmentTest(
 
     @Test
     fun cameraToggled_canRecordVideo() {
+        assumeDeviceHasFrontCamera()
+
         skipVideoRecordingTestIfNotSupportedByEmulator()
         skipTestWithSurfaceProcessingOnCuttlefishApi30()
 

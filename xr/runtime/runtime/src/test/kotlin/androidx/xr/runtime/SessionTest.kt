@@ -19,7 +19,13 @@ package androidx.xr.runtime
 import android.app.Activity
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.xr.runtime.internal.ApkCheckAvailabilityErrorException
+import androidx.xr.runtime.internal.ApkCheckAvailabilityInProgressException
+import androidx.xr.runtime.internal.ApkNotInstalledException
+import androidx.xr.runtime.internal.UnsupportedDeviceException
+import androidx.xr.runtime.testing.FakeJxrPlatformAdapter
 import androidx.xr.runtime.testing.FakeLifecycleManager
+import androidx.xr.runtime.testing.FakeRuntimeFactory
 import androidx.xr.runtime.testing.FakeStateExtender
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.assertFailsWith
@@ -27,7 +33,6 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
@@ -51,7 +56,7 @@ class SessionTest {
     @Before
     fun setUp() {
         activityScenarioRule.scenario.onActivity { this.activity = it }
-        shadowOf(activity).grantPermissions(*Session.SESSION_PERMISSIONS.toTypedArray())
+        shadowOf(activity).grantPermissions(*FakeLifecycleManager.TestPermissions.toTypedArray())
 
         testDispatcher = StandardTestDispatcher()
         testScope = TestScope(testDispatcher)
@@ -84,13 +89,67 @@ class SessionTest {
     }
 
     @Test
-    fun create_permissionNotGranted_returnsPermissionsNotGranted() {
-        val permission = "android.permission.SCENE_UNDERSTANDING"
-        shadowOf(activity).denyPermissions(permission)
+    fun create_permissionException_returnsPermissionsNotGrantedResult() {
+        FakeRuntimeFactory.hasCreatePermission = false
 
-        val result = Session.create(activity) as SessionCreatePermissionsNotGranted
+        val result = Session.create(activity)
+        // Reset the flag to true so other tests are not affected.
+        FakeRuntimeFactory.hasCreatePermission = true
 
-        assertThat(result.permissions).containsExactly(permission)
+        assertThat(result).isInstanceOf(SessionCreatePermissionsNotGranted::class.java)
+    }
+
+    @Test
+    fun create_arcoreNotInstalledException_returnsApkRequiredResult() {
+        FakeRuntimeFactory.lifecycleCreateException = ApkNotInstalledException(ARCORE_PACKAGE_NAME)
+
+        val result = Session.create(activity)
+
+        assertThat(result).isInstanceOf(SessionCreateApkRequired::class.java)
+        assertThat((result as SessionCreateApkRequired).requiredApk).isEqualTo(ARCORE_PACKAGE_NAME)
+    }
+
+    @Test
+    fun create_arcoreUnsupportedDeviceException_returnsUnsupportedDeviceResult() {
+        FakeRuntimeFactory.lifecycleCreateException = UnsupportedDeviceException()
+
+        val result = Session.create(activity)
+
+        assertThat(result).isInstanceOf(SessionCreateUnsupportedDevice::class.java)
+    }
+
+    @Test
+    fun create_arcoreCheckAvailabilityInProgressException_returnsApkRequiredResult() {
+        FakeRuntimeFactory.lifecycleCreateException =
+            ApkCheckAvailabilityInProgressException(ARCORE_PACKAGE_NAME)
+
+        val result = Session.create(activity)
+
+        assertThat(result).isInstanceOf(SessionCreateApkRequired::class.java)
+        assertThat((result as SessionCreateApkRequired).requiredApk).isEqualTo(ARCORE_PACKAGE_NAME)
+    }
+
+    @Test
+    fun create_arcoreCheckAvailabilityErrorException_returnsApkRequiredResult() {
+        FakeRuntimeFactory.lifecycleCreateException =
+            ApkCheckAvailabilityErrorException(ARCORE_PACKAGE_NAME)
+
+        val result = Session.create(activity)
+
+        assertThat(result).isInstanceOf(SessionCreateApkRequired::class.java)
+        assertThat((result as SessionCreateApkRequired).requiredApk).isEqualTo(ARCORE_PACKAGE_NAME)
+    }
+
+    @Test
+    fun create_initializesPlatformAdapter() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+
+        // The FakeJxrPlatformAdapter is being loaded in Session here because it is defined as a
+        // class
+        // in the "//third_party/arcore/androidx/java/androidx/xr/testing" dependency.
+        val platformAdapter = underTest.platformAdapter as FakeJxrPlatformAdapter
+        assertThat(platformAdapter).isNotNull()
+        assertThat(platformAdapter.state.name).isEqualTo("CREATED")
     }
 
     @Test
@@ -98,7 +157,67 @@ class SessionTest {
         val underTest = (Session.create(activity) as SessionCreateSuccess).session
         underTest.destroy()
 
-        assertFailsWith<IllegalStateException> { underTest.configure() }
+        assertFailsWith<IllegalStateException> { underTest.configure(Config()) }
+    }
+
+    @Test
+    fun configure_returnsSuccessAndChangesConfig() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        check(
+            underTest.config.equals(
+                Config(
+                    Config.PlaneTrackingMode.HORIZONTAL_AND_VERTICAL,
+                    Config.HandTrackingMode.ENABLED,
+                    Config.DepthEstimationMode.ENABLED,
+                    Config.AnchorPersistenceMode.ENABLED,
+                )
+            )
+        )
+        val config =
+            Config(
+                Config.PlaneTrackingMode.DISABLED,
+                Config.HandTrackingMode.DISABLED,
+                Config.DepthEstimationMode.DISABLED,
+                Config.AnchorPersistenceMode.DISABLED,
+            )
+
+        val result = underTest.configure(config)
+
+        assertThat(result).isInstanceOf(SessionConfigureSuccess::class.java)
+        assertThat(underTest.config).isEqualTo(config)
+    }
+
+    @Test
+    fun configure_permissionNotGranted_returnsPermissionNotGrantedResult() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        val lifecycleManager = underTest.runtime.lifecycleManager as FakeLifecycleManager
+        val currentConfig = underTest.config
+        check(currentConfig.depthEstimation == Config.DepthEstimationMode.ENABLED)
+        lifecycleManager.hasMissingPermission = true
+
+        val result =
+            underTest.configure(
+                underTest.config.copy(depthEstimation = Config.DepthEstimationMode.DISABLED)
+            )
+
+        assertThat(result).isInstanceOf(SessionConfigurePermissionsNotGranted::class.java)
+        assertThat(underTest.config).isEqualTo(currentConfig)
+    }
+
+    @Test
+    fun configure_unsupportedMode_returnsConfigurationNotSupportedResult() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        val lifecycleManager = underTest.runtime.lifecycleManager as FakeLifecycleManager
+        val currentConfig = underTest.config
+
+        lifecycleManager.shouldSupportPlaneTracking = false
+        val result =
+            underTest.configure(
+                Config(planeTracking = Config.PlaneTrackingMode.HORIZONTAL_AND_VERTICAL)
+            )
+
+        assertThat(result).isInstanceOf(SessionConfigureConfigurationNotSupported::class.java)
+        assertThat(underTest.config).isEqualTo(currentConfig)
     }
 
     // TODO(b/349855733): Add a test to verify configure() calls the corresponding LifecycleManager
@@ -116,22 +235,21 @@ class SessionTest {
     }
 
     @Test
+    fun resume_returnsSuccessAndSetsPlatformAdapterToResumed() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        val result = underTest.resume()
+
+        assertThat(result).isInstanceOf(SessionResumeSuccess::class.java)
+        assertThat((underTest.platformAdapter as FakeJxrPlatformAdapter).state.name)
+            .isEqualTo("STARTED")
+    }
+
+    @Test
     fun resume_destroyed_throwsIllegalStateException() {
         val underTest = (Session.create(activity) as SessionCreateSuccess).session
         underTest.destroy()
 
         assertFailsWith<IllegalStateException> { underTest.resume() }
-    }
-
-    @Test
-    fun resume_permissionNotGranted_returnsPermissionsNotGranted() {
-        val underTest = (Session.create(activity) as SessionCreateSuccess).session
-        val permission = "android.permission.SCENE_UNDERSTANDING"
-        shadowOf(activity).denyPermissions(permission)
-
-        val result = underTest.resume() as SessionResumePermissionsNotGranted
-
-        assertThat(result.permissions).containsExactly(permission)
     }
 
     // TODO(b/349859981): Add a test to verify update() calls the corresponding LifecycleManager
@@ -184,6 +302,17 @@ class SessionTest {
     }
 
     @Test
+    fun pause_setsPlatformAdapterToPaused() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        underTest.resume()
+
+        underTest.pause()
+
+        val platformAdapter = underTest.platformAdapter as FakeJxrPlatformAdapter
+        assertThat(platformAdapter.state.name).isEqualTo("PAUSED")
+    }
+
+    @Test
     fun pause_destroyed_throwsIllegalStateException() {
         val underTest = (Session.create(activity) as SessionCreateSuccess).session
         underTest.destroy()
@@ -213,6 +342,17 @@ class SessionTest {
     }
 
     @Test
+    fun destroy_setsPlatformAdapterToStopped() {
+        val underTest = (Session.create(activity) as SessionCreateSuccess).session
+        underTest.resume()
+
+        underTest.destroy()
+
+        val platformAdapter = underTest.platformAdapter as FakeJxrPlatformAdapter
+        assertThat(platformAdapter.state.name).isEqualTo("STOPPED")
+    }
+
+    @Test
     fun destroy_cancelsCoroutineScope() {
         val underTest = (Session.create(activity) as SessionCreateSuccess).session
         // Creating a job that will not finish by the time destroy is called.
@@ -230,5 +370,9 @@ class SessionTest {
         session.resume()
         testScope.advanceUntilIdle()
         session.pause()
+    }
+
+    private companion object {
+        const private val ARCORE_PACKAGE_NAME = "com.google.ar.core"
     }
 }

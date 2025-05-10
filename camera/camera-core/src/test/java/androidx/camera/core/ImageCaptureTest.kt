@@ -27,7 +27,6 @@ import android.util.Pair
 import android.util.Rational
 import android.util.Size
 import android.view.Surface
-import androidx.annotation.RequiresApi
 import androidx.camera.core.CameraEffect.IMAGE_CAPTURE
 import androidx.camera.core.CameraEffect.PREVIEW
 import androidx.camera.core.CameraEffect.VIDEO_CAPTURE
@@ -48,6 +47,7 @@ import androidx.camera.core.impl.ImageOutputConfig.OPTION_SUPPORTED_RESOLUTIONS
 import androidx.camera.core.impl.MutableOptionsBundle
 import androidx.camera.core.impl.OptionsBundle
 import androidx.camera.core.impl.SessionConfig
+import androidx.camera.core.impl.SessionConfig.SESSION_TYPE_HIGH_SPEED
 import androidx.camera.core.impl.SessionProcessor
 import androidx.camera.core.impl.StreamSpec
 import androidx.camera.core.impl.TagBundle
@@ -57,6 +57,7 @@ import androidx.camera.core.impl.utils.executor.CameraXExecutors
 import androidx.camera.core.impl.utils.executor.CameraXExecutors.mainThreadExecutor
 import androidx.camera.core.internal.CameraUseCaseAdapter
 import androidx.camera.core.internal.ScreenFlashWrapper
+import androidx.camera.core.internal.StreamSpecsCalculatorImpl
 import androidx.camera.core.internal.utils.SizeUtil
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -76,6 +77,7 @@ import androidx.camera.testing.impl.fakes.FakeUseCaseConfigFactory
 import androidx.camera.testing.impl.mocks.MockScreenFlash
 import androidx.camera.testing.impl.mocks.MockScreenFlashListener
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.filters.SdkSuppress
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.util.Collections
@@ -139,7 +141,7 @@ class ImageCaptureTest {
             FakeCamera("1", null, FakeCameraInfoInternal("1", CameraSelector.LENS_FACING_FRONT))
 
         val cameraFactoryProvider =
-            CameraFactory.Provider { _, _, _, _ ->
+            CameraFactory.Provider { _, _, _, _, _ ->
                 val cameraFactory = FakeCameraFactory()
                 cameraFactory.insertDefaultBackCamera(camera.cameraInfoInternal.cameraId) { camera }
                 cameraFactory.insertDefaultFrontCamera(cameraFront.cameraInfoInternal.cameraId) {
@@ -593,17 +595,21 @@ class ImageCaptureTest {
             setOf(listOf(INTERNAL_DEFINED_IMAGE_FORMAT_PRIVATE, ImageFormat.JPEG_R))
         )
         val fakeCameraInfo =
-            FakeCameraInfoInternal().apply {
-                setSupportedResolutions(ImageFormat.PRIVATE, listOf())
-                setSupportedResolutions(ImageFormat.JPEG, listOf())
-                setSupportedResolutions(ImageFormat.JPEG_R, listOf())
-            }
+            FakeCameraInfoInternal(
+                    StreamSpecsCalculatorImpl(FakeUseCaseConfigFactory(), fakeManager)
+                )
+                .apply {
+                    setSupportedResolutions(ImageFormat.PRIVATE, listOf())
+                    setSupportedResolutions(ImageFormat.JPEG, listOf())
+                    setSupportedResolutions(ImageFormat.JPEG_R, listOf())
+                }
+        val useCaseConfigFactory = FakeUseCaseConfigFactory()
         val adapter =
             CameraUseCaseAdapter(
                 FakeCamera(FakeCameraControl(), fakeCameraInfo),
                 FakeCameraCoordinator(),
-                fakeManager,
-                FakeUseCaseConfigFactory()
+                StreamSpecsCalculatorImpl(useCaseConfigFactory, fakeManager),
+                useCaseConfigFactory
             )
         adapter.addUseCases(listOf(imageCapture))
 
@@ -649,6 +655,25 @@ class ImageCaptureTest {
         assertThat(camera.cameraControlInternal).isInstanceOf(FakeCameraControl::class.java)
         val cameraControl = camera.cameraControlInternal as FakeCameraControl
         assertThat(cameraControl.isZslConfigAdded).isTrue()
+    }
+
+    @Test
+    fun sessionConfigMatchesStreamSpec() {
+        val imageCapture =
+            ImageCapture.Builder()
+                .setSessionOptionUnpacker { _, _, _,
+                    ->
+                }
+                .setCaptureOptionUnpacker { _, _ -> }
+                .build()
+        val streamSpec =
+            StreamSpec.builder(Size(640, 480)).setSessionType(SESSION_TYPE_HIGH_SPEED).build()
+
+        imageCapture.bindToCamera(FakeCamera(), null, null, null)
+        imageCapture.updateSuggestedStreamSpec(streamSpec, null)
+
+        val sessionConfig = imageCapture.sessionConfig
+        assertThat(sessionConfig.sessionType).isEqualTo(SESSION_TYPE_HIGH_SPEED)
     }
 
     @Test
@@ -962,7 +987,7 @@ class ImageCaptureTest {
             .isSameInstanceAs(resolutionSelector)
     }
 
-    @RequiresApi(23)
+    @SdkSuppress(minSdkVersion = 23)
     @Test
     fun useMaximumSize_whenNotSettingPostviewResolutioSelector() {
         val imageCapture = ImageCapture.Builder().setPostviewEnabled(true).build()
@@ -984,7 +1009,7 @@ class ImageCaptureTest {
             .isEqualTo(Size(1920, 1080))
     }
 
-    @RequiresApi(23)
+    @SdkSuppress(minSdkVersion = 23)
     @Test
     fun postviewResolutioSelectorCanWork() {
         val resolutionSelector =
@@ -1018,7 +1043,7 @@ class ImageCaptureTest {
             .isEqualTo(Size(1920, 1080))
     }
 
-    @RequiresApi(23)
+    @SdkSuppress(minSdkVersion = 23)
     @Test
     fun throwException_whenPostviewResolutionSelectorCannotSelectSize() {
         val resolutionSelector =

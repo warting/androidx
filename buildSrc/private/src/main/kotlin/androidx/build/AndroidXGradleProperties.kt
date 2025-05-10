@@ -235,8 +235,8 @@ fun Project.isWriteVersionedApiFilesEnabled(): Boolean =
     findBooleanProperty(WRITE_VERSIONED_API_FILES) ?: true
 
 /** Returns whether the build is for checking forward compatibility across projects */
-fun Project.usingMaxDepVersions(): Boolean {
-    return project.providers.gradleProperty(USE_MAX_DEP_VERSIONS).isPresent()
+fun Project.usingMaxDepVersions(): Provider<Boolean> {
+    return project.providers.gradleProperty(USE_MAX_DEP_VERSIONS).map { true }.orElse(false)
 }
 
 /** Returns whether we export compose compiler metrics */
@@ -261,8 +261,5 @@ fun Project.allowMissingLintProject() =
 fun Project.isCustomCompileSdkAllowed(): Boolean =
     findBooleanProperty(ALLOW_CUSTOM_COMPILE_SDK) ?: true
 
-fun Project.findBooleanProperty(propName: String) = booleanPropertyProvider(propName).get()
-
-fun Project.booleanPropertyProvider(propName: String): Provider<Boolean> {
-    return project.providers.gradleProperty(propName).map { s -> s.toBoolean() }.orElse(false)
-}
+fun Project.findBooleanProperty(propName: String): Boolean? =
+    project.providers.gradleProperty(propName).map { it.toBoolean() }.getOrNull()

@@ -16,33 +16,43 @@
 
 package androidx.pdf
 
+import android.os.Build
+import androidx.annotation.RequiresExtension
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.testing.FragmentScenario
 import androidx.lifecycle.Lifecycle
-import androidx.pdf.idlingresource.PdfIdlingResource
 import androidx.test.platform.app.InstrumentationRegistry
 
 internal object FragmentUtils {
 
     private const val TEST_DOCUMENT_FILE = "sample.pdf"
 
-    internal fun scenarioLoadDocument(
-        scenario: FragmentScenario<TestPdfViewerFragmentV2>,
+    @RequiresExtension(extension = Build.VERSION_CODES.S, version = 13)
+    internal fun <T : Fragment> scenarioLoadDocument(
+        scenario: FragmentScenario<T>,
         filename: String = TEST_DOCUMENT_FILE,
         nextState: Lifecycle.State,
         orientation: Int,
-        pdfLoadingIdlingResource: PdfIdlingResource
-    ): FragmentScenario<TestPdfViewerFragmentV2> {
+        onDocumentLoading: (() -> Unit)? = null
+    ): FragmentScenario<T> {
         val context = InstrumentationRegistry.getInstrumentation().context
         val inputStream = context.assets.open(filename)
 
         scenario.moveToState(nextState)
         scenario.onFragment { it.requireActivity().requestedOrientation = orientation }
 
+        onDocumentLoading?.invoke()
+
         // Load the document in the fragment
         scenario.onFragment { fragment ->
-            fragment.documentUri = TestUtils.saveStream(inputStream, fragment.requireContext())
             // Increment pdf load idling resource to wait for background task to complete.
-            pdfLoadingIdlingResource.increment()
+            if (fragment is TestPdfViewerFragmentV1) {
+                fragment.pdfLoadingIdlingResource.increment()
+                fragment.documentUri = TestUtils.saveStream(inputStream, fragment.requireContext())
+            } else if (fragment is TestPdfViewerFragment) {
+                fragment.pdfLoadingIdlingResource.increment()
+                fragment.documentUri = TestUtils.saveStream(inputStream, fragment.requireContext())
+            }
         }
 
         return scenario

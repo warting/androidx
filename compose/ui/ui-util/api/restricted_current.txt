@@ -4,7 +4,7 @@ package androidx.compose.ui {
   @SuppressCompatibility @kotlin.RequiresOptIn(message="This API is experimental and is likely to change in the future.") @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.BINARY) public @interface ExperimentalComposeUiApi {
   }
 
-  @SuppressCompatibility @kotlin.RequiresOptIn(message="Unstable API for use only between compose-ui modules sharing the same exact version, " + "subject to change without notice in major, minor, or patch releases.") @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.BINARY) public @interface InternalComposeUiApi {
+  @SuppressCompatibility @kotlin.RequiresOptIn(message="Unstable API for use only between compose-ui modules sharing the same exact version, subject to change without notice in major, minor, or patch releases.") @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.BINARY) public @interface InternalComposeUiApi {
   }
 
 }
@@ -13,6 +13,7 @@ package androidx.compose.ui.util {
 
   public final class AndroidTrace_androidKt {
     method public static inline <T> T trace(String sectionName, kotlin.jvm.functions.Function0<? extends T> block);
+    method public static void traceValue(String tag, long value);
   }
 
   public final class InlineClassHelperKt {

@@ -34,20 +34,22 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.internal.checkPreconditionNotNull
 import androidx.compose.ui.platform.AndroidComposeView
 import androidx.compose.ui.platform.SemanticsNodeCopy
-import androidx.compose.ui.platform.SemanticsNodeWithAdjustedBounds
 import androidx.compose.ui.platform.coreshims.ContentCaptureSessionCompat
 import androidx.compose.ui.platform.coreshims.ViewCompatShims
 import androidx.compose.ui.platform.coreshims.ViewStructureCompat
-import androidx.compose.ui.platform.getAllUncoveredSemanticsNodesToIntObjectMap
 import androidx.compose.ui.platform.getTextLayoutResult
 import androidx.compose.ui.platform.toLegacyClassName
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsNodeWithAdjustedBounds
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getAllUncoveredSemanticsNodesToIntObjectMap
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastJoinToString
+import androidx.compose.ui.util.trace
+import androidx.core.view.accessibility.AccessibilityNodeProviderCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import java.util.function.Consumer
@@ -105,7 +107,10 @@ internal class AndroidContentCaptureManager(
         get() {
             if (currentSemanticsNodesInvalidated) { // first instance of retrieving all nodes
                 currentSemanticsNodesInvalidated = false
-                field = view.semanticsOwner.getAllUncoveredSemanticsNodesToIntObjectMap()
+                field =
+                    view.semanticsOwner.getAllUncoveredSemanticsNodesToIntObjectMap(
+                        customRootNodeId = AccessibilityNodeProviderCompat.HOST_VIEW_ID
+                    )
                 currentSemanticsNodesSnapshotTimestampMillis = System.currentTimeMillis()
             }
             return field
@@ -126,23 +131,28 @@ internal class AndroidContentCaptureManager(
     private val contentCaptureChangeChecker = Runnable {
         if (!isEnabled) return@Runnable
 
-        // TODO(mnuzen): there might be a case where `view.measureAndLayout()` is called twice --
-        // once by the CC checker and once by the a11y checker.
-        view.measureAndLayout()
+        trace("ContentCapture:changeChecker") {
+            // TODO(mnuzen): there might be a case where `view.measureAndLayout()` is called twice
+            // --
+            // once by the CC checker and once by the a11y checker.
+            view.measureAndLayout()
 
-        // Semantics structural change
-        // Always send disappear event first.
-        sendContentCaptureDisappearEvents()
-        sendContentCaptureAppearEvents(
-            view.semanticsOwner.unmergedRootSemanticsNode,
-            previousSemanticsRoot
-        )
+            // Semantics structural change
+            // Always send disappear event first.
+            sendContentCaptureDisappearEvents()
+            trace("ContentCapture:sendAppearEvents") {
+                sendContentCaptureAppearEvents(
+                    view.semanticsOwner.unmergedRootSemanticsNode,
+                    previousSemanticsRoot
+                )
+            }
 
-        // Property change
-        checkForContentCapturePropertyChanges(currentSemanticsNodes)
-        updateSemanticsCopy()
+            // Property change
+            checkForContentCapturePropertyChanges(currentSemanticsNodes)
+            updateSemanticsCopy()
 
-        checkingForSemanticsChanges = false
+            checkingForSemanticsChanges = false
+        }
     }
 
     override fun onViewAttachedToWindow(v: View) {}

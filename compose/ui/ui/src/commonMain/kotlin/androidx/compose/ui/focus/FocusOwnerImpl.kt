@@ -36,6 +36,7 @@ import androidx.compose.ui.focus.FocusStateImpl.ActiveParent
 import androidx.compose.ui.focus.FocusStateImpl.Captured
 import androidx.compose.ui.focus.FocusStateImpl.Inactive
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.indirect.IndirectTouchEvent
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType.Companion.KeyDown
 import androidx.compose.ui.input.key.KeyEventType.Companion.KeyUp
@@ -57,8 +58,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachReversed
 import androidx.compose.ui.util.trace
-
-private const val Warning = "FocusRelatedWarning"
 
 /**
  * The focus manager is used by different [Owner][androidx.compose.ui.node.Owner] implementations to
@@ -331,7 +330,7 @@ internal class FocusOwnerImpl(
         trace("FocusOwnerImpl:dispatchKeyEvent") {
             if (focusInvalidationManager.hasPendingInvalidation()) {
                 // Ignoring this to unblock b/346370327.
-                println("$Warning: Dispatching key event while focus system is invalidated.")
+                println("$FocusWarning: Dispatching key event while focus system is invalidated.")
                 return false
             }
             if (!validateKeyEvent(keyEvent)) return false
@@ -356,7 +355,7 @@ internal class FocusOwnerImpl(
         if (focusInvalidationManager.hasPendingInvalidation()) {
             // Ignoring this to unblock b/346370327.
             println(
-                "$Warning: Dispatching intercepted soft keyboard event while the focus system" +
+                "$FocusWarning: Dispatching intercepted soft keyboard event while the focus system" +
                     " is invalidated."
             )
             return false
@@ -383,7 +382,9 @@ internal class FocusOwnerImpl(
     ): Boolean {
         if (focusInvalidationManager.hasPendingInvalidation()) {
             // Ignoring this to unblock b/379289347.
-            println("$Warning: Dispatching rotary event while the focus system is invalidated.")
+            println(
+                "$FocusWarning: Dispatching rotary event while the focus system is invalidated."
+            )
             return false
         }
 
@@ -395,6 +396,31 @@ internal class FocusOwnerImpl(
             onPreVisit = { if (it.onPreRotaryScrollEvent(event)) return true },
             onVisit = { if (onFocusedItem()) return true },
             onPostVisit = { if (it.onRotaryScrollEvent(event)) return true }
+        )
+
+        return false
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    override fun dispatchIndirectTouchEvent(
+        event: IndirectTouchEvent,
+        onFocusedItem: () -> Boolean
+    ): Boolean {
+        if (focusInvalidationManager.hasPendingInvalidation()) {
+            // Ignoring this to unblock b/379289347.
+            println(
+                "$FocusWarning: Dispatching indirect touch event while the focus system is invalidated."
+            )
+            return false
+        }
+
+        val focusedIndirectTouchInputNode =
+            findFocusTargetNode()?.nearestAncestorIncludingSelf(Nodes.IndirectTouchInput)
+        focusedIndirectTouchInputNode?.traverseAncestorsIncludingSelf(
+            type = Nodes.IndirectTouchInput,
+            onPreVisit = { if (it.onPreIndirectTouchEvent(event)) return true },
+            onVisit = { if (onFocusedItem()) return true },
+            onPostVisit = { if (it.onIndirectTouchEvent(event)) return true }
         )
 
         return false

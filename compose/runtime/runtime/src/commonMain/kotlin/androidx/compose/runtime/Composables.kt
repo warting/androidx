@@ -175,6 +175,21 @@ val currentComposer: Composer
     }
 
 /**
+ * Returns the [CompositionContext] associated for the current composer.
+ *
+ * This API is exposed for internal usages only. It should not be invoked outside of the Compose
+ * Runtime
+ */
+@InternalComposeApi
+val currentCompositionContext: CompositionContext
+    @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
+    @InternalComposeApi
+    @TestOnly
+    @ReadOnlyComposable
+    @Composable
+    get() = (currentComposer.composition as CompositionImpl).parent
+
+/**
  * Returns an object which can be used to invalidate the current scope at this point in composition.
  * This object can be used to manually cause recompositions.
  */
@@ -206,12 +221,35 @@ val currentCompositionLocalContext: CompositionLocalContext
  * This value is likely to be unique but is not guaranteed unique. There are known cases, such as
  * for loops without a [key], where the runtime does not have enough information to make the
  * compound key hash unique.
+ *
+ * @see currentCompositeKeyHashCode
  */
+@Deprecated(
+    "Prefer the higher-precision currentCompositeKeyHashCode",
+    ReplaceWith("currentCompositeKeyHashCode")
+)
+@Suppress("DEPRECATION")
 val currentCompositeKeyHash: Int
     @Composable
     @ExplicitGroupsComposable
     @OptIn(InternalComposeApi::class)
     get() = currentComposer.compoundKeyHash
+
+/**
+ * A higher-precision variation of [currentCompositeKeyHash] used to map externally stored state to
+ * the composition. By stepping up to a Long, this variation of the key hash is exponentially less
+ * likely to experience a collision.
+ *
+ * In practice, because the hash is not perfectly distributed and because there are situations where
+ * the runtime can't uniquely identify certain repeated content, collisions are still possible. This
+ * higher precision does, however, afford more confidence in the assumption that an arbitrarily
+ * sized composition hierarchy will not experience two unrelated groups having the same key hash.
+ */
+val currentCompositeKeyHashCode: CompositeKeyHashCode
+    @Composable
+    @ExplicitGroupsComposable
+    @OptIn(InternalComposeApi::class)
+    get() = currentComposer.compositeKeyHashCode
 
 /**
  * Emits a node into the composition of type [T].

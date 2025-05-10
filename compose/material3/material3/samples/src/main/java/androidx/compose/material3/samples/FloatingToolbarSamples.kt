@@ -31,12 +31,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AppBarColumn
+import androidx.compose.material3.AppBarRow
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FilledIconButton
@@ -53,7 +56,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalFloatingToolbar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,20 +73,20 @@ import androidx.compose.ui.unit.dp
 @Sampled
 @Composable
 fun ExpandableHorizontalFloatingToolbarSample() {
-    val listState = rememberLazyListState()
-    var currentItem = 0
-    val expanded by remember {
-        derivedStateOf {
-            val temp = currentItem
-            currentItem = listState.firstVisibleItemIndex
-            listState.firstVisibleItemIndex <= temp // true if the list is scrolled up
-        }
-    }
+    var expanded by rememberSaveable { mutableStateOf(true) }
     Scaffold(
         content = { innerPadding ->
             Box(Modifier.padding(innerPadding)) {
                 LazyColumn(
-                    state = listState,
+                    // Apply a floatingToolbarVerticalNestedScroll Modifier toggle the expanded
+                    // state of the HorizontalFloatingToolbar.
+                    modifier =
+                        Modifier.floatingToolbarVerticalNestedScroll(
+                            expanded = expanded,
+                            onExpand = { expanded = true },
+                            onCollapse = { expanded = false },
+                        ),
+                    state = rememberLazyListState(),
                     contentPadding = innerPadding,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -100,8 +102,8 @@ fun ExpandableHorizontalFloatingToolbarSample() {
                 HorizontalFloatingToolbar(
                     modifier = Modifier.align(Alignment.BottomCenter).offset(y = -ScreenOffset),
                     expanded = expanded,
-                    leadingContent = { leadingContent() },
-                    trailingContent = { trailingContent() },
+                    leadingContent = { LeadingContent() },
+                    trailingContent = { TrailingContent() },
                     content = {
                         FilledIconButton(
                             modifier = Modifier.width(64.dp),
@@ -109,7 +111,7 @@ fun ExpandableHorizontalFloatingToolbarSample() {
                         ) {
                             Icon(Icons.Filled.Add, contentDescription = "Localized description")
                         }
-                    },
+                    }
                 )
             }
         }
@@ -120,16 +122,12 @@ fun ExpandableHorizontalFloatingToolbarSample() {
 @Preview
 @Sampled
 @Composable
-fun ScrollableHorizontalFloatingToolbarSample() {
-    val listState = rememberLazyListState()
-    val exitAlwaysScrollBehavior =
-        FloatingToolbarDefaults.exitAlwaysScrollBehavior(exitDirection = Bottom)
+fun OverflowingHorizontalFloatingToolbarSample() {
     Scaffold(
-        modifier = Modifier.nestedScroll(exitAlwaysScrollBehavior),
         content = { innerPadding ->
             Box(Modifier.padding(innerPadding)) {
                 LazyColumn(
-                    state = listState,
+                    state = rememberLazyListState(),
                     contentPadding = innerPadding,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -145,8 +143,122 @@ fun ScrollableHorizontalFloatingToolbarSample() {
                 HorizontalFloatingToolbar(
                     modifier = Modifier.align(Alignment.BottomCenter).offset(y = -ScreenOffset),
                     expanded = true,
-                    leadingContent = { leadingContent() },
-                    trailingContent = { trailingContent() },
+                    leadingContent = { LeadingContent() },
+                    trailingContent = {
+                        AppBarRow(
+                            overflowIndicator = { menuState ->
+                                IconButton(
+                                    onClick = {
+                                        if (menuState.isExpanded) {
+                                            menuState.dismiss()
+                                        } else {
+                                            menuState.show()
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.MoreVert,
+                                        contentDescription = "Localized description"
+                                    )
+                                }
+                            }
+                        ) {
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Download,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Download"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Favorite,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Favorite"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Add,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Add"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Person,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Person"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.ArrowUpward,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "ArrowUpward"
+                            )
+                        }
+                    },
+                    content = {
+                        FilledIconButton(
+                            modifier = Modifier.width(64.dp),
+                            onClick = { /* doSomething() */ }
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = "Localized description")
+                        }
+                    }
+                )
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Preview
+@Sampled
+@Composable
+fun ScrollableHorizontalFloatingToolbarSample() {
+    val exitAlwaysScrollBehavior =
+        FloatingToolbarDefaults.exitAlwaysScrollBehavior(exitDirection = Bottom)
+    Scaffold(
+        modifier = Modifier.nestedScroll(exitAlwaysScrollBehavior),
+        content = { innerPadding ->
+            Box(Modifier.padding(innerPadding)) {
+                LazyColumn(
+                    state = rememberLazyListState(),
+                    contentPadding = innerPadding,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val list = (0..75).map { it.toString() }
+                    items(count = list.size) {
+                        Text(
+                            text = list[it],
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        )
+                    }
+                }
+                HorizontalFloatingToolbar(
+                    modifier = Modifier.align(Alignment.BottomCenter).offset(y = -ScreenOffset),
+                    expanded = true,
+                    leadingContent = { LeadingContent() },
+                    trailingContent = { TrailingContent() },
                     content = {
                         FilledIconButton(
                             modifier = Modifier.width(64.dp),
@@ -167,20 +279,20 @@ fun ScrollableHorizontalFloatingToolbarSample() {
 @Sampled
 @Composable
 fun ExpandableVerticalFloatingToolbarSample() {
-    val listState = rememberLazyListState()
-    var currentItem = 0
-    val expanded by remember {
-        derivedStateOf {
-            val temp = currentItem
-            currentItem = listState.firstVisibleItemIndex
-            listState.firstVisibleItemIndex <= temp // true if the list is scrolled up
-        }
-    }
+    var expanded by rememberSaveable { mutableStateOf(true) }
     Scaffold(
         content = { innerPadding ->
             Box(Modifier.padding(innerPadding)) {
                 LazyColumn(
-                    state = listState,
+                    // Apply a floatingToolbarVerticalNestedScroll Modifier toggle the expanded
+                    // state of the HorizontalFloatingToolbar.
+                    modifier =
+                        Modifier.floatingToolbarVerticalNestedScroll(
+                            expanded = expanded,
+                            onExpand = { expanded = true },
+                            onCollapse = { expanded = false },
+                        ),
+                    state = rememberLazyListState(),
                     contentPadding = innerPadding,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -196,8 +308,8 @@ fun ExpandableVerticalFloatingToolbarSample() {
                 VerticalFloatingToolbar(
                     modifier = Modifier.align(Alignment.CenterEnd).offset(x = -ScreenOffset),
                     expanded = expanded,
-                    leadingContent = { leadingContent() },
-                    trailingContent = { trailingContent() },
+                    leadingContent = { LeadingContent() },
+                    trailingContent = { TrailingContent() },
                     content = {
                         FilledIconButton(
                             modifier = Modifier.height(64.dp),
@@ -216,16 +328,12 @@ fun ExpandableVerticalFloatingToolbarSample() {
 @Preview
 @Sampled
 @Composable
-fun ScrollableVerticalFloatingToolbarSample() {
-    val listState = rememberLazyListState()
-    val exitAlwaysScrollBehavior =
-        FloatingToolbarDefaults.exitAlwaysScrollBehavior(exitDirection = End)
+fun OverflowingVerticalFloatingToolbarSample() {
     Scaffold(
-        modifier = Modifier.nestedScroll(exitAlwaysScrollBehavior),
         content = { innerPadding ->
             Box(Modifier.padding(innerPadding)) {
                 LazyColumn(
-                    state = listState,
+                    state = rememberLazyListState(),
                     contentPadding = innerPadding,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -241,8 +349,122 @@ fun ScrollableVerticalFloatingToolbarSample() {
                 VerticalFloatingToolbar(
                     modifier = Modifier.align(Alignment.CenterEnd).offset(x = -ScreenOffset),
                     expanded = true,
-                    leadingContent = { leadingContent() },
-                    trailingContent = { trailingContent() },
+                    leadingContent = { LeadingContent() },
+                    trailingContent = {
+                        AppBarColumn(
+                            overflowIndicator = { menuState ->
+                                IconButton(
+                                    onClick = {
+                                        if (menuState.isExpanded) {
+                                            menuState.dismiss()
+                                        } else {
+                                            menuState.show()
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.MoreVert,
+                                        contentDescription = "Localized description"
+                                    )
+                                }
+                            }
+                        ) {
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Download,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Download"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Favorite,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Favorite"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Add,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Add"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Person,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "Person"
+                            )
+                            clickableItem(
+                                onClick = { /* doSomething() */ },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.ArrowUpward,
+                                        contentDescription = "Localized description"
+                                    )
+                                },
+                                label = "ArrowUpward"
+                            )
+                        }
+                    },
+                    content = {
+                        FilledIconButton(
+                            modifier = Modifier.height(64.dp),
+                            onClick = { /* doSomething() */ }
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = "Localized description")
+                        }
+                    }
+                )
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Preview
+@Sampled
+@Composable
+fun ScrollableVerticalFloatingToolbarSample() {
+    val exitAlwaysScrollBehavior =
+        FloatingToolbarDefaults.exitAlwaysScrollBehavior(exitDirection = End)
+    Scaffold(
+        modifier = Modifier.nestedScroll(exitAlwaysScrollBehavior),
+        content = { innerPadding ->
+            Box(Modifier.padding(innerPadding)) {
+                LazyColumn(
+                    state = rememberLazyListState(),
+                    contentPadding = innerPadding,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val list = (0..75).map { it.toString() }
+                    items(count = list.size) {
+                        Text(
+                            text = list[it],
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        )
+                    }
+                }
+                VerticalFloatingToolbar(
+                    modifier = Modifier.align(Alignment.CenterEnd).offset(x = -ScreenOffset),
+                    expanded = true,
+                    leadingContent = { LeadingContent() },
+                    trailingContent = { TrailingContent() },
                     content = {
                         FilledIconButton(
                             modifier = Modifier.height(64.dp),
@@ -370,7 +592,6 @@ fun CenteredHorizontalFloatingToolbarWithFabSample() {
 @Sampled
 @Composable
 fun VerticalFloatingToolbarWithFabSample() {
-
     var expanded by rememberSaveable { mutableStateOf(true) }
     val vibrantColors = FloatingToolbarDefaults.vibrantFloatingToolbarColors()
     Scaffold { innerPadding ->
@@ -489,7 +710,7 @@ fun HorizontalFloatingToolbarAsScaffoldFabSample() {
                 floatingActionButton = {
                     // Match the FAB to the vibrantColors. See also StandardFloatingActionButton.
                     FloatingToolbarDefaults.VibrantFloatingActionButton(
-                        onClick = { expanded = !expanded },
+                        onClick = { expanded = !expanded }
                     ) {
                         Icon(Icons.Filled.Add, "Localized description")
                     }
@@ -514,7 +735,7 @@ fun HorizontalFloatingToolbarAsScaffoldFabSample() {
         // When setting this to `FabPosition.Start` remember to set a
         // `floatingActionButtonPosition = FloatingToolbarHorizontalFabPosition.Start` at the
         // HorizontalFloatingToolbar as well.
-        floatingActionButtonPosition = FabPosition.End
+        floatingActionButtonPosition = FabPosition.End,
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding)) {
             Column(
@@ -526,7 +747,7 @@ fun HorizontalFloatingToolbarAsScaffoldFabSample() {
                         Modifier.floatingToolbarVerticalNestedScroll(
                             expanded = expanded,
                             onExpand = { expanded = true },
-                            onCollapse = { expanded = false }
+                            onCollapse = { expanded = false },
                         )
                     )
                     .verticalScroll(rememberScrollState())
@@ -538,7 +759,7 @@ fun HorizontalFloatingToolbarAsScaffoldFabSample() {
 }
 
 @Composable
-private fun leadingContent() {
+private fun LeadingContent() {
     IconButton(onClick = { /* doSomething() */ }) {
         Icon(Icons.Filled.Check, contentDescription = "Localized description")
     }
@@ -548,7 +769,7 @@ private fun leadingContent() {
 }
 
 @Composable
-private fun trailingContent() {
+private fun TrailingContent() {
     IconButton(onClick = { /* doSomething() */ }) {
         Icon(Icons.Filled.Download, contentDescription = "Localized description")
     }

@@ -17,6 +17,7 @@
 package androidx.compose.foundation.text.input.internal
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.FocusableNode
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.internal.ReceiveContentConfiguration
@@ -41,11 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.autofill.ContentDataType
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.focus.FocusEventModifierNode
-import androidx.compose.ui.focus.FocusManager
-import androidx.compose.ui.focus.FocusRequesterModifierNode
-import androidx.compose.ui.focus.FocusState
-import androidx.compose.ui.focus.requestFocus
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyInputModifierNode
@@ -85,6 +81,7 @@ import androidx.compose.ui.semantics.cutText
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.editableText
 import androidx.compose.ui.semantics.getTextLayoutResult
+import androidx.compose.ui.semantics.inputText
 import androidx.compose.ui.semantics.insertTextAtCursor
 import androidx.compose.ui.semantics.isEditable
 import androidx.compose.ui.semantics.onAutofillText
@@ -193,8 +190,6 @@ internal class TextFieldDecoratorModifierNode(
     DrawModifierNode,
     PlatformTextInputModifierNode,
     SemanticsModifierNode,
-    FocusRequesterModifierNode,
-    FocusEventModifierNode,
     GlobalPositionAwareModifierNode,
     PointerInputModifierNode,
     KeyInputModifierNode,
@@ -206,6 +201,30 @@ internal class TextFieldDecoratorModifierNode(
     init {
         textFieldSelectionState.requestAutofillAction = { requestAutofill() }
     }
+
+    private val focusableNode =
+        FocusableNode(
+            interactionSource = interactionSource,
+            onFocusChange = { isFocused ->
+                val editable = enabled && !readOnly
+                if (isFocused) {
+                    if (editable) {
+                        startInputSession(fromTap = false)
+                    }
+                } else {
+                    disposeInputSession()
+                    // only clear the composing region when element loses focus. Window focus lost
+                    // should not clear the composing region.
+                    textFieldState.editUntransformedTextAsUser { commitComposition() }
+                    // Deselect when losing focus even if readonly.
+                    textFieldState.collapseSelectionToMax()
+                }
+
+                // updateWindowFocus eventually makes a call to `onFocusChange`, so we don't need to
+                // trigger it from here.
+                updateWindowFocus()
+            }
+        )
 
     private val pointerInputNode =
         delegate(
@@ -280,7 +299,9 @@ internal class TextFieldDecoratorModifierNode(
                 onMoved = { position ->
                     val positionOnTextField = textLayoutState.fromWindowToDecoration(position)
                     val cursorPosition = textLayoutState.getOffsetForPosition(positionOnTextField)
-                    textFieldState.selectCharsIn(TextRange(cursorPosition))
+                    if (cursorPosition >= 0) {
+                        textFieldState.selectCharsIn(TextRange(cursorPosition))
+                    }
                     textFieldSelectionState.updateHandleDragging(Handle.Cursor, positionOnTextField)
                 },
                 onDrop = { clipEntry, clipMetadata ->
@@ -320,28 +341,22 @@ internal class TextFieldDecoratorModifierNode(
             )
         )
 
-    /**
-     * Needs to be kept separate from a window focus so we can restart an input session when the
-     * window receives the focus back. Element can stay focused even if the window loses its focus.
-     */
-    private var isElementFocused: Boolean = false
-
     /** Keeps focus state of the window */
     private var windowInfo: WindowInfo? = null
 
     private val isFocused: Boolean
         get() {
-            // make sure that we read both window focus and element focus for snapshot aware
-            // callers to successfully update when either one changes
-            val isWindowFocused = windowInfo?.isWindowFocused == true
-            return isElementFocused && isWindowFocused
+            // Avoid reading WindowInfo.isWindowFocused when the text field is not focused;
+            // otherwise all text fields in a window will be recomposed when it becomes focused.
+            return focusableNode.focusState.isFocused && windowInfo?.isWindowFocused == true
         }
 
     /**
      * We observe text changes to show/hide text toolbar and cursor handles. This job is only run
-     * when [isFocused] is true, and cancels when focus is lost.
+     * when [isFocused] is true, and cancels when focus is lost. It should also be restarted
+     * whenever [textFieldSelectionState] instance changes.
      */
-    private var observeChangesJob: Job? = null
+    private var toolbarAndHandlesVisibilityObserverJob: Job? = null
 
     /**
      * Manages key events. These events often are sourced by a hardware keyboard but it's also
@@ -351,22 +366,8 @@ internal class TextFieldDecoratorModifierNode(
 
     private val keyboardActionScope =
         object : KeyboardActionScope {
-            private val focusManager: FocusManager
-                get() = currentValueOf(LocalFocusManager)
-
             override fun defaultKeyboardAction(imeAction: ImeAction) {
-                when (imeAction) {
-                    ImeAction.Next -> {
-                        focusManager.moveFocus(FocusDirection.Next)
-                    }
-                    ImeAction.Previous -> {
-                        focusManager.moveFocus(FocusDirection.Previous)
-                    }
-                    ImeAction.Done -> {
-                        requireKeyboardController().hide()
-                    }
-                    else -> Unit
-                }
+                defaultKeyboardActionWithResult(imeAction)
             }
         }
 
@@ -487,12 +488,32 @@ internal class TextFieldDecoratorModifierNode(
             if (isAttached) {
                 textFieldSelectionState.receiveContentConfiguration =
                     receiveContentConfigurationProvider
+
+                if (isFocused && toolbarAndHandlesVisibilityObserverJob != null) {
+                    toolbarAndHandlesVisibilityObserverJob?.cancel()
+                    toolbarAndHandlesVisibilityObserverJob =
+                        coroutineScope.launch {
+                            textFieldSelectionState.startToolbarAndHandlesVisibilityObserver()
+                        }
+                }
             }
             textFieldSelectionState.requestAutofillAction = { requestAutofill() }
         }
 
         if (interactionSource != previousInteractionSource) {
             pointerInputNode.resetPointerInputHandler()
+            if (focusableNode.isAttached) {
+                focusableNode.update(interactionSource)
+            }
+        }
+
+        if (enabled != previousEnabled) {
+            if (enabled) {
+                delegate(focusableNode)
+                focusableNode.update(interactionSource)
+            } else {
+                undelegate(focusableNode)
+            }
         }
     }
 
@@ -503,6 +524,7 @@ internal class TextFieldDecoratorModifierNode(
     override fun SemanticsPropertyReceiver.applySemantics() {
         val text = textFieldState.outputText
         val selection = text.selection
+        inputText = AnnotatedString(textFieldState.untransformedText.toString())
         editableText = AnnotatedString(text.toString())
         textSelectionRange = selection
 
@@ -624,48 +646,44 @@ internal class TextFieldDecoratorModifierNode(
         }
 
         filter?.let { with(it) { applySemantics() } }
+
+        if (enabled) {
+            with(focusableNode) { applySemantics() }
+        }
     }
 
-    override fun onFocusEvent(focusState: FocusState) {
-        if (isElementFocused == focusState.isFocused) {
-            return
-        }
-        isElementFocused = focusState.isFocused
-        onFocusChange()
-
-        val editable = enabled && !readOnly
-        if (focusState.isFocused) {
-            // Deselect when losing focus even if readonly.
-            if (editable) {
-                startInputSession(fromTap = false)
-            }
-        } else {
-            disposeInputSession()
-            // only clear the composing region when element loses focus. Window focus lost should
-            // not clear the composing region.
-            textFieldState.editUntransformedTextAsUser { commitComposition() }
-            textFieldState.collapseSelectionToMax()
+    private fun requestFocus() {
+        if (focusableNode.isAttached) {
+            focusableNode.requestFocus()
         }
     }
 
     /**
-     * Should be called when either [isElementFocused] or [WindowInfo.isWindowFocused] change since
-     * they are used in evaluation of [isFocused].
+     * Must be called whenever the focus state of [focusableNode] or the window's focus state
+     * ([WindowInfo.isWindowFocused]) changes. The [isFocused] state is derived from these two
+     * sources, so any change to them requires this method to be invoked.
      */
-    private fun onFocusChange() {
+    private fun onIsFocusedUpdated() {
         textFieldSelectionState.isFocused = this.isFocused
-        if (isFocused && observeChangesJob == null) {
+        if (isFocused && toolbarAndHandlesVisibilityObserverJob == null) {
             // only start a new job is there's not an ongoing one.
-            observeChangesJob = coroutineScope.launch { textFieldSelectionState.observeChanges() }
+            toolbarAndHandlesVisibilityObserverJob =
+                coroutineScope.launch {
+                    textFieldSelectionState.startToolbarAndHandlesVisibilityObserver()
+                }
         } else if (!isFocused) {
-            observeChangesJob?.cancel()
-            observeChangesJob = null
+            toolbarAndHandlesVisibilityObserverJob?.cancel()
+            toolbarAndHandlesVisibilityObserverJob = null
         }
     }
 
     override fun onAttach() {
         onObservedReadsChanged()
         textFieldSelectionState.receiveContentConfiguration = receiveContentConfigurationProvider
+
+        if (enabled) {
+            delegate(focusableNode)
+        }
     }
 
     override fun onDetach() {
@@ -675,6 +693,10 @@ internal class TextFieldDecoratorModifierNode(
 
     override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         textLayoutState.decoratorNodeCoordinates = coordinates
+
+        if (enabled) {
+            focusableNode.onGloballyPositioned(coordinates)
+        }
     }
 
     override fun onPointerEvent(
@@ -713,9 +735,13 @@ internal class TextFieldDecoratorModifierNode(
     }
 
     override fun onObservedReadsChanged() {
+        updateWindowFocus()
+    }
+
+    private fun updateWindowFocus() {
         observeReads {
             windowInfo = currentValueOf(LocalWindowInfo)
-            onFocusChange()
+            onIsFocusedUpdated()
         }
     }
 
@@ -776,21 +802,38 @@ internal class TextFieldDecoratorModifierNode(
         }
     }
 
-    private fun onImeActionPerformed(imeAction: ImeAction) {
+    private fun onImeActionPerformed(imeAction: ImeAction): Boolean {
         if (
             imeAction == ImeAction.None ||
                 imeAction == ImeAction.Default ||
                 keyboardActionHandler == null
         ) {
             // this should never happen but better be safe
-            keyboardActionScope.defaultKeyboardAction(imeAction)
-            return
+            return defaultKeyboardActionWithResult(imeAction)
         }
 
         keyboardActionHandler?.onKeyboardAction(
             performDefaultAction = { keyboardActionScope.defaultKeyboardAction(imeAction) }
         )
+        return true
     }
+
+    private fun defaultKeyboardActionWithResult(imeAction: ImeAction): Boolean =
+        when (imeAction) {
+            ImeAction.Next -> {
+                currentValueOf(LocalFocusManager).moveFocus(FocusDirection.Next)
+                true
+            }
+            ImeAction.Previous -> {
+                currentValueOf(LocalFocusManager).moveFocus(FocusDirection.Previous)
+                true
+            }
+            ImeAction.Done -> {
+                requireKeyboardController().hide()
+                true
+            }
+            else -> false
+        }
 }
 
 /** Runs platform-specific text input logic. */

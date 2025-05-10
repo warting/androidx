@@ -46,7 +46,7 @@ import kotlinx.coroutines.withContext
  * starts being collected, if a database operation changes one of the tables that the [Flow] was
  * created from, then such table is considered 'invalidated' and the [Flow] will emit a new value.
  */
-expect class InvalidationTracker
+public expect class InvalidationTracker
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) // used in generated code
 constructor(
     database: RoomDatabase,
@@ -54,7 +54,9 @@ constructor(
     viewTables: Map<String, @JvmSuppressWildcards Set<String>>,
     vararg tableNames: String
 ) {
-    /** Internal method to initialize tracker for a given connection. Invoked by generated code. */
+    /**
+     * Internal function to initialize tracker for a given connection. Invoked by generated code.
+     */
     internal fun internalInit(connection: SQLiteConnection)
 
     /**
@@ -83,7 +85,10 @@ constructor(
      *   `true`.
      */
     @JvmOverloads
-    fun createFlow(vararg tables: String, emitInitialState: Boolean = true): Flow<Set<String>>
+    public fun createFlow(
+        vararg tables: String,
+        emitInitialState: Boolean = true
+    ): Flow<Set<String>>
 
     /**
      * Synchronize created [Flow]s with their tables.
@@ -105,7 +110,7 @@ constructor(
      * via another connection or through [RoomDatabase.useConnection] you might need to invoke this
      * function manually to trigger invalidation.
      */
-    fun refreshAsync()
+    public fun refreshAsync()
 
     /**
      * Non-asynchronous version of [refreshAsync] with the addition that it will return true if
@@ -114,7 +119,8 @@ constructor(
      * An optional array of tables can be given to validate if any of those tables had pending
      * invalidations, if so causing this function to return true.
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) suspend fun refresh(vararg tables: String): Boolean
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public suspend fun refresh(vararg tables: String): Boolean
 
     /** Stops invalidation tracker operations. */
     internal fun stop()
@@ -303,9 +309,7 @@ internal class TriggerBasedInvalidationTracker(
                     return@useConnection
                 }
                 val tablesToSync = observedTableStates.getTablesToSync()
-                val startOrStopTracking =
-                    tablesToSync != null && tablesToSync.any { it != ObserveOp.NO_OP }
-                if (startOrStopTracking) {
+                if (tablesToSync != null) {
                     connection.withTransaction(SQLiteTransactionType.IMMEDIATE) {
                         tablesToSync.forEachIndexed { tableId, observeOp ->
                             when (observeOp) {
@@ -502,7 +506,7 @@ internal class ObservedTableStates(size: Int) {
     /**
      * Gets an array of operations to be performed for table at index i from the last time this
      * function was called and based on the [onObserverAdded] and [onObserverRemoved] invocations
-     * that occurred in-between.
+     * that occurred in-between and if at least one operation is ADD or REMOVE.
      */
     internal fun getTablesToSync(): Array<ObserveOp>? =
         lock.withLock {
@@ -510,15 +514,19 @@ internal class ObservedTableStates(size: Int) {
                 return null
             }
             needsSync = false
-            Array(tableObserversCount.size) { i ->
-                val newState = tableObserversCount[i] > 0
-                if (newState != tableObservedState[i]) {
-                    tableObservedState[i] = newState
-                    if (newState) ObserveOp.ADD else ObserveOp.REMOVE
-                } else {
-                    ObserveOp.NO_OP
+            var addOrRemove = false
+            val ops =
+                Array(tableObserversCount.size) { i ->
+                    val newState = tableObserversCount[i] > 0
+                    if (newState != tableObservedState[i]) {
+                        addOrRemove = true
+                        tableObservedState[i] = newState
+                        if (newState) ObserveOp.ADD else ObserveOp.REMOVE
+                    } else {
+                        ObserveOp.NO_OP
+                    }
                 }
-            }
+            if (addOrRemove) ops else null
         }
 
     /** Notifies that an observer was added and return true if the state of some table changed. */

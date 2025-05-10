@@ -25,6 +25,7 @@ import androidx.pdf.PdfDocument
 import androidx.pdf.content.PdfPageTextContent
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import org.junit.Before
@@ -70,16 +71,19 @@ class PageTest {
 
     private lateinit var page: Page
 
-    private fun createPage(isTouchExplorationEnabled: Boolean): Page {
+    private val errorFlow = MutableSharedFlow<Throwable>()
+
+    private fun createPage(): Page {
         return Page(
             0,
             pageSize = PAGE_SIZE,
             pdfDocument,
             testScope,
             MAX_BITMAP_SIZE,
-            isTouchExplorationEnabled = isTouchExplorationEnabled,
             invalidationTracker,
-            onPageTextReady
+            onPageTextReady,
+            errorFlow,
+            isAccessibilityEnabled = true
         )
     }
 
@@ -90,7 +94,7 @@ class PageTest {
         invalidationCounter = 0
         pageTextReadyCounter = 0
 
-        page = createPage(isTouchExplorationEnabled = true)
+        page = createPage()
     }
 
     @Test
@@ -157,7 +161,8 @@ class PageTest {
     }
 
     @Test
-    fun updateState_withTouchExplorationEnabled_fetchesPageText() {
+    fun updateState_withAccessibilityEnabled_fetchesPageText() {
+        page.isAccessibilityEnabled = true
         page.setVisible(zoom = 1.0f, FULL_PAGE_RECT)
         testDispatcher.scheduler.runCurrent()
         assertThat(page.pageText).isEqualTo("SampleText")
@@ -165,8 +170,8 @@ class PageTest {
     }
 
     @Test
-    fun setVisible_withTouchExplorationDisabled_doesNotFetchPageText() {
-        page = createPage(isTouchExplorationEnabled = false)
+    fun setVisible_withAccessibilityDisabled_doesNotFetchPageText() {
+        page.isAccessibilityEnabled = false
         page.setVisible(zoom = 1.0f, FULL_PAGE_RECT)
         testDispatcher.scheduler.runCurrent()
 
@@ -176,6 +181,7 @@ class PageTest {
 
     @Test
     fun updateState_doesNotFetchPageTextIfAlreadyFetched() {
+        page.isAccessibilityEnabled = true
         page.setVisible(zoom = 1.0f, FULL_PAGE_RECT)
         testDispatcher.scheduler.runCurrent()
         assertThat(page.pageText).isEqualTo("SampleText")

@@ -66,10 +66,14 @@ import layoutinspector.compose.inspection.LayoutInspectorComposeProtocol.Unknown
 import layoutinspector.compose.inspection.LayoutInspectorComposeProtocol.UpdateSettingsCommand
 import layoutinspector.compose.inspection.LayoutInspectorComposeProtocol.UpdateSettingsResponse
 
+// The ".studio" prefix prevents logs from showing in logcat,
+// unless the "logcat.ignore.studio.tags" flag is disabled.
+internal const val LOG_TAG = "ComposeInspector"
+internal const val SPAM_LOG_TAG = "studio.$LOG_TAG"
+
 private const val LAYOUT_INSPECTION_ID = "layoutinspector.compose.inspection"
 private const val MAX_RECURSIONS = 2
 private const val MAX_ITERABLE_SIZE = 5
-private const val TAG = "ComposeLayoutInspector"
 
 // created by java.util.ServiceLoader
 class ComposeLayoutInspectorFactory :
@@ -82,8 +86,11 @@ class ComposeLayoutInspectorFactory :
     }
 }
 
-class ComposeLayoutInspector(connection: Connection, environment: InspectorEnvironment) :
-    Inspector(connection) {
+class ComposeLayoutInspector(
+    connection: Connection,
+    // Keep this instance for easy access through reflection:
+    private val environment: InspectorEnvironment
+) : Inspector(connection) {
 
     /** Cache data which allows us to reuse previously queried inspector nodes */
     private class CacheData(val rootView: View, val trees: List<CacheTree>) {
@@ -128,6 +135,8 @@ class ComposeLayoutInspector(connection: Connection, environment: InspectorEnvir
     private var cachedGeneration = 0
     private var cachedSystemComposablesSkipped = false
     private var cachedHasAllParameters = false
+    // Keep this instance for easy access through reflection
+    private var disposed = false
     private val cachedNodes: MutableLongObjectMap<CacheData>
         get() {
             check(Thread.currentThread() == inspectorThread) {
@@ -138,6 +147,11 @@ class ComposeLayoutInspector(connection: Connection, environment: InspectorEnvir
 
     init {
         enableInspection(environment.artTooling())
+    }
+
+    override fun onDispose() {
+        disposed = true
+        cachedNodes.clear()
     }
 
     override fun onReceiveCommand(data: ByteArray, callback: CommandCallback) {
@@ -566,7 +580,7 @@ class ComposeLayoutInspector(connection: Connection, environment: InspectorEnvir
                 field.isAccessible = true
                 field.setBoolean(null, true)
             } catch (ex: Exception) {
-                Log.w(TAG, "Could not access isDebugInspectorInfoEnabled.", ex)
+                Log.w(LOG_TAG, "Could not access isDebugInspectorInfoEnabled.", ex)
             }
         }
     }

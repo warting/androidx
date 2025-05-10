@@ -239,8 +239,8 @@ package androidx.core.app {
     ctor @RequiresApi(26) public MultiWindowModeChangedInfo(boolean isInMultiWindowMode, android.content.res.Configuration newConfig);
     method @RequiresApi(26) public android.content.res.Configuration getNewConfig();
     method public boolean isInMultiWindowMode();
-    property public final boolean isInMultiWindowMode;
-    property @RequiresApi(26) public final android.content.res.Configuration newConfig;
+    property public boolean isInMultiWindowMode;
+    property @RequiresApi(26) public android.content.res.Configuration newConfig;
   }
 
   public final class NavUtils {
@@ -339,6 +339,7 @@ package androidx.core.app {
     method public static java.util.List<androidx.core.app.Person!> getPeople(android.app.Notification);
     method public static android.app.Notification? getPublicVersion(android.app.Notification);
     method public static CharSequence? getSettingsText(android.app.Notification);
+    method public static String? getShortCriticalText(android.app.Notification);
     method public static String? getShortcutId(android.app.Notification);
     method public static boolean getShowWhen(android.app.Notification);
     method public static String? getSortKey(android.app.Notification);
@@ -346,6 +347,7 @@ package androidx.core.app {
     method public static long getTimeoutAfter(android.app.Notification);
     method public static boolean getUsesChronometer(android.app.Notification);
     method @androidx.core.app.NotificationCompat.NotificationVisibility public static int getVisibility(android.app.Notification);
+    method public static boolean hasPromotableCharacteristics(android.app.Notification);
     method public static boolean isGroupSummary(android.app.Notification);
     method public static android.graphics.Bitmap? reduceLargeIconSize(android.content.Context, android.graphics.Bitmap?);
     field public static final int BADGE_ICON_LARGE = 2; // 0x2
@@ -413,14 +415,21 @@ package androidx.core.app {
     field public static final String EXTRA_PICTURE_CONTENT_DESCRIPTION = "android.pictureContentDescription";
     field public static final String EXTRA_PICTURE_ICON = "android.pictureIcon";
     field public static final String EXTRA_PROGRESS = "android.progress";
+    field public static final String EXTRA_PROGRESS_END_ICON = "android.progressEndIcon";
     field public static final String EXTRA_PROGRESS_INDETERMINATE = "android.progressIndeterminate";
     field public static final String EXTRA_PROGRESS_MAX = "android.progressMax";
+    field public static final String EXTRA_PROGRESS_POINTS = "android.progressPoints";
+    field public static final String EXTRA_PROGRESS_SEGMENTS = "android.progressSegments";
+    field public static final String EXTRA_PROGRESS_START_ICON = "android.progressStartIcon";
+    field public static final String EXTRA_PROGRESS_TRACKER_ICON = "android.progressTrackerIcon";
     field public static final String EXTRA_REMOTE_INPUT_HISTORY = "android.remoteInputHistory";
     field public static final String EXTRA_SELF_DISPLAY_NAME = "android.selfDisplayName";
+    field public static final String EXTRA_SHORT_CRITICAL_TEXT = "android.shortCriticalText";
     field public static final String EXTRA_SHOW_BIG_PICTURE_WHEN_COLLAPSED = "android.showBigPictureWhenCollapsed";
     field public static final String EXTRA_SHOW_CHRONOMETER = "android.showChronometer";
     field public static final String EXTRA_SHOW_WHEN = "android.showWhen";
     field public static final String EXTRA_SMALL_ICON = "android.icon";
+    field public static final String EXTRA_STYLED_BY_PROGRESS = "android.styledByProgress";
     field public static final String EXTRA_SUB_TEXT = "android.subText";
     field public static final String EXTRA_SUMMARY_TEXT = "android.summaryText";
     field public static final String EXTRA_TEMPLATE = "android.template";
@@ -490,7 +499,7 @@ package androidx.core.app {
     field public static final int SEMANTIC_ACTION_UNMUTE = 7; // 0x7
     field public android.app.PendingIntent? actionIntent;
     field @Deprecated public int icon;
-    field public CharSequence! title;
+    field public CharSequence? title;
   }
 
   public static final class NotificationCompat.Action.Builder {
@@ -658,6 +667,7 @@ package androidx.core.app {
     method public androidx.core.app.NotificationCompat.Builder setPublicVersion(android.app.Notification?);
     method public androidx.core.app.NotificationCompat.Builder setRemoteInputHistory(CharSequence![]?);
     method public androidx.core.app.NotificationCompat.Builder setSettingsText(CharSequence?);
+    method public androidx.core.app.NotificationCompat.Builder setShortCriticalText(String?);
     method public androidx.core.app.NotificationCompat.Builder setShortcutId(String?);
     method public androidx.core.app.NotificationCompat.Builder setShortcutInfo(androidx.core.content.pm.ShortcutInfoCompat?);
     method public androidx.core.app.NotificationCompat.Builder setShowWhen(boolean);
@@ -791,6 +801,47 @@ package androidx.core.app {
   @IntDef({androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC, androidx.core.app.NotificationCompat.VISIBILITY_PRIVATE, androidx.core.app.NotificationCompat.VISIBILITY_SECRET}) @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) public static @interface NotificationCompat.NotificationVisibility {
   }
 
+  public static class NotificationCompat.ProgressStyle extends androidx.core.app.NotificationCompat.Style {
+    ctor public NotificationCompat.ProgressStyle();
+    method public androidx.core.app.NotificationCompat.ProgressStyle addProgressPoint(androidx.core.app.NotificationCompat.ProgressStyle.Point);
+    method public androidx.core.app.NotificationCompat.ProgressStyle addProgressSegment(androidx.core.app.NotificationCompat.ProgressStyle.Segment);
+    method @IntRange(from=0) public int getProgress();
+    method public androidx.core.graphics.drawable.IconCompat? getProgressEndIcon();
+    method @IntRange(from=0) public int getProgressMax();
+    method public java.util.List<androidx.core.app.NotificationCompat.ProgressStyle.Point!> getProgressPoints();
+    method public java.util.List<androidx.core.app.NotificationCompat.ProgressStyle.Segment!> getProgressSegments();
+    method public androidx.core.graphics.drawable.IconCompat? getProgressStartIcon();
+    method public androidx.core.graphics.drawable.IconCompat? getProgressTrackerIcon();
+    method public boolean isProgressIndeterminate();
+    method public boolean isStyledByProgress();
+    method public androidx.core.app.NotificationCompat.ProgressStyle setProgress(@IntRange(from=0) int);
+    method public androidx.core.app.NotificationCompat.ProgressStyle setProgressEndIcon(androidx.core.graphics.drawable.IconCompat?);
+    method public androidx.core.app.NotificationCompat.ProgressStyle setProgressIndeterminate(boolean);
+    method public androidx.core.app.NotificationCompat.ProgressStyle setProgressPoints(java.util.List<androidx.core.app.NotificationCompat.ProgressStyle.Point!>);
+    method public androidx.core.app.NotificationCompat.ProgressStyle setProgressSegments(java.util.List<androidx.core.app.NotificationCompat.ProgressStyle.Segment!>);
+    method public androidx.core.app.NotificationCompat.ProgressStyle setProgressStartIcon(androidx.core.graphics.drawable.IconCompat?);
+    method public androidx.core.app.NotificationCompat.ProgressStyle setProgressTrackerIcon(androidx.core.graphics.drawable.IconCompat?);
+    method public androidx.core.app.NotificationCompat.ProgressStyle setStyledByProgress(boolean);
+  }
+
+  public static final class NotificationCompat.ProgressStyle.Point {
+    ctor public NotificationCompat.ProgressStyle.Point(@IntRange(from=1) int);
+    method @ColorInt public int getColor();
+    method public int getId();
+    method @IntRange(from=1) public int getPosition();
+    method public androidx.core.app.NotificationCompat.ProgressStyle.Point setColor(@ColorInt int);
+    method public androidx.core.app.NotificationCompat.ProgressStyle.Point setId(int);
+  }
+
+  public static final class NotificationCompat.ProgressStyle.Segment {
+    ctor public NotificationCompat.ProgressStyle.Segment(@IntRange(from=1) int);
+    method @ColorInt public int getColor();
+    method public int getId();
+    method @IntRange(from=1) public int getLength();
+    method public androidx.core.app.NotificationCompat.ProgressStyle.Segment setColor(@ColorInt int);
+    method public androidx.core.app.NotificationCompat.ProgressStyle.Segment setId(int);
+  }
+
   @IntDef({androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_DEFAULT, androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE, androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_DEFERRED}) @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) public static @interface NotificationCompat.ServiceNotificationBehavior {
   }
 
@@ -911,6 +962,7 @@ package androidx.core.app {
 
   public final class NotificationManagerCompat {
     method public boolean areNotificationsEnabled();
+    method public boolean canPostPromotedNotifications();
     method public boolean canUseFullScreenIntent();
     method public void cancel(int);
     method public void cancel(String?, int);
@@ -1034,8 +1086,8 @@ package androidx.core.app {
     ctor @RequiresApi(26) public PictureInPictureModeChangedInfo(boolean isInPictureInPictureMode, android.content.res.Configuration newConfig);
     method @RequiresApi(26) public android.content.res.Configuration getNewConfig();
     method public boolean isInPictureInPictureMode();
-    property public final boolean isInPictureInPictureMode;
-    property @RequiresApi(26) public final android.content.res.Configuration newConfig;
+    property public boolean isInPictureInPictureMode;
+    property @RequiresApi(26) public android.content.res.Configuration newConfig;
   }
 
   @androidx.versionedparcelable.VersionedParcelize(jetifyAs="android.support.v4.app.RemoteActionCompat") public final class RemoteActionCompat implements androidx.versionedparcelable.VersionedParcelable {
@@ -1674,6 +1726,32 @@ package androidx.core.database.sqlite {
 
 }
 
+package androidx.core.flagging {
+
+  public interface AconfigPackageCompat {
+    method public boolean getBooleanFlagValue(String flagName, boolean defaultValue);
+    method @kotlin.jvm.Throws(exceptionClasses=AconfigStorageReadException::class) public static androidx.core.flagging.AconfigPackageCompat load(String packageName) throws android.os.flagging.AconfigStorageReadException;
+    field public static final androidx.core.flagging.AconfigPackageCompat.Companion Companion;
+  }
+
+  public static final class AconfigPackageCompat.Companion {
+    method @kotlin.jvm.Throws(exceptionClasses=AconfigStorageReadException::class) public androidx.core.flagging.AconfigPackageCompat load(String packageName) throws android.os.flagging.AconfigStorageReadException;
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class Flags {
+    ctor public Flags();
+    method public static boolean getBooleanFlagValue(String packageName, String flagName);
+    method public static boolean getBooleanFlagValue(String packageName, String flagName, optional boolean defaultValue);
+    field public static final androidx.core.flagging.Flags.Companion Companion;
+  }
+
+  public static final class Flags.Companion {
+    method public boolean getBooleanFlagValue(String packageName, String flagName);
+    method public boolean getBooleanFlagValue(String packageName, String flagName, optional boolean defaultValue);
+  }
+
+}
+
 package androidx.core.graphics {
 
   public final class BitmapCompat {
@@ -2258,8 +2336,8 @@ package androidx.core.os {
   }
 
   public static final class BufferFillPolicy.Companion {
-    property public final androidx.core.os.BufferFillPolicy DISCARD;
-    property public final androidx.core.os.BufferFillPolicy RING_BUFFER;
+    property public androidx.core.os.BufferFillPolicy DISCARD;
+    property public androidx.core.os.BufferFillPolicy RING_BUFFER;
   }
 
   public final class BuildCompat {
@@ -2276,10 +2354,10 @@ package androidx.core.os {
     method @Deprecated @ChecksSdkIntAtLeast(api=33, codename="Tiramisu") public static boolean isAtLeastT();
     method @Deprecated @ChecksSdkIntAtLeast(api=34, codename="UpsideDownCake") public static boolean isAtLeastU();
     method @Deprecated @ChecksSdkIntAtLeast(api=35, codename="VanillaIceCream") public static boolean isAtLeastV();
-    property @ChecksSdkIntAtLeast(extension=android.os.ext.SdkExtensions.AD_SERVICES) public final int AD_SERVICES_EXTENSION_INT;
-    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.R) public final int R_EXTENSION_INT;
-    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.S) public final int S_EXTENSION_INT;
-    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.TIRAMISU) public final int T_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.ext.SdkExtensions.AD_SERVICES) public int AD_SERVICES_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.R) public int R_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.S) public int S_EXTENSION_INT;
+    property @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.TIRAMISU) public int T_EXTENSION_INT;
     field @ChecksSdkIntAtLeast(extension=android.os.ext.SdkExtensions.AD_SERVICES) public static final int AD_SERVICES_EXTENSION_INT;
     field public static final androidx.core.os.BuildCompat INSTANCE;
     field @ChecksSdkIntAtLeast(extension=android.os.Build.VERSION_CODES.R) public static final int R_EXTENSION_INT;
@@ -2428,10 +2506,10 @@ package androidx.core.os {
     method public android.os.Bundle getParams();
     method public int getProfilingType();
     method public String? getTag();
-    property public final android.os.CancellationSignal? cancellationSignal;
-    property public final android.os.Bundle params;
-    property public final int profilingType;
-    property public final String? tag;
+    property public android.os.CancellationSignal? cancellationSignal;
+    property public android.os.Bundle params;
+    property public int profilingType;
+    property public String? tag;
   }
 
   @RequiresApi(api=35) public abstract class ProfilingRequestBuilder<T extends androidx.core.os.ProfilingRequestBuilder<T>> {
@@ -3053,6 +3131,7 @@ package androidx.core.view {
 
   public final class DisplayCompat {
     method public static androidx.core.view.DisplayCompat.ModeCompat getMode(android.content.Context, android.view.Display);
+    method public static androidx.core.view.RoundedCornerCompat? getRoundedCorner(android.view.Display, @androidx.core.view.RoundedCornerCompat.Position int);
     method public static androidx.core.view.DisplayCompat.ModeCompat![] getSupportedModes(android.content.Context, android.view.Display);
   }
 
@@ -3456,6 +3535,22 @@ package androidx.core.view {
     field public static final int TYPE_WAIT = 1004; // 0x3ec
     field public static final int TYPE_ZOOM_IN = 1018; // 0x3fa
     field public static final int TYPE_ZOOM_OUT = 1019; // 0x3fb
+  }
+
+  public final class RoundedCornerCompat {
+    ctor @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP) public RoundedCornerCompat(@androidx.core.view.RoundedCornerCompat.Position int, int, int, int);
+    method public android.graphics.Point getCenter();
+    method public int getCenterX();
+    method public int getCenterY();
+    method @androidx.core.view.RoundedCornerCompat.Position public int getPosition();
+    method public int getRadius();
+    field public static final int POSITION_BOTTOM_LEFT = 3; // 0x3
+    field public static final int POSITION_BOTTOM_RIGHT = 2; // 0x2
+    field public static final int POSITION_TOP_LEFT = 0; // 0x0
+    field public static final int POSITION_TOP_RIGHT = 1; // 0x1
+  }
+
+  @IntDef({androidx.core.view.RoundedCornerCompat.POSITION_TOP_LEFT, androidx.core.view.RoundedCornerCompat.POSITION_TOP_RIGHT, androidx.core.view.RoundedCornerCompat.POSITION_BOTTOM_RIGHT, androidx.core.view.RoundedCornerCompat.POSITION_BOTTOM_LEFT}) @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) public static @interface RoundedCornerCompat.Position {
   }
 
   public final class ScaleGestureDetectorCompat {
@@ -3862,6 +3957,7 @@ package androidx.core.view {
   }
 
   public final class WindowCompat {
+    method public static void enableEdgeToEdge(android.view.Window);
     method public static androidx.core.view.WindowInsetsControllerCompat getInsetsController(android.view.Window, android.view.View);
     method public static <T extends android.view.View> T requireViewById(android.view.Window, @IdRes int);
     method public static void setDecorFitsSystemWindows(android.view.Window, boolean);
@@ -3934,6 +4030,7 @@ package androidx.core.view {
     method public androidx.core.graphics.Insets getInsets(@androidx.core.view.WindowInsetsCompat.Type.InsetsType int);
     method public androidx.core.graphics.Insets getInsetsIgnoringVisibility(@androidx.core.view.WindowInsetsCompat.Type.InsetsType int);
     method @Deprecated public androidx.core.graphics.Insets getMandatorySystemGestureInsets();
+    method public androidx.core.view.RoundedCornerCompat? getRoundedCorner(@androidx.core.view.RoundedCornerCompat.Position int);
     method @Deprecated public int getStableInsetBottom();
     method @Deprecated public int getStableInsetLeft();
     method @Deprecated public int getStableInsetRight();
@@ -3970,6 +4067,7 @@ package androidx.core.view {
     method public androidx.core.view.WindowInsetsCompat.Builder setInsets(@androidx.core.view.WindowInsetsCompat.Type.InsetsType int, androidx.core.graphics.Insets);
     method public androidx.core.view.WindowInsetsCompat.Builder setInsetsIgnoringVisibility(@androidx.core.view.WindowInsetsCompat.Type.InsetsType int, androidx.core.graphics.Insets);
     method @Deprecated public androidx.core.view.WindowInsetsCompat.Builder setMandatorySystemGestureInsets(androidx.core.graphics.Insets);
+    method public androidx.core.view.WindowInsetsCompat.Builder setRoundedCorner(@androidx.core.view.RoundedCornerCompat.Position int, androidx.core.view.RoundedCornerCompat?);
     method @Deprecated public androidx.core.view.WindowInsetsCompat.Builder setStableInsets(androidx.core.graphics.Insets);
     method @Deprecated public androidx.core.view.WindowInsetsCompat.Builder setSystemGestureInsets(androidx.core.graphics.Insets);
     method @Deprecated public androidx.core.view.WindowInsetsCompat.Builder setSystemWindowInsets(androidx.core.graphics.Insets);
@@ -4119,6 +4217,8 @@ package androidx.core.view.accessibility {
     method public void addAction(int);
     method public void addChild(android.view.View!);
     method public void addChild(android.view.View!, int);
+    method public void addLabeledBy(android.view.View);
+    method public void addLabeledBy(android.view.View, int);
     method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public void addSpansToExtras(CharSequence!, android.view.View!);
     method public boolean canOpenPopup();
     method public java.util.List<androidx.core.view.accessibility.AccessibilityNodeInfoCompat!>! findAccessibilityNodeInfosByText(String!);
@@ -4131,6 +4231,7 @@ package androidx.core.view.accessibility {
     method @Deprecated public void getBoundsInParent(android.graphics.Rect!);
     method public void getBoundsInScreen(android.graphics.Rect!);
     method public void getBoundsInWindow(android.graphics.Rect);
+    method public int getChecked();
     method public androidx.core.view.accessibility.AccessibilityNodeInfoCompat! getChild(int);
     method public androidx.core.view.accessibility.AccessibilityNodeInfoCompat? getChild(int, int);
     method public int getChildCount();
@@ -4142,13 +4243,15 @@ package androidx.core.view.accessibility {
     method public CharSequence! getContentDescription();
     method public int getDrawingOrder();
     method public CharSequence! getError();
+    method public int getExpandedState();
     method public android.view.accessibility.AccessibilityNodeInfo.ExtraRenderingInfo? getExtraRenderingInfo();
     method public android.os.Bundle! getExtras();
     method public CharSequence? getHintText();
     method @Deprecated public Object! getInfo();
     method public int getInputType();
     method public androidx.core.view.accessibility.AccessibilityNodeInfoCompat! getLabelFor();
-    method public androidx.core.view.accessibility.AccessibilityNodeInfoCompat! getLabeledBy();
+    method @Deprecated public androidx.core.view.accessibility.AccessibilityNodeInfoCompat! getLabeledBy();
+    method public java.util.List<androidx.core.view.accessibility.AccessibilityNodeInfoCompat!> getLabeledByList();
     method public int getLiveRegion();
     method public int getMaxTextLength();
     method public long getMinDurationBetweenContentChangesMillis();
@@ -4160,6 +4263,7 @@ package androidx.core.view.accessibility {
     method public androidx.core.view.accessibility.AccessibilityNodeInfoCompat.RangeInfoCompat! getRangeInfo();
     method public CharSequence? getRoleDescription();
     method public CharSequence? getStateDescription();
+    method public CharSequence? getSupplementalDescription();
     method public CharSequence! getText();
     method public int getTextSelectionEnd();
     method public int getTextSelectionStart();
@@ -4175,7 +4279,7 @@ package androidx.core.view.accessibility {
     method public boolean isAccessibilityDataSensitive();
     method public boolean isAccessibilityFocused();
     method public boolean isCheckable();
-    method public boolean isChecked();
+    method @Deprecated public boolean isChecked();
     method public boolean isClickable();
     method public boolean isContentInvalid();
     method public boolean isContextClickable();
@@ -4209,6 +4313,8 @@ package androidx.core.view.accessibility {
     method public boolean removeAction(androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat!);
     method public boolean removeChild(android.view.View!);
     method public boolean removeChild(android.view.View!, int);
+    method public boolean removeLabeledBy(android.view.View);
+    method public boolean removeLabeledBy(android.view.View, int);
     method public void setAccessibilityDataSensitive(boolean);
     method public void setAccessibilityFocused(boolean);
     method public void setAvailableExtraData(java.util.List<java.lang.String!>);
@@ -4217,7 +4323,8 @@ package androidx.core.view.accessibility {
     method public void setBoundsInWindow(android.graphics.Rect);
     method public void setCanOpenPopup(boolean);
     method public void setCheckable(boolean);
-    method public void setChecked(boolean);
+    method @Deprecated public void setChecked(boolean);
+    method public void setChecked(int);
     method public void setClassName(CharSequence!);
     method public void setClickable(boolean);
     method public void setCollectionInfo(Object!);
@@ -4231,6 +4338,7 @@ package androidx.core.view.accessibility {
     method public void setEditable(boolean);
     method public void setEnabled(boolean);
     method public void setError(CharSequence!);
+    method public void setExpandedState(int);
     method public void setFieldRequired(boolean);
     method public void setFocusable(boolean);
     method public void setFocused(boolean);
@@ -4241,8 +4349,8 @@ package androidx.core.view.accessibility {
     method public void setInputType(int);
     method public void setLabelFor(android.view.View!);
     method public void setLabelFor(android.view.View!, int);
-    method public void setLabeledBy(android.view.View!);
-    method public void setLabeledBy(android.view.View!, int);
+    method @Deprecated public void setLabeledBy(android.view.View!);
+    method @Deprecated public void setLabeledBy(android.view.View!, int);
     method public void setLiveRegion(int);
     method public void setLongClickable(boolean);
     method public void setMaxTextLength(int);
@@ -4265,6 +4373,7 @@ package androidx.core.view.accessibility {
     method public void setSource(android.view.View!);
     method public void setSource(android.view.View!, int);
     method public void setStateDescription(CharSequence?);
+    method public void setSupplementalDescription(CharSequence?);
     method public void setText(CharSequence!);
     method public void setTextEntryKey(boolean);
     method public void setTextSelectable(boolean);
@@ -4691,17 +4800,26 @@ package androidx.core.view.inputmethod {
 
 }
 
-package androidx.core.view.insetscontrast {
+package androidx.core.view.insets {
 
-  public class ColorProtection extends androidx.core.view.insetscontrast.ContrastProtection {
+  public class ColorProtection extends androidx.core.view.insets.Protection {
     ctor public ColorProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
     ctor public ColorProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int, @ColorInt int);
     method @ColorInt public int getColor();
     method public void setColor(@ColorInt int);
   }
 
-  public abstract class ContrastProtection {
-    ctor public ContrastProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
+  public class GradientProtection extends androidx.core.view.insets.Protection {
+    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
+    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int, @ColorInt int);
+    method @ColorInt public int getColor();
+    method public float getScale();
+    method public void setColor(@ColorInt int);
+    method public void setScale(float);
+  }
+
+  public abstract class Protection {
+    ctor public Protection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
     method public void animateAlpha(float);
     method public void animateInsetsAmount(float);
     method @FloatRange(from=0.0, to=1.0) public float getAlpha();
@@ -4711,23 +4829,13 @@ package androidx.core.view.insetscontrast {
     method public void setInsetAmount(@FloatRange(from=0.0, to=1.0) float);
   }
 
-  public class GradientProtection extends androidx.core.view.insetscontrast.ContrastProtection {
-    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int);
-    ctor public GradientProtection(@androidx.core.view.WindowInsetsCompat.Side.InsetsSide int, @ColorInt int);
-    method @ColorInt public int getColor();
-    method public float getScale();
-    method public void setColor(@ColorInt int);
-    method public void setScale(float);
-  }
-
-  public class ProtectionView extends android.widget.FrameLayout {
-    ctor public ProtectionView(android.content.Context, androidx.core.view.insetscontrast.SystemBarStateMonitor, java.util.List<androidx.core.view.insetscontrast.ContrastProtection!>);
-    method public void dispose();
-  }
-
-  public class SystemBarStateMonitor {
-    ctor public SystemBarStateMonitor(android.view.Window);
-    method public void dispose();
+  public class ProtectionLayout extends android.widget.FrameLayout {
+    ctor public ProtectionLayout(android.content.Context);
+    ctor public ProtectionLayout(android.content.Context, android.util.AttributeSet?);
+    ctor public ProtectionLayout(android.content.Context, android.util.AttributeSet?, @AttrRes int);
+    ctor public ProtectionLayout(android.content.Context, android.util.AttributeSet?, @AttrRes int, @StyleRes int);
+    ctor public ProtectionLayout(android.content.Context, java.util.List<androidx.core.view.insets.Protection!>);
+    method public void setProtections(java.util.List<androidx.core.view.insets.Protection!>);
   }
 
 }
