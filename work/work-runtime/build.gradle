@@ -22,13 +22,14 @@
  * modifying its settings.
  */
 import androidx.build.SoftwareType
+import androidx.build.KotlinTarget
 
 import static androidx.inspection.gradle.InspectionPluginKt.packageInspector
 
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id("androidx.stableaidl")
 }
@@ -84,13 +85,13 @@ dependencies {
     androidTestImplementation(project(":lifecycle:lifecycle-runtime-testing"))
     androidTestImplementation("androidx.room:room-testing:2.6.1")
     androidTestImplementation(libs.testRunner)
+    androidTestImplementation(libs.testUiautomator)
     androidTestImplementation(libs.espressoCore)
     androidTestImplementation(libs.mockitoCore)
     androidTestImplementation(libs.dexmakerMockito)
     androidTestImplementation(project(":internal-testutils-runtime"))
     testImplementation(libs.junit)
     testImplementation(libs.truth)
-    testImplementation(libs.robolectric)
     testImplementation(libs.testCoreKtx)
     lintPublish(project(":work:work-runtime-lint"))
 }
@@ -105,8 +106,11 @@ ksp {
 androidx {
     name = "WorkManager Runtime"
     type = SoftwareType.PUBLISHED_LIBRARY
+    //TODO(b/407640603): Migrate to Kotlin 2. Task :work:work-runtime:kspReleaseKotlin fails
+    kotlinTarget = KotlinTarget.KOTLIN_1_9
     inceptionYear = "2018"
     description = "Android WorkManager runtime library"
     failOnDeprecationWarnings = false
     legacyDisableKotlinStrictApiMode = true
+    enableRobolectric()
 }

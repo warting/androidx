@@ -18,6 +18,7 @@ package androidx.glance.appwidget
 
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
@@ -61,6 +62,8 @@ object TestGlanceAppWidget : GlanceAppWidget() {
 
     var onProvidePreview: (@Composable TestGlanceAppWidget.(Int) -> Unit)? = null
 
+    var shouldThrowErrorWhenCreatingSession = false
+
     fun setOnDeleteBlock(block: (GlanceId) -> Unit) {
         onDeleteBlock = block
     }
@@ -91,7 +94,7 @@ object TestGlanceAppWidget : GlanceAppWidget() {
 
     inline fun withProvidePreview(
         noinline previewBlock: @Composable TestGlanceAppWidget.(Int) -> Unit,
-        withBlock: () -> Unit
+        withBlock: () -> Unit,
     ) {
         val previousProvidePreview = onProvidePreview
         onProvidePreview = previewBlock
@@ -100,5 +103,23 @@ object TestGlanceAppWidget : GlanceAppWidget() {
         } finally {
             onProvidePreview = previousProvidePreview
         }
+    }
+
+    inline fun withErrorOnSessionCreation(block: () -> Unit) {
+        shouldThrowErrorWhenCreatingSession = true
+        try {
+            block()
+        } finally {
+            shouldThrowErrorWhenCreatingSession = false
+        }
+    }
+
+    override fun createAppWidgetSession(
+        context: Context,
+        id: AppWidgetId,
+        options: Bundle?,
+    ): AppWidgetSession {
+        return if (shouldThrowErrorWhenCreatingSession) error("Error creating app widget session")
+        else super.createAppWidgetSession(context, id, options)
     }
 }

@@ -20,10 +20,13 @@ import android.app.Activity
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
+import androidx.xr.runtime.Config
+import androidx.xr.runtime.Config.AnchorPersistenceMode
 import androidx.xr.runtime.Session
 import androidx.xr.runtime.SessionCreateSuccess
+import androidx.xr.runtime.TrackingState
 import androidx.xr.runtime.internal.Anchor as RuntimeAnchor
-import androidx.xr.runtime.internal.TrackingState
+import androidx.xr.runtime.internal.AnchorInvalidUuidException
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Quaternion
 import androidx.xr.runtime.math.Vector3
@@ -32,6 +35,7 @@ import androidx.xr.runtime.testing.FakeRuntimeAnchor
 import androidx.xr.runtime.testing.FakeRuntimePlane
 import com.google.common.truth.Truth.assertThat
 import java.util.UUID
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -51,7 +55,7 @@ class AnchorTest {
     @get:Rule
     val grantPermissionRule =
         GrantPermissionRule.grant(
-            "android.permission.SCENE_UNDERSTANDING",
+            "android.permission.SCENE_UNDERSTANDING_COARSE",
             "android.permission.HAND_TRACKING",
         )
 
@@ -75,6 +79,15 @@ class AnchorTest {
     }
 
     @Test
+    fun create_notTracking_returnsAnchorNotTracking() = createTestSessionAndRunTest {
+        val fakePerceptionManager = session.runtime.perceptionManager as FakePerceptionManager
+        fakePerceptionManager.isTrackingAvailable = false
+
+        assertThat(Anchor.create(session, Pose()))
+            .isInstanceOf(AnchorCreateTrackingUnavailable::class.java)
+    }
+
+    @Test
     fun detach_removeAnchorFromActiveAnchorManager() {
         val runtimeAnchor = FakeRuntimeAnchor(Pose())
         val underTest = Anchor(runtimeAnchor, xrResourcesManager)
@@ -88,16 +101,31 @@ class AnchorTest {
     }
 
     @Test
+    fun detach_stopsUpdateAndQueuesAnchorToBeDetached() {
+        val runtimeAnchor = FakeRuntimePlane().createAnchor(Pose()) as FakeRuntimeAnchor
+        check(runtimeAnchor.isAttached)
+        val underTest = Anchor(runtimeAnchor, xrResourcesManager)
+        xrResourcesManager.addUpdatable(underTest)
+        check(xrResourcesManager.updatables.contains(underTest))
+        check(xrResourcesManager.updatables.size == 1)
+
+        underTest.detach()
+
+        assertThat(xrResourcesManager.updatables).isEmpty()
+        assertThat(xrResourcesManager.anchorsToDetachQueue.toList()).containsExactly(underTest)
+    }
+
+    @Test
     fun update_trackingStateMatchesRuntimeTrackingState() = runBlocking {
         val runtimeAnchor = FakeRuntimeAnchor(Pose())
-        runtimeAnchor.trackingState = TrackingState.Paused
+        runtimeAnchor.trackingState = TrackingState.PAUSED
         val underTest = Anchor(runtimeAnchor, xrResourcesManager)
-        check(underTest.state.value.trackingState.equals(TrackingState.Paused))
-        runtimeAnchor.trackingState = TrackingState.Tracking
+        check(underTest.state.value.trackingState.equals(TrackingState.PAUSED))
+        runtimeAnchor.trackingState = TrackingState.TRACKING
 
         underTest.update()
 
-        assertThat(underTest.state.value.trackingState).isEqualTo(TrackingState.Tracking)
+        assertThat(underTest.state.value.trackingState).isEqualTo(TrackingState.TRACKING)
     }
 
     @Test
@@ -118,21 +146,35 @@ class AnchorTest {
     }
 
     @Test
-    fun persist_runtimeAnchorIsPersisted() = runTest {
-        val runtimeAnchor = FakeRuntimeAnchor(Pose())
-        val underTest = Anchor(runtimeAnchor, xrResourcesManager)
-        check(runtimeAnchor.persistenceState == RuntimeAnchor.PersistenceState.NotPersisted)
+    fun persist_runtimeAnchorIsPersisted() = createTestSessionAndRunTest {
+        runTest {
+            val runtimeAnchor = FakeRuntimeAnchor(Pose())
+            val underTest = Anchor(runtimeAnchor, xrResourcesManager)
+            check(runtimeAnchor.persistenceState == RuntimeAnchor.PersistenceState.NOT_PERSISTED)
 
-        var uuid: UUID? = null
-        val persistJob = launch { uuid = underTest.persist() }
-        val updateJob = launch { underTest.update() }
-        updateJob.join()
-        persistJob.join()
+            var uuid: UUID? = null
+            val persistJob = launch { uuid = underTest.persist() }
+            val updateJob = launch { underTest.update() }
+            updateJob.join()
+            persistJob.join()
 
-        assertThat(uuid).isNotNull()
-        assertThat(runtimeAnchor.persistenceState)
-            .isEqualTo(RuntimeAnchor.PersistenceState.Persisted)
+            assertThat(uuid).isNotNull()
+            assertThat(runtimeAnchor.persistenceState)
+                .isEqualTo(RuntimeAnchor.PersistenceState.PERSISTED)
+        }
     }
+
+    @Test
+    fun persist_anchorPersistenceDisabled_throwsIllegalStateException() =
+        createTestSessionAndRunTest {
+            runTest {
+                val runtimeAnchor = FakeRuntimeAnchor(Pose())
+                val underTest = Anchor(runtimeAnchor, xrResourcesManager)
+                session.configure(Config(anchorPersistence = AnchorPersistenceMode.DISABLED))
+
+                assertFailsWith<IllegalStateException> { underTest.persist() }
+            }
+        }
 
     @Test
     fun getPersistedAnchorUuids_previouslyPersistedAnchor_returnsPersistedAnchorUuid() =
@@ -141,7 +183,7 @@ class AnchorTest {
                 val runtimeAnchor =
                     FakeRuntimeAnchor(
                         Pose(),
-                        session.runtime.perceptionManager as FakePerceptionManager
+                        session.runtime.perceptionManager as FakePerceptionManager,
                     )
                 val underTest = Anchor(runtimeAnchor, xrResourcesManager)
                 var uuid: UUID? = null
@@ -161,12 +203,22 @@ class AnchorTest {
         }
 
     @Test
+    fun getPersistedAnchorUuids_anchorPersistenceDisabled_throwsIllegalStateException() =
+        createTestSessionAndRunTest {
+            runTest {
+                session.configure(Config(anchorPersistence = AnchorPersistenceMode.DISABLED))
+
+                assertFailsWith<IllegalStateException> { Anchor.getPersistedAnchorUuids(session) }
+            }
+        }
+
+    @Test
     fun load_previouslyPersistedAnchor_returnsAnchorCreateSuccess() = createTestSessionAndRunTest {
         runTest {
             val runtimeAnchor =
                 FakeRuntimeAnchor(
                     Pose(),
-                    session.runtime.perceptionManager as FakePerceptionManager
+                    session.runtime.perceptionManager as FakePerceptionManager,
                 )
             val underTest = Anchor(runtimeAnchor, xrResourcesManager)
             var uuid: UUID? = null
@@ -176,6 +228,16 @@ class AnchorTest {
             persistJob.join()
 
             assertThat(Anchor.load(session, uuid!!)).isInstanceOf(AnchorCreateSuccess::class.java)
+        }
+    }
+
+    @Test
+    fun load_invalidUuid_returnsAnchorLoadInvalidUuid() = createTestSessionAndRunTest {
+        runTest {
+            assertThat(Anchor.load(session, UUID.randomUUID()))
+                .isInstanceOf(AnchorLoadInvalidUuid::class.java)
+            assertThat(Anchor.load(session, UUID(0L, 0L)))
+                .isInstanceOf(AnchorLoadInvalidUuid::class.java)
         }
     }
 
@@ -196,6 +258,15 @@ class AnchorTest {
     }
 
     @Test
+    fun load_anchorPersistenceDisabled_throwsIllegalStateException() = createTestSessionAndRunTest {
+        runTest {
+            session.configure(Config(anchorPersistence = AnchorPersistenceMode.DISABLED))
+
+            assertFailsWith<IllegalStateException> { Anchor.load(session, UUID.randomUUID()) }
+        }
+    }
+
+    @Test
     fun loadFromNativePointer_returnsAnchorCreateSuccess() = createTestSessionAndRunTest {
         assertThat(Anchor.loadFromNativePointer(session, 123L)).isNotNull()
     }
@@ -206,7 +277,7 @@ class AnchorTest {
             val runtimeAnchor =
                 FakeRuntimeAnchor(
                     Pose(),
-                    session.runtime.perceptionManager as FakePerceptionManager
+                    session.runtime.perceptionManager as FakePerceptionManager,
                 )
             val underTest = Anchor(runtimeAnchor, xrResourcesManager)
             var uuid: UUID? = null
@@ -222,14 +293,25 @@ class AnchorTest {
     }
 
     @Test
-    fun detach_removesRuntimeAnchor() {
-        val runtimeAnchor = FakeRuntimePlane().createAnchor(Pose()) as FakeRuntimeAnchor
-        check(runtimeAnchor.isAttached)
-        val underTest = Anchor(runtimeAnchor, xrResourcesManager)
+    fun unpersist_anchorPersistenceDisabled_throwsIllegalStateException() =
+        createTestSessionAndRunTest {
+            runTest {
+                session.configure(Config(anchorPersistence = AnchorPersistenceMode.DISABLED))
 
-        underTest.detach()
+                assertFailsWith<IllegalStateException> {
+                    Anchor.unpersist(session, UUID.randomUUID())
+                }
+            }
+        }
 
-        assertThat(runtimeAnchor.isAttached).isFalse()
+    @Test
+    fun unpersist_invalidUuid_throwsAnchorInvalidUuidException() = createTestSessionAndRunTest {
+        runTest {
+            assertFailsWith<AnchorInvalidUuidException> {
+                Anchor.unpersist(session, UUID.randomUUID())
+            }
+            assertFailsWith<AnchorInvalidUuidException> { Anchor.unpersist(session, UUID(0L, 0L)) }
+        }
     }
 
     @Test
@@ -283,6 +365,7 @@ class AnchorTest {
                 session =
                     (Session.create(activity, StandardTestDispatcher()) as SessionCreateSuccess)
                         .session
+                xrResourcesManager.lifecycleManager = session.runtime.lifecycleManager
 
                 testBody()
             }

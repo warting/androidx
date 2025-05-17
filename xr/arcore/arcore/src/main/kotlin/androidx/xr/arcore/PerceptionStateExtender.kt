@@ -40,7 +40,9 @@ internal class PerceptionStateExtender : StateExtender {
 
     override fun initialize(runtime: Runtime) {
         perceptionManager = runtime.perceptionManager
+        xrResourcesManager.lifecycleManager = runtime.lifecycleManager
         xrResourcesManager.initiateHands(perceptionManager.leftHand, perceptionManager.rightHand)
+        xrResourcesManager.initiateEarth(perceptionManager.earth)
     }
 
     override suspend fun extend(coreState: CoreState) {

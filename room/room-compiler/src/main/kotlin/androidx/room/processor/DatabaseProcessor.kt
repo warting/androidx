@@ -41,7 +41,7 @@ import androidx.room.vo.Entity
 import androidx.room.vo.FtsEntity
 import androidx.room.vo.Warning
 import androidx.room.vo.columnNames
-import androidx.room.vo.findFieldByColumnName
+import androidx.room.vo.findPropertyByColumnName
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Path
@@ -93,7 +93,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                 .getAllMethods()
                 .filter { it.isAbstract() }
                 .filterNot {
-                    // remove methods that belong to room
+                    // remove functions that belong to room
                     it.enclosingElement.asClassName() == RoomTypeNames.ROOM_DB
                 }
                 .mapNotNull { executable ->
@@ -104,7 +104,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                     if (daoElement == null) {
                         context.logger.e(
                             executable,
-                            ProcessorErrors.DATABASE_INVALID_DAO_FUNCTION_RETURN_TYPE
+                            ProcessorErrors.DATABASE_INVALID_DAO_FUNCTION_RETURN_TYPE,
                         )
                         null
                     } else {
@@ -112,7 +112,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                             context.logger.w(
                                 Warning.JVM_NAME_ON_OVERRIDDEN_FUNCTION,
                                 executable,
-                                ProcessorErrors.JVM_NAME_ON_OVERRIDDEN_FUNCTION
+                                ProcessorErrors.JVM_NAME_ON_OVERRIDDEN_FUNCTION,
                             )
                         }
                         val dao =
@@ -134,7 +134,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
         context.checker.check(
             predicate = version > 0,
             element = element,
-            errorMsg = ProcessorErrors.INVALID_DATABASE_VERSION
+            errorMsg = ProcessorErrors.INVALID_DATABASE_VERSION,
         )
 
         val constructorObject = processConstructorObject(element)
@@ -150,7 +150,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                 exportSchema = exportSchema,
                 enableForeignKeys = hasForeignKeys,
                 overrideClearAllTables = hasClearAllTables,
-                constructorObject = constructorObject
+                constructorObject = constructorObject,
             )
         database.autoMigrations = processAutoMigrations(element, dbAnnotation, database.bundle)
         return database
@@ -159,7 +159,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
     private fun processAutoMigrations(
         element: XTypeElement,
         dbAnnotation: XAnnotation,
-        latestDbSchema: DatabaseBundle
+        latestDbSchema: DatabaseBundle,
     ): List<androidx.room.vo.AutoMigration> {
         val autoMigrationList = dbAnnotation["autoMigrations"]?.asAnnotationList() ?: emptyList()
         if (autoMigrationList.isEmpty()) {
@@ -193,7 +193,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                     context = context,
                     spec = autoMigrationAnnotation["spec"]?.asType(),
                     fromSchemaBundle = fromSchemaBundle,
-                    toSchemaBundle = toSchemaBundle
+                    toSchemaBundle = toSchemaBundle,
                 )
                 .process()
         }
@@ -221,7 +221,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                     element,
                     ProcessorErrors.autoMigrationSchemasNotFound(
                         version,
-                        schemaFolderPath.toString()
+                        schemaFolderPath.toString(),
                     ),
                 )
                 null
@@ -230,7 +230,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                 context.logger.e("Unable to read schema file: ${th.message ?: ""}")
                 context.logger.e(
                     element,
-                    invalidAutoMigrationSchema(version, schemaFolderPath.toString())
+                    invalidAutoMigrationSchema(version, schemaFolderPath.toString()),
                 )
                 null
             }
@@ -247,22 +247,22 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                         element,
                         ProcessorErrors.foreignKeyMissingParentEntityInDatabase(
                             foreignKey.parentTable,
-                            entity.element.qualifiedName
-                        )
+                            entity.element.qualifiedName,
+                        ),
                     )
                     return@foreignKeyLoop
                 }
                 val parentFields =
                     foreignKey.parentColumns.mapNotNull { columnName ->
-                        val parentField = parent.findFieldByColumnName(columnName)
+                        val parentField = parent.findPropertyByColumnName(columnName)
                         if (parentField == null) {
                             context.logger.e(
                                 entity.element,
                                 ProcessorErrors.foreignKeyParentColumnDoesNotExist(
                                     parentEntity = parent.element.qualifiedName,
                                     missingColumn = columnName,
-                                    allColumns = parent.columnNames
-                                )
+                                    allColumns = parent.columnNames,
+                                ),
                             )
                         }
                         parentField
@@ -278,8 +278,8 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                             parentEntity = parent.element.qualifiedName,
                             childEntity = entity.element.qualifiedName,
                             parentColumns = foreignKey.parentColumns,
-                            childColumns = foreignKey.childFields.map { it.columnName }
-                        )
+                            childColumns = foreignKey.childProperties.map { it.columnName },
+                        ),
                     )
                     return@foreignKeyLoop
                 }
@@ -304,8 +304,8 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                             it.key,
                             it.value.map {
                                 "${it.second.typeName.toString(context.codeLanguage)} > ${it.first}"
-                            }
-                        )
+                            },
+                        ),
                     )
                 }
             }
@@ -314,7 +314,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
     private fun validateUniqueDaoClasses(
         dbElement: XTypeElement,
         daoFunctions: List<DaoFunction>,
-        entities: List<Entity>
+        entities: List<Entity>,
     ) {
         val entityTypeNames = entities.map { it.typeName }.toSet()
         daoFunctions
@@ -324,12 +324,12 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                     val error =
                         ProcessorErrors.duplicateDao(
                             dao = it.key.toString(context.codeLanguage),
-                            functionNames = it.value.map { it.element.name }
+                            functionNames = it.value.map { it.element.name },
                         )
                     it.value.forEach { daoFunction ->
                         context.logger.e(
                             daoFunction.element,
-                            ProcessorErrors.DAO_FUNCTION_CONFLICTS_WITH_OTHERS
+                            ProcessorErrors.DAO_FUNCTION_CONFLICTS_WITH_OTHERS,
                         )
                     }
                     // also report the full error for the database
@@ -345,21 +345,21 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                             ProcessorErrors.shortcutEntityIsNotInDatabase(
                                 database = dbElement.qualifiedName,
                                 dao = dao.typeName.toString(context.codeLanguage),
-                                entity = typeName.toString(context.codeLanguage)
-                            )
+                                entity = typeName.toString(context.codeLanguage),
+                            ),
                         )
                     }
                 }
             }
         daoFunctions.forEach { daoFunction ->
-            daoFunction.dao.mDeleteOrUpdateShortcutFunctions.forEach { method ->
-                method.entities.forEach {
-                    check(method.element, daoFunction.dao, it.value.entityTypeName)
+            daoFunction.dao.mDeleteOrUpdateShortcutFunctions.forEach { function ->
+                function.entities.forEach {
+                    check(function.element, daoFunction.dao, it.value.entityTypeName)
                 }
             }
-            daoFunction.dao.mInsertOrUpsertShortcutFunctions.forEach { method ->
-                method.entities.forEach {
-                    check(method.element, daoFunction.dao, it.value.entityTypeName)
+            daoFunction.dao.mInsertOrUpsertShortcutFunctions.forEach { function ->
+                function.entities.forEach {
+                    check(function.element, daoFunction.dao, it.value.entityTypeName)
                 }
             }
         }
@@ -368,14 +368,14 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
     private fun validateUniqueTableAndViewNames(
         dbElement: XTypeElement,
         entities: List<Entity>,
-        views: List<DatabaseView>
+        views: List<DatabaseView>,
     ) {
         val entitiesInfo =
             entities.map {
                 Triple(
                     it.tableName.lowercase(Locale.US),
                     it.typeName.toString(context.codeLanguage),
-                    it.element
+                    it.element,
                 )
             }
         val viewsInfo =
@@ -383,7 +383,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                 Triple(
                     it.viewName.lowercase(Locale.US),
                     it.typeName.toString(context.codeLanguage),
-                    it.element
+                    it.element,
                 )
             }
         (entitiesInfo + viewsInfo)
@@ -393,7 +393,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                 val error =
                     ProcessorErrors.duplicateTableNames(
                         byName.key,
-                        byName.value.map { (_, typeName, _) -> typeName }
+                        byName.value.map { (_, typeName, _) -> typeName },
                     )
                 // report it for each of them and the database to make it easier
                 // for the developer
@@ -415,8 +415,8 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                     dbElement,
                     ProcessorErrors.missingExternalContentEntity(
                         it.element.qualifiedName,
-                        it.ftsOptions.contentEntity!!.element.qualifiedName
-                    )
+                        it.ftsOptions.contentEntity!!.element.qualifiedName,
+                    ),
                 )
             }
     }
@@ -426,7 +426,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
         context.checker.check(
             entityList.isNotEmpty(),
             element,
-            ProcessorErrors.DATABASE_ANNOTATION_MUST_HAVE_LIST_OF_ENTITIES
+            ProcessorErrors.DATABASE_ANNOTATION_MUST_HAVE_LIST_OF_ENTITIES,
         )
         return entityList.mapNotNull {
             val typeElement = it.typeElement
@@ -435,7 +435,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                     element,
                     ProcessorErrors.invalidEntityTypeInDatabaseAnnotation(
                         it.asTypeName().toString(context.codeLanguage)
-                    )
+                    ),
                 )
                 null
             } else {
@@ -454,7 +454,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                         element,
                         ProcessorErrors.invalidViewTypeInDatabaseAnnotation(
                             it.asTypeName().toString(context.codeLanguage)
-                        )
+                        ),
                     )
                     null
                 } else {
@@ -466,7 +466,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
 
     private fun verifyDatabaseViews(
         map: Map<XTypeElement, DatabaseView>,
-        dbVerifier: DatabaseVerifier
+        dbVerifier: DatabaseVerifier,
     ) {
         for ((viewElement, view) in map) {
             if (viewElement.hasAnnotation(SkipQueryVerification::class)) {
@@ -476,7 +476,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
             if (view.query.resultInfo?.error != null) {
                 context.logger.e(
                     viewElement,
-                    DatabaseVerificationErrors.cannotVerifyQuery(view.query.resultInfo!!.error!!)
+                    DatabaseVerificationErrors.cannotVerifyQuery(view.query.resultInfo!!.error!!),
                 )
             }
         }
@@ -528,7 +528,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                     element,
                     ProcessorErrors.viewCircularReferenceDetected(
                         unresolvedViews.map { it.viewName }
-                    )
+                    ),
                 )
                 break
             }
@@ -546,7 +546,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
             context.checker.check(
                 predicate = context.isJvmOnlyTarget(),
                 element = element,
-                errorMsg = ProcessorErrors.MISSING_CONSTRUCTED_BY_ANNOTATION
+                errorMsg = ProcessorErrors.MISSING_CONSTRUCTED_BY_ANNOTATION,
             )
             return null
         }
@@ -560,13 +560,13 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
         context.checker.check(
             predicate = typeElement.isKotlinObject(),
             element = typeElement,
-            errorMsg = ProcessorErrors.INVALID_CONSTRUCTED_BY_NOT_OBJECT
+            errorMsg = ProcessorErrors.INVALID_CONSTRUCTED_BY_NOT_OBJECT,
         )
 
         context.checker.check(
             predicate = typeElement.isExpect(),
             element = typeElement,
-            errorMsg = ProcessorErrors.INVALID_CONSTRUCTED_BY_NOT_EXPECT
+            errorMsg = ProcessorErrors.INVALID_CONSTRUCTED_BY_NOT_EXPECT,
         )
 
         val expectedSuperInterfaceTypeName =
@@ -581,7 +581,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                 msg =
                     ProcessorErrors.invalidConstructedBySuperInterface(
                         expectedSuperInterfaceTypeName.toString(context.codeLanguage)
-                    )
+                    ),
             )
             return null
         }
@@ -593,7 +593,7 @@ class DatabaseProcessor(baseContext: Context, val element: XTypeElement) {
                 msg =
                     ProcessorErrors.invalidConstructedBySuperInterface(
                         expectedSuperInterfaceTypeName.toString(context.codeLanguage)
-                    )
+                    ),
             )
             return null
         }

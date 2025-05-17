@@ -31,13 +31,13 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.testing.impl.CameraPipeConfigTestRule
 import androidx.camera.testing.impl.CameraUtil
+import androidx.camera.testing.impl.CountdownDeferred
 import androidx.camera.testing.impl.fakes.FakeLifecycleOwner
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.filters.LargeTest
 import com.google.common.truth.Truth
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -58,14 +58,12 @@ private const val CAPTURE_TIMEOUT = 15_000.toLong() //  15 seconds
 @RunWith(Parameterized::class)
 class ImageCaptureWithoutStoragePermissionTest(
     implName: String,
-    private val cameraXConfig: CameraXConfig
+    private val cameraXConfig: CameraXConfig,
 ) {
 
     @get:Rule
     val cameraPipeConfigTestRule =
-        CameraPipeConfigTestRule(
-            active = implName == CameraPipeConfig::class.simpleName,
-        )
+        CameraPipeConfigTestRule(active = implName == CameraPipeConfig::class.simpleName)
 
     @get:Rule
     val cameraRule =
@@ -79,7 +77,7 @@ class ImageCaptureWithoutStoragePermissionTest(
         fun data() =
             listOf(
                 arrayOf(Camera2Config::class.simpleName, Camera2Config.defaultConfig()),
-                arrayOf(CameraPipeConfig::class.simpleName, CameraPipeConfig.defaultConfig())
+                arrayOf(CameraPipeConfig::class.simpleName, CameraPipeConfig.defaultConfig()),
             )
     }
 
@@ -127,7 +125,7 @@ class ImageCaptureWithoutStoragePermissionTest(
             ImageCapture.OutputFileOptions.Builder(
                     context.contentResolver,
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    contentValues
+                    contentValues,
                 )
                 .build()
 
@@ -171,28 +169,11 @@ class ImageCaptureWithoutStoragePermissionTest(
         suspend fun awaitCapturesAndAssert(
             timeout: Long = CAPTURE_TIMEOUT,
             savedImagesCount: Int = 0,
-            errorsCount: Int = 0
+            errorsCount: Int = 0,
         ) {
             Truth.assertThat(withTimeoutOrNull(timeout) { latch.await() }).isNotNull()
             Truth.assertThat(results.size).isEqualTo(savedImagesCount)
             Truth.assertThat(errors.size).isEqualTo(errorsCount)
-        }
-    }
-
-    private class CountdownDeferred(count: Int) {
-
-        private val deferredItems =
-            mutableListOf<CompletableDeferred<Unit>>().apply {
-                repeat(count) { add(CompletableDeferred()) }
-            }
-        private var index = 0
-
-        fun countDown() {
-            deferredItems[index++].complete(Unit)
-        }
-
-        suspend fun await() {
-            deferredItems.forEach { it.await() }
         }
     }
 }

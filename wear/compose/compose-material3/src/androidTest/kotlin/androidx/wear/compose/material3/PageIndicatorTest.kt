@@ -17,7 +17,6 @@
 package androidx.wear.compose.material3
 
 import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.testutils.assertContainsColor
 import androidx.compose.testutils.assertDoesNotContainColor
 import androidx.compose.ui.Modifier
@@ -31,11 +30,12 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.filters.SdkSuppress
 import androidx.wear.compose.foundation.pager.PagerState
 import org.junit.Rule
 import org.junit.Test
 
-@RequiresApi(Build.VERSION_CODES.O)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class PageIndicatorTest {
     @get:Rule val rule = createComposeRule()
 
@@ -46,19 +46,6 @@ class PageIndicatorTest {
                 HorizontalPageIndicator(
                     modifier = Modifier.testTag(TEST_TAG),
                     pagerState = pagerState_start,
-                )
-            }
-        }
-        rule.onNodeWithTag(TEST_TAG).assertExists()
-    }
-
-    @Test
-    public fun horizontalPageIndicator_supports_testtag_linear() {
-        rule.setContentWithTheme {
-            ScreenConfiguration(screenSizeDp = 150, isRound = false) {
-                HorizontalPageIndicator(
-                    modifier = Modifier.testTag(TEST_TAG),
-                    pagerState = pagerState_start
                 )
             }
         }
@@ -79,19 +66,6 @@ class PageIndicatorTest {
     }
 
     @Test
-    public fun verticalPageIndicator_supports_testtag_linear() {
-        rule.setContentWithTheme {
-            ScreenConfiguration(screenSizeDp = 150, isRound = false) {
-                VerticalPageIndicator(
-                    modifier = Modifier.testTag(TEST_TAG),
-                    pagerState = pagerState_start
-                )
-            }
-        }
-        rule.onNodeWithTag(TEST_TAG).assertExists()
-    }
-
-    @Test
     public fun horizontalPageIndicator_position_is_selected_circular() {
         horizontalPageIndicator_position_is_selected_circular(LayoutDirection.Ltr)
     }
@@ -105,7 +79,7 @@ class PageIndicatorTest {
                     pagerState = pagerState_middle,
                     selectedColor = selectedColor,
                     unselectedColor = unselectedColor,
-                    backgroundColor = backgroundColor
+                    backgroundColor = backgroundColor,
                 )
             }
         }
@@ -142,7 +116,7 @@ class PageIndicatorTest {
                     pagerState = pagerState_middle,
                     selectedColor = selectedColor,
                     unselectedColor = unselectedColor,
-                    backgroundColor = backgroundColor
+                    backgroundColor = backgroundColor,
                 )
             }
         }
@@ -179,7 +153,7 @@ class PageIndicatorTest {
                         PagerState(
                             currentPage = 1,
                             currentPageOffsetFraction = 0.0f,
-                            pageCount = { 9 }
+                            pageCount = { 9 },
                         ),
                 )
             }
@@ -206,7 +180,7 @@ class PageIndicatorTest {
                         PagerState(
                             currentPage = 1,
                             currentPageOffsetFraction = 0.0f,
-                            pageCount = { pagesCount }
+                            pageCount = { pagesCount },
                         ),
                 )
             }
@@ -238,11 +212,11 @@ class PageIndicatorTest {
                         PagerState(
                             currentPage = 0,
                             currentPageOffsetFraction = 0f,
-                            pageCount = { 1 }
+                            pageCount = { 1 },
                         ),
                     selectedColor = selectedColor,
                     unselectedColor = unselectedColor,
-                    backgroundColor = backgroundColor
+                    backgroundColor = backgroundColor,
                 )
             }
         }
@@ -274,7 +248,7 @@ class PageIndicatorTest {
                         pagerState = pagerState_start,
                         selectedColor = selectedColor,
                         unselectedColor = unselectedColor,
-                        backgroundColor = backgroundColor
+                        backgroundColor = backgroundColor,
                     )
                 }
             }
@@ -311,7 +285,7 @@ class PageIndicatorTest {
                         pagerState = pagerState_start,
                         selectedColor = selectedColor,
                         unselectedColor = unselectedColor,
-                        backgroundColor = backgroundColor
+                        backgroundColor = backgroundColor,
                     )
                 }
             }
@@ -339,14 +313,14 @@ class PageIndicatorTest {
         PagerState(
             currentPage = SELECTED_PAGE_INDEX,
             currentPageOffsetFraction = 0.0f,
-            pageCount = { PAGE_COUNT }
+            pageCount = { PAGE_COUNT },
         )
 
     private val pagerState_middle =
         PagerState(
             currentPage = SELECTED_PAGE_INDEX,
             currentPageOffsetFraction = 0.5f,
-            pageCount = { PAGE_COUNT }
+            pageCount = { PAGE_COUNT },
         )
 
     companion object {

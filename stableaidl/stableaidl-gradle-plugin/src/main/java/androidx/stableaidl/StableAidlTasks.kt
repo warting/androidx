@@ -69,12 +69,13 @@ fun registerCompileAidlApi(
     variant: Variant,
     aidlExecutable: Provider<RegularFile>,
     aidlFramework: Provider<RegularFile>,
+    shadowFramework: Provider<Directory>,
     aidlVersion: Provider<String>,
     sourceDir: SourceDirectories.Flat,
     packagedDir: Provider<Directory>,
     importsDir: SourceDirectories.Flat,
     depImports: List<FileCollection>,
-    outputDir: Provider<Directory>
+    outputDir: Provider<Directory>,
 ): TaskProvider<StableAidlCompile> =
     project.tasks
         .register(computeTaskName("compile", variant, "AidlApi"), StableAidlCompile::class.java) {
@@ -89,14 +90,15 @@ fun registerCompileAidlApi(
             task.sourceDirs.set(sourceDir.all)
             task.sourceOutputDir.set(outputDir)
             task.packagedDir.set(packagedDir)
-            task.importDirs.set(importsDir.all)
+            task.importDirs.addAll(importsDir.all)
+            task.shadowFrameworkDir.set(shadowFramework)
             depImports.forEach { task.dependencyImportDirs.addAll(it.elements) }
             task.extraArgs.set(listOf("--structured"))
         }
         .also { taskProvider ->
             variant.sources.java?.addGeneratedSourceDirectory(
                 taskProvider,
-                StableAidlCompile::sourceOutputDir
+                StableAidlCompile::sourceOutputDir,
             )
 
             // The API elements config is used by the compile classpath.
@@ -125,7 +127,7 @@ fun registerCompileAidlApi(
  */
 private fun DomainObjectCollection<ConfigurationVariant>.allNamed(
     name: String,
-    action: Action<ConfigurationVariant>
+    action: Action<ConfigurationVariant>,
 ) = configureEach { variant ->
     if (variant.name == name) {
         action.execute(variant)
@@ -135,22 +137,19 @@ private fun DomainObjectCollection<ConfigurationVariant>.allNamed(
 fun registerPackageAidlApi(
     project: Project,
     variant: Variant,
-    compileAidlApiTask: TaskProvider<StableAidlCompile>
+    compileAidlApiTask: TaskProvider<StableAidlCompile>,
 ): TaskProvider<StableAidlPackageApi> =
     project.tasks
         .register(
             computeTaskName("package", variant, "AidlApi"),
-            StableAidlPackageApi::class.java
+            StableAidlPackageApi::class.java,
         ) { task ->
             task.packagedDir.set(compileAidlApiTask.flatMap { it.packagedDir })
         }
         .also { taskProvider ->
             variant.artifacts
                 .use(taskProvider)
-                .wiredWithFiles(
-                    StableAidlPackageApi::aarFile,
-                    StableAidlPackageApi::updatedAarFile,
-                )
+                .wiredWithFiles(StableAidlPackageApi::aarFile, StableAidlPackageApi::updatedAarFile)
                 .toTransform(SingleArtifact.AAR)
         }
 
@@ -159,16 +158,17 @@ fun registerGenerateAidlApi(
     variant: Variant,
     aidlExecutable: Provider<RegularFile>,
     aidlFramework: Provider<RegularFile>,
+    shadowFramework: Provider<Directory>,
     aidlVersion: Provider<String>,
     sourceDir: SourceDirectories.Flat,
     importsDir: SourceDirectories.Flat,
     depImports: List<FileCollection>,
     builtApiDir: Provider<Directory>,
-    compileAidlApiTask: Provider<StableAidlCompile>
+    compileAidlApiTask: Provider<StableAidlCompile>,
 ): TaskProvider<StableAidlCompile> =
     project.tasks.register(
         computeTaskName("generate", variant, "AidlApi"),
-        StableAidlCompile::class.java
+        StableAidlCompile::class.java,
     ) { task ->
         task.group = TASK_GROUP_API
         task.description = "Generates API files from AIDL source code"
@@ -178,7 +178,8 @@ fun registerGenerateAidlApi(
         task.aidlVersion.set(aidlVersion)
         task.sourceDirs.set(sourceDir.all)
         task.sourceOutputDir.set(builtApiDir)
-        task.importDirs.set(importsDir.all)
+        task.importDirs.addAll(importsDir.all)
+        task.shadowFrameworkDir.set(shadowFramework)
         depImports.forEach { task.dependencyImportDirs.addAll(it.elements) }
         task.extraArgs.set(listOf("--structured", "--dumpapi"))
         task.dependsOn(compileAidlApiTask)
@@ -192,6 +193,7 @@ fun registerCheckApiAidlRelease(
     variant: Variant,
     aidlExecutable: Provider<RegularFile>,
     aidlFramework: Provider<RegularFile>,
+    shadowFramework: Provider<Directory>,
     importsDir: SourceDirectories.Flat,
     depImports: List<FileCollection>,
     lastReleasedApiDir: Directory,
@@ -199,7 +201,7 @@ fun registerCheckApiAidlRelease(
 ): TaskProvider<StableAidlCheckApi> =
     project.tasks.register(
         computeTaskName("check", variant, "AidlApiRelease"),
-        StableAidlCheckApi::class.java
+        StableAidlCheckApi::class.java,
     ) { task ->
         task.group = TASK_GROUP_API
         task.description =
@@ -207,7 +209,8 @@ fun registerCheckApiAidlRelease(
         task.variantName = variant.name
         task.aidlExecutable.set(aidlExecutable)
         task.aidlFrameworkProvider.set(aidlFramework)
-        task.importDirs.set(importsDir.all)
+        task.importDirs.addAll(importsDir.all)
+        task.shadowFrameworkDir.set(shadowFramework)
         depImports.forEach { task.dependencyImportDirs.addAll(it.elements) }
         task.checkApiMode.set(StableAidlCheckApi.MODE_COMPATIBLE)
         task.expectedApiDir.set(lastReleasedApiDir)
@@ -223,6 +226,7 @@ fun registerCheckAidlApi(
     variant: Variant,
     aidlExecutable: Provider<RegularFile>,
     aidlFramework: Provider<RegularFile>,
+    shadowFramework: Provider<Directory>,
     importsDir: SourceDirectories.Flat,
     depImports: List<FileCollection>,
     lastCheckedInApiFile: Directory,
@@ -231,7 +235,7 @@ fun registerCheckAidlApi(
 ): TaskProvider<StableAidlCheckApi> =
     project.tasks.register(
         computeTaskName("check", variant, "AidlApi"),
-        StableAidlCheckApi::class.java
+        StableAidlCheckApi::class.java,
     ) { task ->
         task.group = TASK_GROUP_API
         task.description =
@@ -239,7 +243,8 @@ fun registerCheckAidlApi(
         task.variantName = variant.name
         task.aidlExecutable.set(aidlExecutable)
         task.aidlFrameworkProvider.set(aidlFramework)
-        task.importDirs.set(importsDir.all)
+        task.importDirs.addAll(importsDir.all)
+        task.shadowFrameworkDir.set(shadowFramework)
         depImports.forEach { task.dependencyImportDirs.addAll(it.elements) }
         task.checkApiMode.set(StableAidlCheckApi.MODE_EQUAL)
         task.expectedApiDir.set(lastCheckedInApiFile)
@@ -258,7 +263,7 @@ fun registerUpdateAidlApi(
 ): TaskProvider<UpdateStableAidlApiTask> =
     project.tasks.register(
         computeTaskName("update", variant, "AidlApi"),
-        UpdateStableAidlApiTask::class.java
+        UpdateStableAidlApiTask::class.java,
     ) { task ->
         task.group = TASK_GROUP_API
         task.description =

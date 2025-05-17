@@ -20,9 +20,11 @@ package androidx.xr.scenecore
 
 import android.util.Log
 import androidx.annotation.RestrictTo
-import androidx.xr.scenecore.JxrPlatformAdapter.SpatialEnvironment.SetPassthroughOpacityPreferenceResult as RtSetPassthroughOpacityPreferenceResult
-import androidx.xr.scenecore.JxrPlatformAdapter.SpatialEnvironment.SetSpatialEnvironmentPreferenceResult as RtSetSpatialEnvironmentPreferenceResult
-import androidx.xr.scenecore.JxrPlatformAdapter.SpatialEnvironment.SpatialEnvironmentPreference as RtSpatialEnvironmentPreference
+import androidx.xr.runtime.internal.JxrPlatformAdapter
+import androidx.xr.runtime.internal.SpatialEnvironment as RtSpatialEnvironment
+import androidx.xr.runtime.internal.SpatialEnvironment.SetPassthroughOpacityPreferenceResult as RtSetPassthroughOpacityPreferenceResult
+import androidx.xr.runtime.internal.SpatialEnvironment.SetSpatialEnvironmentPreferenceResult as RtSetSpatialEnvironmentPreferenceResult
+import androidx.xr.runtime.internal.SpatialEnvironment.SpatialEnvironmentPreference as RtSpatialEnvironmentPreference
 import com.google.errorprone.annotations.CanIgnoreReturnValue
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Consumer
@@ -54,7 +56,7 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
 
     private val TAG = "SpatialEnvironment"
 
-    private val rtEnvironment: JxrPlatformAdapter.SpatialEnvironment = runtime.spatialEnvironment
+    private val rtEnvironment: RtSpatialEnvironment = runtime.spatialEnvironment
 
     // These two fields are only used by the deprecated setSkybox() and setGeometry() methods.
     // TODO: b/370015943 - Remove after clients migrate to the SpatialEnvironmentPreference APIs.
@@ -67,14 +69,14 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
     public class PassthroughMode internal constructor(public val value: Int) {
         public companion object {
             /** The state at startup. The application cannot set this state. No longer used. */
-            @JvmField public val Uninitialized: PassthroughMode = PassthroughMode(0)
+            @JvmField public val UNINITIALIZED: PassthroughMode = PassthroughMode(0)
             /**
              * The user's passthrough is not composed into their view. Environment skyboxes and
              * geometry are only visible in this state.
              */
-            @JvmField public val Disabled: PassthroughMode = PassthroughMode(1)
+            @JvmField public val DISABLED: PassthroughMode = PassthroughMode(1)
             /** The user's passthrough is visible at full or partial opacity. */
-            @JvmField public val Enabled: PassthroughMode = PassthroughMode(2)
+            @JvmField public val ENABLED: PassthroughMode = PassthroughMode(2)
         }
     }
 
@@ -85,10 +87,23 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
      *   null, it will be all black.
      * @param geometry The preferred geometry for the environment based on a pre-loaded [GltfModel].
      *   If null, there will be no geometry.
+     * @param geometryMaterial The material to override a given mesh in the geometry. If null, the
+     *   material will not override any mesh.
+     * @param geometryMeshName The name of the mesh to override with the material. If null, the
+     *   material will not override any mesh.
+     * @param geometryAnimationName The name of the animation to play on the geometry. If null, the
+     *   geometry will not play any animation. Note that the animation will be played in loop.
+     * @throws IllegalStateException if the material is not properly set up and if the geometry glTF
+     *   model does not contain the mesh or the animation name.
      */
-    public class SpatialEnvironmentPreference(
+    public class SpatialEnvironmentPreference
+    @JvmOverloads
+    constructor(
         public val skybox: ExrImage?,
         public val geometry: GltfModel?,
+        internal val geometryMaterial: Material? = null,
+        internal val geometryMeshName: String? = null,
+        internal val geometryAnimationName: String? = null,
     ) {
 
         override fun equals(other: Any?): Boolean {
@@ -121,9 +136,9 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
     @Deprecated(message = "Use setPassthroughOpacityPreference instead.")
     public fun setPassthrough(passthroughMode: PassthroughMode) {
         when (passthroughMode) {
-            PassthroughMode.Uninitialized -> return // Do nothing. This isn't allowed.
-            PassthroughMode.Disabled -> setPassthroughOpacityPreference(0.0f)
-            PassthroughMode.Enabled -> setPassthroughOpacityPreference(1.0f)
+            PassthroughMode.UNINITIALIZED -> return // Do nothing. This isn't allowed.
+            PassthroughMode.DISABLED -> setPassthroughOpacityPreference(0.0f)
+            PassthroughMode.ENABLED -> setPassthroughOpacityPreference(1.0f)
         }
     }
 
@@ -142,9 +157,9 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
     @Deprecated(message = "Use getCurrentPassthroughOpacity instead.")
     public fun getPassthroughMode(): PassthroughMode {
         if (getCurrentPassthroughOpacity() > 0.0f) {
-            return PassthroughMode.Enabled
+            return PassthroughMode.ENABLED
         } else {
-            return PassthroughMode.Disabled
+            return PassthroughMode.DISABLED
         }
     }
 
@@ -297,7 +312,7 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
      * @return True if the environment set by [setSpatialEnvironmentPreference] is active.
      */
     public fun isSpatialEnvironmentPreferenceActive(): Boolean {
-        return rtEnvironment.isSpatialEnvironmentPreferenceActive
+        return rtEnvironment.isSpatialEnvironmentPreferenceActive()
     }
 
     /**
@@ -330,8 +345,7 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
      * application, meaning the default system environment will be displayed instead.
      *
      * If the given [SpatialEnvironmentPreference] is not null, but all of its properties are null,
-     * then the spatial environment will consist of a black skybox and no geometry
-     * [isSpatialEnvironmentPreferenceActive] is true.
+     * then the spatial environment will consist of a black skybox and no geometry.
      *
      * Changes to the Environment state will be notified via listeners added with
      * [addOnSpatialEnvironmentChangedListener].
@@ -434,7 +448,13 @@ public class SpatialEnvironment(private val runtime: JxrPlatformAdapter) {
 
 internal fun SpatialEnvironment.SpatialEnvironmentPreference.toRtSpatialEnvironmentPreference():
     RtSpatialEnvironmentPreference {
-    return RtSpatialEnvironmentPreference(skybox?.image, geometry?.model)
+    return RtSpatialEnvironmentPreference(
+        skybox?.image,
+        geometry?.model,
+        geometryMaterial?.material,
+        geometryMeshName,
+        geometryAnimationName,
+    )
 }
 
 internal fun RtSpatialEnvironmentPreference.toSpatialEnvironmentPreference():
@@ -442,25 +462,32 @@ internal fun RtSpatialEnvironmentPreference.toSpatialEnvironmentPreference():
     return SpatialEnvironment.SpatialEnvironmentPreference(
         skybox?.let { ExrImage(it) },
         geometry?.let { GltfModel(it) },
+        geometryMaterial?.let { Material(it) },
+        geometryMeshName,
+        geometryAnimationName,
     )
 }
 
-internal fun RtSetSpatialEnvironmentPreferenceResult.toSetSpatialEnvironmentPreferenceResult():
+internal fun Int.toSetSpatialEnvironmentPreferenceResult():
     SpatialEnvironment.SetSpatialEnvironmentPreferenceResult {
     return when (this) {
         RtSetSpatialEnvironmentPreferenceResult.CHANGE_APPLIED ->
             SpatialEnvironment.SetSpatialEnvironmentPreferenceChangeApplied()
         RtSetSpatialEnvironmentPreferenceResult.CHANGE_PENDING ->
             SpatialEnvironment.SetSpatialEnvironmentPreferenceChangePending()
+        else ->
+            throw IllegalArgumentException("Unknown SetSpatialEnvironmentPreferenceResult: $this")
     }
 }
 
-internal fun RtSetPassthroughOpacityPreferenceResult.toSetPassthroughOpacityPreferenceResult():
+internal fun Int.toSetPassthroughOpacityPreferenceResult():
     SpatialEnvironment.SetPassthroughOpacityPreferenceResult {
     return when (this) {
         RtSetPassthroughOpacityPreferenceResult.CHANGE_APPLIED ->
             SpatialEnvironment.SetPassthroughOpacityPreferenceChangeApplied()
         RtSetPassthroughOpacityPreferenceResult.CHANGE_PENDING ->
             SpatialEnvironment.SetPassthroughOpacityPreferenceChangePending()
+        else ->
+            throw IllegalArgumentException("Unknown SetPassthroughOpacityPreferenceResult: $this")
     }
 }

@@ -26,6 +26,7 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.ClearCredentialStateRequest.Companion.TYPE_CLEAR_RESTORE_CREDENTIAL
 import androidx.credentials.CreateCredentialRequest
 import androidx.credentials.CreateCredentialResponse
+import androidx.credentials.CreateDigitalCredentialRequest
 import androidx.credentials.CreatePasswordRequest
 import androidx.credentials.CreatePublicKeyCredentialRequest
 import androidx.credentials.CreateRestoreCredentialRequest
@@ -49,6 +50,7 @@ import androidx.credentials.playservices.controllers.identityauth.beginsignin.Cr
 import androidx.credentials.playservices.controllers.identityauth.createpassword.CredentialProviderCreatePasswordController
 import androidx.credentials.playservices.controllers.identityauth.createpublickeycredential.CredentialProviderCreatePublicKeyCredentialController
 import androidx.credentials.playservices.controllers.identityauth.getsigninintent.CredentialProviderGetSignInIntentController
+import androidx.credentials.playservices.controllers.identitycredentials.createdigitalcredential.CreateDigitalCredentialController
 import androidx.credentials.playservices.controllers.identitycredentials.createpublickeycredential.CreatePublicKeyCredentialController
 import androidx.credentials.playservices.controllers.identitycredentials.getdigitalcredential.CredentialProviderGetDigitalCredentialController
 import com.google.android.gms.auth.api.identity.Identity
@@ -73,7 +75,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
         request: GetCredentialRequest,
         cancellationSignal: CancellationSignal?,
         executor: Executor,
-        callback: CredentialManagerCallback<GetCredentialResponse, GetCredentialException>
+        callback: CredentialManagerCallback<GetCredentialResponse, GetCredentialException>,
     ) {
         if (cancellationReviewer(cancellationSignal)) {
             return
@@ -138,7 +140,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
         request: CreateCredentialRequest,
         cancellationSignal: CancellationSignal?,
         executor: Executor,
-        callback: CredentialManagerCallback<CreateCredentialResponse, CreateCredentialException>
+        callback: CredentialManagerCallback<CreateCredentialResponse, CreateCredentialException>,
     ) {
         if (cancellationReviewer(cancellationSignal)) {
             return
@@ -149,7 +151,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
                     .invokePlayServices(request, callback, executor, cancellationSignal)
             }
             is CreatePublicKeyCredentialRequest -> {
-                if (request.isConditionalCreateRequest) {
+                if (request.isConditional) {
                     CreatePublicKeyCredentialController.getInstance(context)
                         .invokePlayServices(request, callback, executor, cancellationSignal)
                 } else {
@@ -174,6 +176,23 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
                 CredentialProviderCreateRestoreCredentialController(context)
                     .invokePlayServices(request, callback, executor, cancellationSignal)
             }
+            is CreateDigitalCredentialRequest -> {
+                if (Build.VERSION.SDK_INT >= 23) {
+                    CreateDigitalCredentialController(context)
+                        .invokePlayServices(request, callback, executor, cancellationSignal)
+                } else {
+                    cancellationReviewerWithCallback(cancellationSignal) {
+                        executor.execute {
+                            callback.onError(
+                                CreateCredentialProviderConfigurationException(
+                                    "this feature requires the minimum API level to be 23"
+                                )
+                            )
+                        }
+                    }
+                    return
+                }
+            }
             else -> {
                 throw UnsupportedOperationException(
                     "Create Credential request is unsupported, not password or " +
@@ -196,7 +215,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
                 TAG,
                 "Connection with Google Play Services was not " +
                     "successful. Connection result is: " +
-                    connectionResult.toString()
+                    connectionResult.toString(),
             )
         }
         return isSuccessful
@@ -209,7 +228,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
     private fun isGooglePlayServicesAvailable(context: Context, minApkVersion: Int): Int {
         return googleApiAvailability.isGooglePlayServicesAvailable(
             context,
-            /*minApkVersion=*/ minApkVersion
+            /*minApkVersion=*/ minApkVersion,
         )
     }
 
@@ -217,7 +236,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
         request: ClearCredentialStateRequest,
         cancellationSignal: CancellationSignal?,
         executor: Executor,
-        callback: CredentialManagerCallback<Void?, ClearCredentialException>
+        callback: CredentialManagerCallback<Void?, ClearCredentialException>,
     ) {
         if (cancellationReviewer(cancellationSignal)) {
             return
@@ -276,7 +295,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
                         {
                             Log.i(TAG, "During clear credential, signed out successfully!")
                             executor.execute { callback.onResult(null) }
-                        }
+                        },
                     )
                 }
                 .addOnFailureListener { e ->
@@ -288,7 +307,7 @@ class CredentialProviderPlayServicesImpl(private val context: Context) : Credent
                                 executor.execute {
                                     callback.onError(ClearCredentialUnknownException(e.message))
                                 }
-                            }
+                            },
                         )
                     }
                 }

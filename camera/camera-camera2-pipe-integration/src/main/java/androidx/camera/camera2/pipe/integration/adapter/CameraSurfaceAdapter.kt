@@ -45,7 +45,7 @@ import androidx.camera.core.impl.UseCaseConfig
 public class CameraSurfaceAdapter(
     context: Context,
     cameraComponent: Any?,
-    availableCameraIds: Set<String>
+    availableCameraIds: Set<String>,
 ) : CameraDeviceSurfaceManager {
     private val component = cameraComponent as CameraAppComponent
     private val supportedSurfaceCombinationMap =
@@ -60,7 +60,7 @@ public class CameraSurfaceAdapter(
     /** Prepare supportedSurfaceCombinationMap for surface adapter. */
     private fun initSupportedSurfaceCombinationMap(
         context: Context,
-        availableCameraIds: Set<String>
+        availableCameraIds: Set<String>,
     ) {
         for (cameraId in availableCameraIds) {
             try {
@@ -73,14 +73,14 @@ public class CameraSurfaceAdapter(
                         cameraMetadata,
                         StreamConfigurationMapCompat(
                             streamConfigurationMap,
-                            OutputSizesCorrector(cameraMetadata, streamConfigurationMap)
-                        )
+                            OutputSizesCorrector(cameraMetadata, streamConfigurationMap),
+                        ),
                     )
                 supportedSurfaceCombinationMap[cameraId] =
                     SupportedSurfaceCombination(
                         context,
                         cameraMetadata,
-                        CameraModule.provideEncoderProfilesProvider(cameraId, cameraQuirks)
+                        CameraModule.provideEncoderProfilesProvider(cameraId, cameraQuirks),
                     )
             } catch (exception: DoNotDisturbException) {
                 Log.error {
@@ -104,14 +104,14 @@ public class CameraSurfaceAdapter(
         cameraMode: Int,
         cameraId: String,
         imageFormat: Int,
-        size: Size
+        size: Size,
     ): SurfaceConfig {
         checkIfSupportedCombinationExist(cameraId)
 
         return supportedSurfaceCombinationMap[cameraId]!!.transformSurfaceConfig(
             cameraMode,
             imageFormat,
-            size
+            size,
         )
     }
 
@@ -146,7 +146,8 @@ public class CameraSurfaceAdapter(
         existingSurfaces: List<AttachedSurfaceInfo>,
         newUseCaseConfigsSupportedSizeMap: Map<UseCaseConfig<*>, List<Size>>,
         isPreviewStabilizationOn: Boolean,
-        hasVideoCapture: Boolean
+        hasVideoCapture: Boolean,
+        allowFeatureCombinationResolutions: Boolean,
     ): Pair<Map<UseCaseConfig<*>, StreamSpec>, Map<AttachedSurfaceInfo, StreamSpec>> {
 
         if (!checkIfSupportedCombinationExist(cameraId)) {
@@ -160,7 +161,8 @@ public class CameraSurfaceAdapter(
             existingSurfaces,
             newUseCaseConfigsSupportedSizeMap,
             isPreviewStabilizationOn,
-            hasVideoCapture
+            hasVideoCapture,
+            allowFeatureCombinationResolutions,
         )
     }
 }

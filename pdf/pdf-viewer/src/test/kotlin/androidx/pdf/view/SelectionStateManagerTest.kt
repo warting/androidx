@@ -19,15 +19,16 @@ package androidx.pdf.view
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
+import android.util.SparseArray
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import androidx.pdf.PdfDocument
 import androidx.pdf.content.PageSelection
 import androidx.pdf.content.PdfPageTextContent
 import androidx.pdf.content.SelectionBoundary
-import androidx.test.filters.SmallTest
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -43,11 +44,11 @@ import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
 import org.robolectric.RobolectricTestRunner
 
-@SmallTest
 @RunWith(RobolectricTestRunner::class)
 class SelectionStateManagerTest {
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
+    private val errorFlow = MutableSharedFlow<Throwable>()
 
     // TODO(b/385407478) replace with FakePdfDocument when we're able to share it more broadly
     private val pdfDocument =
@@ -61,20 +62,7 @@ class SelectionStateManagerTest {
         }
 
     /** It's simpler to set the selection manually for tests concerning the draggable handles */
-    private val initialSelectionForDragging =
-        SelectionModel(
-            TextSelection(
-                "This is the text that's selected",
-                listOf(
-                    PdfRect(pageNum = 0, RectF(150F, 150F, 190F, 160F)),
-                    PdfRect(pageNum = 0, RectF(10F, 170F, 50F, 180F)),
-                )
-            ),
-            startBoundary =
-                UiSelectionBoundary(PdfPoint(pageNum = 0, PointF(150F, 160F)), isRtl = true),
-            endBoundary =
-                UiSelectionBoundary(PdfPoint(pageNum = 0, PointF(50F, 180F)), isRtl = true),
-        )
+    private val initialSelectionForDragging = getInitialSelectionForDragging()
 
     private lateinit var selectionStateManager: SelectionStateManager
 
@@ -84,7 +72,9 @@ class SelectionStateManagerTest {
             SelectionStateManager(
                 pdfDocument,
                 testScope,
-                handleTouchTargetSizePx = HANDLE_TOUCH_TARGET_PX
+                handleTouchTargetSizePx = HANDLE_TOUCH_TARGET_PX,
+                errorFlow,
+                pageMetadataLoader = null,
             )
     }
 
@@ -102,8 +92,10 @@ class SelectionStateManagerTest {
 
         val selectionModel = selectionStateManager.selectionModel.value
         assertThat(selectionModel).isNotNull()
-        assertThat(selectionModel?.selection).isInstanceOf(TextSelection::class.java)
-        val selection = requireNotNull(selectionModel?.selection as TextSelection)
+        assertThat(selectionModel?.documentSelection?.selection)
+            .isInstanceOf(TextSelection::class.java)
+        val selection =
+            requireNotNull(selectionModel?.documentSelection?.selection as TextSelection)
         assertThat(selection.bounds)
             .isEqualTo(
                 listOf(
@@ -113,8 +105,8 @@ class SelectionStateManagerTest {
                             selectionPoint.pagePoint.x,
                             selectionPoint.pagePoint.y,
                             selectionPoint.pagePoint.x,
-                            selectionPoint.pagePoint.y
-                        )
+                            selectionPoint.pagePoint.y,
+                        ),
                     )
                 )
             )
@@ -149,8 +141,10 @@ class SelectionStateManagerTest {
 
         val selectionModel = selectionStateManager.selectionModel.value
         assertThat(selectionModel).isNotNull()
-        assertThat(selectionModel?.selection).isInstanceOf(TextSelection::class.java)
-        val selection = requireNotNull(selectionModel?.selection as TextSelection)
+        assertThat(selectionModel?.documentSelection?.selection)
+            .isInstanceOf(TextSelection::class.java)
+        val selection =
+            requireNotNull(selectionModel?.documentSelection?.selection as TextSelection)
         assertThat(selection.bounds)
             .isEqualTo(
                 listOf(
@@ -160,8 +154,8 @@ class SelectionStateManagerTest {
                             selectionPoint2.pagePoint.x,
                             selectionPoint2.pagePoint.y,
                             selectionPoint2.pagePoint.x,
-                            selectionPoint2.pagePoint.y
-                        )
+                            selectionPoint2.pagePoint.y,
+                        ),
                     )
                 )
             )
@@ -219,7 +213,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_DOWN,
                     PdfPoint(pageNum = 0, PointF(0F, 0F)),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isFalse()
@@ -239,7 +233,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_DOWN,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
@@ -259,7 +253,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_DOWN,
                     PdfPoint(pageNum = 0, insideEndHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
@@ -277,7 +271,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_DOWN,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
@@ -289,14 +283,14 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_MOVE,
                     PdfPoint(pageNum = 0, newStartPosition),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
 
         // Make sure the selection is updated appropriately
         testDispatcher.scheduler.runCurrent()
-        val selection = selectionStateManager.selectionModel.value?.selection
+        val selection = selectionStateManager.selectionModel.value?.documentSelection?.selection
         assertThat(selection).isInstanceOf(TextSelection::class.java)
         val expectedStartLoc = initialSelectionForDragging.endBoundary.location.pagePoint
         val expectedEndLoc =
@@ -319,7 +313,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_DOWN,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
@@ -330,7 +324,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_MOVE,
                     location = null,
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
@@ -351,7 +345,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_MOVE,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isFalse()
@@ -372,7 +366,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_UP,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isFalse()
@@ -392,7 +386,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_DOWN,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
@@ -402,7 +396,7 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_UP,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isTrue()
@@ -412,10 +406,113 @@ class SelectionStateManagerTest {
                 selectionStateManager.maybeDragSelectionHandle(
                     MotionEvent.ACTION_MOVE,
                     PdfPoint(pageNum = 0, insideStartHandle),
-                    currentZoom = 2.0F
+                    currentZoom = 2.0F,
                 )
             )
             .isFalse()
+    }
+
+    @Test
+    fun maybeDragHandle_actionMove_extendSelectionDownwards() {
+        selectionStateManager._selectionModel.update { initialSelectionForDragging }
+        // "Grab" the start handle
+        val insideStartHandle =
+            PointF(initialSelectionForDragging.startBoundary.location.pagePoint).apply {
+                offset(-HANDLE_TOUCH_TARGET_PX / 4.0F, HANDLE_TOUCH_TARGET_PX / 4.0F)
+            }
+
+        assertThat(
+                selectionStateManager.maybeDragSelectionHandle(
+                    MotionEvent.ACTION_DOWN,
+                    PdfPoint(pageNum = 0, insideStartHandle),
+                    currentZoom = 2.0F,
+                )
+            )
+            .isTrue()
+
+        val value =
+            selectionStateManager.maybeDragSelectionHandle(
+                MotionEvent.ACTION_MOVE,
+                PdfPoint(pageNum = 2, initialSelectionForDragging.endBoundary.location.pagePoint),
+                currentZoom = 2.0F,
+            )
+        assertThat(value).isTrue()
+
+        // Make sure the selection is updated appropriately
+        testDispatcher.scheduler.runCurrent()
+        val selection = selectionStateManager.selectionModel.value?.documentSelection?.selection
+
+        assertThat(selection).isInstanceOf(TextSelection::class.java)
+        val expectedStartLoc = initialSelectionForDragging.startBoundary.location.pagePoint
+        val expectedEndLoc = initialSelectionForDragging.endBoundary.location.pagePoint
+
+        val expectedText =
+            "This is all the text between $expectedStartLoc and PointF(0.0, 0.0) This is all the text between PointF(0.0, 0.0) and $expectedEndLoc"
+
+        assertThat((selection as TextSelection).text).isEqualTo(expectedText)
+    }
+
+    @Test
+    fun maybeDragHandle_actionMove_extendSelectionUpwards() {
+        selectionStateManager._selectionModel.update { getInitialSelectionForDragging(1) }
+        // "Grab" the start handle
+        val insideStartHandle =
+            PointF(initialSelectionForDragging.startBoundary.location.pagePoint).apply {
+                offset(-HANDLE_TOUCH_TARGET_PX / 4.0F, HANDLE_TOUCH_TARGET_PX / 4.0F)
+            }
+
+        assertThat(
+                selectionStateManager.maybeDragSelectionHandle(
+                    MotionEvent.ACTION_DOWN,
+                    PdfPoint(pageNum = 1, insideStartHandle),
+                    currentZoom = 2.0F,
+                )
+            )
+            .isTrue()
+
+        val value =
+            selectionStateManager.maybeDragSelectionHandle(
+                MotionEvent.ACTION_MOVE,
+                PdfPoint(pageNum = 0, initialSelectionForDragging.startBoundary.location.pagePoint),
+                currentZoom = 2.0F,
+            )
+        assertThat(value).isTrue()
+
+        // Make sure the selection is updated appropriately
+        testDispatcher.scheduler.runCurrent()
+        val selection = selectionStateManager.selectionModel.value?.documentSelection?.selection
+
+        assertThat(selection).isInstanceOf(TextSelection::class.java)
+        val expectedStartLoc = initialSelectionForDragging.startBoundary.location.pagePoint
+        val expectedEndLoc = initialSelectionForDragging.endBoundary.location.pagePoint
+
+        val expectedText =
+            "This is all the text between $expectedStartLoc and PointF(0.0, 0.0) This is all the text between PointF(0.0, 0.0) and $expectedEndLoc"
+
+        assertThat((selection as TextSelection).text).isEqualTo(expectedText)
+    }
+
+    private fun getInitialSelectionForDragging(pageNumber: Int = 0): SelectionModel {
+        return SelectionModel(
+            DocumentSelection(
+                SparseArray<List<Selection>>().apply {
+                    set(
+                        pageNumber,
+                        listOf(
+                            TextSelection(
+                                "This is the text that's selected",
+                                listOf(
+                                    PdfRect(pageNum = pageNumber, RectF(150F, 150F, 190F, 160F)),
+                                    PdfRect(pageNum = pageNumber, RectF(10F, 170F, 50F, 180F)),
+                                ),
+                            )
+                        ),
+                    )
+                }
+            ),
+            UiSelectionBoundary(PdfPoint(pageNum = pageNumber, PointF(150F, 160F)), isRtl = true),
+            UiSelectionBoundary(PdfPoint(pageNum = pageNumber, PointF(50F, 180F)), isRtl = true),
+        )
     }
 
     private fun pageSelectionFor(page: Int, start: PointF, end: PointF): PageSelection {
@@ -430,12 +527,12 @@ class SelectionStateManagerTest {
                             minOf(start.x, end.x),
                             minOf(start.y, end.y),
                             maxOf(start.x, end.x),
-                            maxOf(start.y, end.y)
+                            maxOf(start.y, end.y),
                         )
                     ),
-                    text = "This is all the text between $start and $end"
+                    text = "This is all the text between $start and $end",
                 )
-            )
+            ),
         )
     }
 }

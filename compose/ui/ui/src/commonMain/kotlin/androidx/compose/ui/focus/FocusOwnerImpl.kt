@@ -36,6 +36,7 @@ import androidx.compose.ui.focus.FocusStateImpl.ActiveParent
 import androidx.compose.ui.focus.FocusStateImpl.Captured
 import androidx.compose.ui.focus.FocusStateImpl.Inactive
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.indirect.IndirectTouchEvent
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType.Companion.KeyDown
 import androidx.compose.ui.input.key.KeyEventType.Companion.KeyUp
@@ -58,8 +59,6 @@ import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachReversed
 import androidx.compose.ui.util.trace
 
-private const val Warning = "FocusRelatedWarning"
-
 /**
  * The focus manager is used by different [Owner][androidx.compose.ui.node.Owner] implementations to
  * control focus.
@@ -71,7 +70,7 @@ internal class FocusOwnerImpl(
     private val onMoveFocusInterop: (focusDirection: FocusDirection) -> Boolean,
     private val onClearFocusForOwner: () -> Unit,
     private val onFocusRectInterop: () -> Rect?,
-    private val onLayoutDirection: (() -> LayoutDirection)
+    private val onLayoutDirection: (() -> LayoutDirection),
 ) : FocusOwner {
 
     // The root focus target is not focusable, and acts like a focus group.
@@ -82,7 +81,7 @@ internal class FocusOwnerImpl(
             onRequestApplyChangesListener,
             ::invalidateOwnerFocusState,
             ::rootState,
-            ::activeFocusTargetNode
+            ::activeFocusTargetNode,
         )
 
     override val focusTransactionManager: FocusTransactionManager = FocusTransactionManager()
@@ -119,7 +118,7 @@ internal class FocusOwnerImpl(
      */
     override fun requestFocusForOwner(
         focusDirection: FocusDirection?,
-        previouslyFocusedRect: Rect?
+        previouslyFocusedRect: Rect?,
     ): Boolean = onRequestFocusForOwner(focusDirection, previouslyFocusedRect)
 
     /**
@@ -181,7 +180,7 @@ internal class FocusOwnerImpl(
         force: Boolean,
         refreshFocusEvents: Boolean,
         clearOwnerFocus: Boolean,
-        focusDirection: FocusDirection
+        focusDirection: FocusDirection,
     ): Boolean {
         val clearedFocusSuccessfully =
             if (@OptIn(ExperimentalComposeUiApi::class) ComposeUiFlags.isTrackFocusEnabled) {
@@ -234,7 +233,7 @@ internal class FocusOwnerImpl(
         if (refreshFocusEvents && previousActiveFocusTargetNode != null) {
             previousActiveFocusTargetNode.dispatchFocusCallbacks(
                 if (isFocusCaptured) Captured else Active,
-                Inactive
+                Inactive,
             )
             previousActiveFocusTargetNode.visitAncestors(Nodes.FocusTarget) {
                 it.dispatchFocusCallbacks(ActiveParent, Inactive)
@@ -287,7 +286,7 @@ internal class FocusOwnerImpl(
                     force = false,
                     refreshFocusEvents = true,
                     clearOwnerFocus = false,
-                    focusDirection = focusDirection
+                    focusDirection = focusDirection,
                 )
             return clearFocus && takeFocus(focusDirection, previouslyFocusedRect = null)
         }
@@ -302,7 +301,7 @@ internal class FocusOwnerImpl(
     override fun focusSearch(
         focusDirection: FocusDirection,
         focusedRect: Rect?,
-        onFound: (FocusTargetNode) -> Boolean
+        onFound: (FocusTargetNode) -> Boolean,
     ): Boolean? {
         val source =
             findFocusTargetNode()?.also {
@@ -331,7 +330,7 @@ internal class FocusOwnerImpl(
         trace("FocusOwnerImpl:dispatchKeyEvent") {
             if (focusInvalidationManager.hasPendingInvalidation()) {
                 // Ignoring this to unblock b/346370327.
-                println("$Warning: Dispatching key event while focus system is invalidated.")
+                println("$FocusWarning: Dispatching key event while focus system is invalidated.")
                 return false
             }
             if (!validateKeyEvent(keyEvent)) return false
@@ -346,7 +345,7 @@ internal class FocusOwnerImpl(
                 type = Nodes.KeyInput,
                 onPreVisit = { if (it.onPreKeyEvent(keyEvent)) return true },
                 onVisit = { if (onFocusedItem.invoke()) return true },
-                onPostVisit = { if (it.onKeyEvent(keyEvent)) return true }
+                onPostVisit = { if (it.onKeyEvent(keyEvent)) return true },
             )
             return false
         }
@@ -356,7 +355,7 @@ internal class FocusOwnerImpl(
         if (focusInvalidationManager.hasPendingInvalidation()) {
             // Ignoring this to unblock b/346370327.
             println(
-                "$Warning: Dispatching intercepted soft keyboard event while the focus system" +
+                "$FocusWarning: Dispatching intercepted soft keyboard event while the focus system" +
                     " is invalidated."
             )
             return false
@@ -371,7 +370,7 @@ internal class FocusOwnerImpl(
             type = Nodes.SoftKeyboardKeyInput,
             onPreVisit = { if (it.onPreInterceptKeyBeforeSoftKeyboard(keyEvent)) return true },
             onVisit = { /* TODO(b/320510084): dispatch soft keyboard events to embedded views. */ },
-            onPostVisit = { if (it.onInterceptKeyBeforeSoftKeyboard(keyEvent)) return true }
+            onPostVisit = { if (it.onInterceptKeyBeforeSoftKeyboard(keyEvent)) return true },
         )
         return false
     }
@@ -379,11 +378,13 @@ internal class FocusOwnerImpl(
     /** Dispatches a rotary scroll event through the compose hierarchy. */
     override fun dispatchRotaryEvent(
         event: RotaryScrollEvent,
-        onFocusedItem: () -> Boolean
+        onFocusedItem: () -> Boolean,
     ): Boolean {
         if (focusInvalidationManager.hasPendingInvalidation()) {
             // Ignoring this to unblock b/379289347.
-            println("$Warning: Dispatching rotary event while the focus system is invalidated.")
+            println(
+                "$FocusWarning: Dispatching rotary event while the focus system is invalidated."
+            )
             return false
         }
 
@@ -394,7 +395,32 @@ internal class FocusOwnerImpl(
             type = Nodes.RotaryInput,
             onPreVisit = { if (it.onPreRotaryScrollEvent(event)) return true },
             onVisit = { if (onFocusedItem()) return true },
-            onPostVisit = { if (it.onRotaryScrollEvent(event)) return true }
+            onPostVisit = { if (it.onRotaryScrollEvent(event)) return true },
+        )
+
+        return false
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    override fun dispatchIndirectTouchEvent(
+        event: IndirectTouchEvent,
+        onFocusedItem: () -> Boolean,
+    ): Boolean {
+        if (focusInvalidationManager.hasPendingInvalidation()) {
+            // Ignoring this to unblock b/379289347.
+            println(
+                "$FocusWarning: Dispatching indirect touch event while the focus system is invalidated."
+            )
+            return false
+        }
+
+        val focusedIndirectTouchInputNode =
+            findFocusTargetNode()?.nearestAncestorIncludingSelf(Nodes.IndirectTouchInput)
+        focusedIndirectTouchInputNode?.traverseAncestorsIncludingSelf(
+            type = Nodes.IndirectTouchInput,
+            onPreVisit = { if (it.onPreIndirectTouchEvent(event)) return true },
+            onVisit = { if (onFocusedItem()) return true },
+            onPostVisit = { if (it.onIndirectTouchEvent(event)) return true },
         )
 
         return false
@@ -435,7 +461,7 @@ internal class FocusOwnerImpl(
         type: NodeKind<T>,
         onPreVisit: (T) -> Unit,
         onVisit: () -> Unit,
-        onPostVisit: (T) -> Unit
+        onPostVisit: (T) -> Unit,
     ) {
         val ancestors = ancestors(type)
         ancestors?.fastForEachReversed(onPreVisit)

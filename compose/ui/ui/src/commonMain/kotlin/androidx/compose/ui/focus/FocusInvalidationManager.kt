@@ -37,7 +37,7 @@ internal class FocusInvalidationManager(
     private val onRequestApplyChangesListener: (() -> Unit) -> Unit,
     private val invalidateOwnerFocusState: () -> Unit,
     private val rootFocusStateFetcher: () -> FocusState,
-    private val activeFocusTargetNodeFetcher: () -> FocusTargetNode?
+    private val activeFocusTargetNodeFetcher: () -> FocusTargetNode?,
 ) {
     private val focusTargetNodes = mutableScatterSetOf<FocusTargetNode>()
     private val focusEventNodes = mutableScatterSetOf<FocusEventModifierNode>()
@@ -127,17 +127,16 @@ internal class FocusInvalidationManager(
                 activeFocusTargetNode.invalidateFocus()
             }
 
-            var hasVisitedAncestorTarget = false
+            val activeFocusTargetNodeState = activeFocusTargetNode.focusState
+            var traversedFocusTargetCount = 0
             activeFocusTargetNode.visitAncestors(
                 Nodes.FocusTarget or Nodes.FocusEvent,
-                includeSelf = true
+                includeSelf = true,
             ) {
                 // Keep track of whether we traversed past the first target node ancestor of the
                 // active focus target node, so that all the subsequent event nodes are sent the
                 // ActiveParent state rather than Active/Captured.
-                if (it is FocusTargetNode && it !== activeFocusTargetNode) {
-                    hasVisitedAncestorTarget = true
-                }
+                if (it.isKind(Nodes.FocusTarget)) traversedFocusTargetCount++
 
                 // Don't send events to event nodes that were not invalidated.
                 if (it !is FocusEventModifierNode || !focusEventNodes.contains(it)) {
@@ -147,10 +146,10 @@ internal class FocusInvalidationManager(
                 // Event nodes that are between the active focus target and the first ancestor
                 // target receive the Active/Captured state, while the event nodes further up
                 // receive the ActiveParent state.
-                if (hasVisitedAncestorTarget) {
-                    it.onFocusEvent(ActiveParent)
+                if (traversedFocusTargetCount <= 1) {
+                    it.onFocusEvent(activeFocusTargetNodeState)
                 } else {
-                    it.onFocusEvent(activeFocusTargetNode.focusState)
+                    it.onFocusEvent(ActiveParent)
                 }
 
                 // Remove the event node from the list of invalidated nodes, so that we only send a

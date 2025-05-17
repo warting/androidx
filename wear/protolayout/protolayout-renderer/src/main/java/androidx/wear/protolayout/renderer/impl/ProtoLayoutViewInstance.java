@@ -31,6 +31,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import android.content.Context;
 import android.content.res.Resources;
 import android.util.Log;
+import android.util.Printer;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -147,7 +148,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
 
     private final boolean mAdaptiveUpdateRatesEnabled;
     private boolean mWasFullyVisibleBefore;
-    private final boolean mAllowLayoutChangingBindsWithoutDefault;
 
     /** This keeps track of the current inflated parent for the layout. */
     private @Nullable ViewGroup mInflateParent = null;
@@ -202,7 +202,7 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
 
     private boolean mCanReattachWithoutRendering = false;
 
-    private static final int DYNAMIC_NODES_MAX_COUNT = 200;
+    private static final int DYNAMIC_NODES_MAX_COUNT = 400;
 
     /**
      * This is used to provide a {@link ResourceResolvers} object to the {@link
@@ -376,7 +376,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
         private final boolean mUpdatesEnabled;
         private final boolean mAdaptiveUpdateRatesEnabled;
         private final boolean mIsViewFullyVisible;
-        private final boolean mAllowLayoutChangingBindsWithoutDefault;
 
         Config(
                 @NonNull Context uiContext,
@@ -396,8 +395,7 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                 int runningAnimationsLimit,
                 boolean updatesEnabled,
                 boolean adaptiveUpdateRatesEnabled,
-                boolean isViewFullyVisible,
-                boolean allowLayoutChangingBindsWithoutDefault) {
+                boolean isViewFullyVisible) {
             this.mUiContext = uiContext;
             this.mRendererResources = rendererResources;
             this.mResourceResolversProvider = resourceResolversProvider;
@@ -416,7 +414,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
             this.mUpdatesEnabled = updatesEnabled;
             this.mAdaptiveUpdateRatesEnabled = adaptiveUpdateRatesEnabled;
             this.mIsViewFullyVisible = isViewFullyVisible;
-            this.mAllowLayoutChangingBindsWithoutDefault = allowLayoutChangingBindsWithoutDefault;
         }
 
         /** Returns UI Context used for interacting with the UI. */
@@ -520,18 +517,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
             return mIsViewFullyVisible;
         }
 
-        /**
-         * Sets whether a "layout changing" data bind can be applied without the "value_for_layout"
-         * field being filled in, or being set to zero / empty. Defaults to false.
-         *
-         * <p>This is to support legacy apps which use layout-changing data bind before the full
-         * support was built.
-         */
-        @RestrictTo(Scope.LIBRARY)
-        public boolean getAllowLayoutChangingBindsWithoutDefault() {
-            return mAllowLayoutChangingBindsWithoutDefault;
-        }
-
         /** Builder for {@link Config}. */
         @RestrictTo(Scope.LIBRARY_GROUP_PREFIX)
         public static final class Builder {
@@ -557,7 +542,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
             private boolean mUpdatesEnabled = true;
             private boolean mAdaptiveUpdateRatesEnabled = true;
             private boolean mIsViewFullyVisible = true;
-            private boolean mAllowLayoutChangingBindsWithoutDefault = false;
 
             /**
              * Builder for the {@link Config} class.
@@ -695,22 +679,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                 return this;
             }
 
-            /**
-             * Sets whether a "layout changing" data bind can be applied without the
-             * "value_for_layout" field being filled in, or being set to zero / empty. Defaults to
-             * false.
-             *
-             * <p>This is to support legacy apps which use layout-changing data bind before the full
-             * support was built.
-             */
-            @RestrictTo(Scope.LIBRARY)
-            public @NonNull Builder setAllowLayoutChangingBindsWithoutDefault(
-                    boolean allowLayoutChangingBindsWithoutDefault) {
-                this.mAllowLayoutChangingBindsWithoutDefault =
-                        allowLayoutChangingBindsWithoutDefault;
-                return this;
-            }
-
             /** Builds {@link Config} object. */
             public @NonNull Config build() {
                 LoadActionListener loadActionListener = mLoadActionListener;
@@ -757,8 +725,7 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                         mRunningAnimationsLimit,
                         mUpdatesEnabled,
                         mAdaptiveUpdateRatesEnabled,
-                        mIsViewFullyVisible,
-                        mAllowLayoutChangingBindsWithoutDefault);
+                        mIsViewFullyVisible);
             }
         }
     }
@@ -777,8 +744,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
         this.mLoggingUtils = config.getLoggingUtils();
         this.mAdaptiveUpdateRatesEnabled = config.getAdaptiveUpdateRatesEnabled();
         this.mWasFullyVisibleBefore = false;
-        this.mAllowLayoutChangingBindsWithoutDefault =
-                config.getAllowLayoutChangingBindsWithoutDefault();
         this.mProviderStatsLogger = config.getProviderStatsLogger();
 
         StateStore stateStore = config.getStateStore();
@@ -865,8 +830,6 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                         .setProtoLayoutTheme(mProtoLayoutTheme)
                         .setAnimationEnabled(mAnimationEnabled)
                         .setClickableIdExtra(mClickableIdExtra)
-                        .setAllowLayoutChangingBindsWithoutDefault(
-                                mAllowLayoutChangingBindsWithoutDefault)
                         .setInflaterStatsLogger(inflaterStatsLogger)
                         .setApplyFontVariantBodyAsDefault(true);
         if (mDataPipeline != null) {
@@ -939,14 +902,21 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
     }
 
     @UiThread
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    @RestrictTo(Scope.LIBRARY_GROUP)
     public @NonNull ListenableFuture<RenderingArtifact> renderLayoutAndAttach(
             @NonNull Layout layout,
             ResourceProto.@NonNull Resources resources,
             @NonNull ViewGroup attachParent) {
-
         return renderAndAttach(
                 layout, resources, attachParent, mProviderStatsLogger.createInflaterStatsLogger());
+    }
+
+    /** Dumps the state of this tile view instance. */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    @UiThread
+    public void dump(@NonNull Printer printer) {
+        printer.println(
+                "attachedParent: " + Integer.toHexString(System.identityHashCode(mAttachParent)));
     }
 
     /**
@@ -1060,7 +1030,7 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                 ProtoLayoutInflater.clearRenderedMetadata(checkNotNull(prevInflateParent));
             }
 
-                        RenderedMetadata prevRenderedMetadata =
+            RenderedMetadata prevRenderedMetadata =
                     prevInflateParent != null
                             ? ProtoLayoutInflater.getRenderedMetadata(prevInflateParent)
                             : null;
@@ -1339,6 +1309,15 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                 mDataPipeline.setFullyVisible(false);
                 mWasFullyVisibleBefore = false;
             }
+        }
+    }
+
+    /** Sets whether a new layout is pending. This is used to update the data pipeline. */
+    @RestrictTo(Scope.LIBRARY)
+    @UiThread
+    public void setLayoutUpdatePending(boolean isLayoutUpdatePending) {
+        if (mDataPipeline != null) {
+            mDataPipeline.setLayoutUpdatePending(isLayoutUpdatePending);
         }
     }
 

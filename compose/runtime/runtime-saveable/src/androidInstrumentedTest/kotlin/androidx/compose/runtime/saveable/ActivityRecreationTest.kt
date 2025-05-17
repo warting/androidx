@@ -304,7 +304,7 @@ class RecreationTest3Activity : BaseRestorableActivity() {
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
+                1f,
             )
         val child1 = ComposeView(this)
         child1.id = R.id.child1
@@ -316,11 +316,11 @@ class RecreationTest3Activity : BaseRestorableActivity() {
 
         child1.setContent {
             arrayOf<Any?>()
-            array1 = rememberSaveable(key = "key") { intArrayOf(0) }
+            array1 = rememberSaveable { intArrayOf(0) }
         }
         child2.setContent {
             arrayOf<Any?>()
-            array2 = rememberSaveable(key = "key") { intArrayOf(0) }
+            array2 = rememberSaveable { intArrayOf(0) }
         }
     }
 }
@@ -336,7 +336,7 @@ class RecreationTest4Activity : BaseRestorableActivity() {
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
+                1f,
             )
         val child1 = FrameLayout(this)
         child1.id = R.id.child1
@@ -420,7 +420,7 @@ val StateAsMapSaver =
         restore = {
             @Suppress("UNCHECKED_CAST")
             it["state"] as MutableState<Int>
-        }
+        },
     )
 
 class PopupsRecreationTestActivity : BaseRestorableActivity() {
@@ -475,12 +475,12 @@ class TestFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ) =
         ComposeView(requireContext()).apply {
             setContent {
                 arrayOf<Any?>()
-                array = rememberSaveable(key = "key") { intArrayOf(0) }
+                array = rememberSaveable { intArrayOf(0) }
             }
         }
 }

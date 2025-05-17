@@ -276,8 +276,27 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
         previousAttachedWindowToken = windowToken
 
-        if (shouldCreateCompositionOnAttachedToWindow) {
-            ensureCompositionCreated()
+        if (shouldCreateCompositionOnAttachedToWindow && composition == null) {
+            if (childCount > 0) {
+                // onAttachedToWindow() is called on the parent before it is called on its children.
+                // if we call ensureCompositionCreated() the composition will happen too early,
+                // before AndroidComposeView will have attached callback and get the newest
+                // owners from the hierarchy. To prevent that we should start the composition
+                // only when the child is attached as well.
+                val child = getChildAt(0)
+                val listener =
+                    object : OnAttachStateChangeListener {
+                        override fun onViewAttachedToWindow(v: View) {
+                            child.removeOnAttachStateChangeListener(this)
+                            ensureCompositionCreated()
+                        }
+
+                        override fun onViewDetachedFromWindow(v: View) {}
+                    }
+                child.addOnAttachStateChangeListener(listener)
+            } else {
+                ensureCompositionCreated()
+            }
         }
     }
 
@@ -302,7 +321,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         )
         setMeasuredDimension(
             child.measuredWidth + paddingLeft + paddingRight,
-            child.measuredHeight + paddingTop + paddingBottom
+            child.measuredHeight + paddingTop + paddingBottom,
         )
     }
 
@@ -314,14 +333,14 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         left: Int,
         top: Int,
         right: Int,
-        bottom: Int
+        bottom: Int,
     ) {
         getChildAt(0)
             ?.layout(
                 paddingLeft,
                 paddingTop,
                 right - left - paddingRight,
-                bottom - top - paddingBottom
+                bottom - top - paddingBottom,
             )
     }
 
@@ -391,7 +410,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         child: View?,
         index: Int,
         params: LayoutParams?,
-        preventRequestLayout: Boolean
+        preventRequestLayout: Boolean,
     ): Boolean {
         checkAddView()
         return super.addViewInLayout(child, index, params, preventRequestLayout)

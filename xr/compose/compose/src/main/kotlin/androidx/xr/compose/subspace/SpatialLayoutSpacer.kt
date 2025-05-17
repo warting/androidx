@@ -38,28 +38,7 @@ import androidx.xr.compose.unit.VolumeConstraints
 @SubspaceComposable
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
 public fun SpatialLayoutSpacer(modifier: SubspaceModifier = SubspaceModifier) {
-    SubspaceLayout(
-        name = defaultSpatialLayoutSpacerName(),
-        modifier = modifier,
-        measurePolicy = SpacerMeasurePolicy,
-    )
-}
-
-/**
- * A composable that represents an empty space layout. Its size can be controlled using modifiers
- * like [SubspaceModifier.width], [SubspaceModifier.height], etc.
- *
- * @param modifier Modifiers to apply to this spacer.
- * @param name The name of this SpatialLayoutSpacer element.
- */
-@Composable
-@SubspaceComposable
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-public fun SpatialLayoutSpacer(
-    modifier: SubspaceModifier = SubspaceModifier,
-    name: String = defaultSpatialLayoutSpacerName(),
-) {
-    SubspaceLayout(name = name, modifier = modifier, measurePolicy = SpacerMeasurePolicy)
+    SubspaceLayout(modifier = modifier, measurePolicy = SpacerMeasurePolicy)
 }
 
 private object SpacerMeasurePolicy : MeasurePolicy {
@@ -74,10 +53,4 @@ private object SpacerMeasurePolicy : MeasurePolicy {
             layout(width, height, depth) {}
         }
     }
-}
-
-private var spatialLayoutSpacerNamePart: Int = 0
-
-private fun defaultSpatialLayoutSpacerName(): String {
-    return "Spacer-${spatialLayoutSpacerNamePart++}"
 }

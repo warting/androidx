@@ -17,7 +17,9 @@
 package androidx.compose.foundation.text.input.internal
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.text.input.AnnotatedOutputTransformation
 import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.MutableOutputTransformationAnnotationScope
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldCharSequence
@@ -28,6 +30,8 @@ import androidx.compose.foundation.text.input.internal.IndexTransformationType.D
 import androidx.compose.foundation.text.input.internal.IndexTransformationType.Insertion
 import androidx.compose.foundation.text.input.internal.IndexTransformationType.Replacement
 import androidx.compose.foundation.text.input.internal.IndexTransformationType.Untransformed
+import androidx.compose.foundation.text.input.internal.TransformedTextFieldState.Companion.mapFromTransformed
+import androidx.compose.foundation.text.input.internal.TransformedTextFieldState.Companion.mapToTransformed
 import androidx.compose.foundation.text.input.internal.undo.TextFieldEditUndoBehavior
 import androidx.compose.foundation.text.input.setSelectionCoerced
 import androidx.compose.runtime.Stable
@@ -112,6 +116,13 @@ internal class TransformedTextFieldState(
     private val codepointTransformation: CodepointTransformation? = null,
     private val outputTransformation: OutputTransformation? = null,
 ) {
+    private val annotationScope =
+        if (outputTransformation is AnnotatedOutputTransformation) {
+            MutableOutputTransformationAnnotationScope()
+        } else {
+            null
+        }
+
     private val outputTransformedText: State<TransformedText?>? =
         // Don't allocate a derived state object if we don't need it, they're expensive.
         outputTransformation?.let { transformation ->
@@ -120,7 +131,8 @@ internal class TransformedTextFieldState(
                 calculateTransformedText(
                     untransformedValue = textFieldState.value,
                     outputTransformation = transformation,
-                    wedgeAffinity = selectionWedgeAffinity
+                    wedgeAffinity = selectionWedgeAffinity,
+                    annotationScope = annotationScope,
                 )
             }
         }
@@ -133,7 +145,7 @@ internal class TransformedTextFieldState(
                     // when ran.
                     untransformedValue = outputTransformedText?.value?.text ?: textFieldState.value,
                     codepointTransformation = transformation,
-                    wedgeAffinity = selectionWedgeAffinity
+                    wedgeAffinity = selectionWedgeAffinity,
                 )
             }
         }
@@ -224,7 +236,7 @@ internal class TransformedTextFieldState(
     fun deleteSelectedText() {
         textFieldState.editAsUser(
             inputTransformation,
-            undoBehavior = TextFieldEditUndoBehavior.NeverMerge
+            undoBehavior = TextFieldEditUndoBehavior.NeverMerge,
         ) {
             // `selection` is read from the buffer, so we don't need to transform it.
             delete(selection.min, selection.max)
@@ -241,12 +253,12 @@ internal class TransformedTextFieldState(
         newText: CharSequence,
         range: TextRange,
         undoBehavior: TextFieldEditUndoBehavior = TextFieldEditUndoBehavior.MergeIfPossible,
-        restartImeIfContentChanges: Boolean = true
+        restartImeIfContentChanges: Boolean = true,
     ) {
         textFieldState.editAsUser(
             inputTransformation = inputTransformation,
             undoBehavior = undoBehavior,
-            restartImeIfContentChanges = restartImeIfContentChanges
+            restartImeIfContentChanges = restartImeIfContentChanges,
         ) {
             val selection = mapFromTransformed(range)
             replace(selection.min, selection.max, newText)
@@ -260,12 +272,12 @@ internal class TransformedTextFieldState(
         newText: CharSequence,
         clearComposition: Boolean = false,
         undoBehavior: TextFieldEditUndoBehavior = TextFieldEditUndoBehavior.MergeIfPossible,
-        restartImeIfContentChanges: Boolean = true
+        restartImeIfContentChanges: Boolean = true,
     ) {
         textFieldState.editAsUser(
             inputTransformation = inputTransformation,
             restartImeIfContentChanges = restartImeIfContentChanges,
-            undoBehavior = undoBehavior
+            undoBehavior = undoBehavior,
         ) {
             if (clearComposition) {
                 commitComposition()
@@ -315,11 +327,11 @@ internal class TransformedTextFieldState(
      */
     inline fun editUntransformedTextAsUser(
         restartImeIfContentChanges: Boolean = true,
-        block: TextFieldBuffer.() -> Unit
+        block: TextFieldBuffer.() -> Unit,
     ) {
         textFieldState.editAsUser(
             inputTransformation = inputTransformation,
-            restartImeIfContentChanges = restartImeIfContentChanges
+            restartImeIfContentChanges = restartImeIfContentChanges,
         ) {
             block()
             updateWedgeAffinity()
@@ -444,11 +456,12 @@ internal class TransformedTextFieldState(
                             calculateTransformedText(
                                     untransformedValue = oldValue,
                                     outputTransformation = outputTransformation,
-                                    wedgeAffinity = selectionWedgeAffinity
+                                    wedgeAffinity = selectionWedgeAffinity,
+                                    annotationScope = annotationScope,
                                 )
                                 ?.text ?: oldValue,
                         newValue = visualText,
-                        restartIme = restartIme
+                        restartIme = restartIme,
                     )
                 }
             } else {
@@ -508,20 +521,36 @@ internal class TransformedTextFieldState(
         private fun calculateTransformedText(
             untransformedValue: TextFieldCharSequence,
             outputTransformation: OutputTransformation,
-            wedgeAffinity: SelectionWedgeAffinity
+            wedgeAffinity: SelectionWedgeAffinity,
+            annotationScope: MutableOutputTransformationAnnotationScope?,
         ): TransformedText? {
             val offsetMappingCalculator = OffsetMappingCalculator()
             val buffer =
                 TextFieldBuffer(
                     initialValue = untransformedValue,
-                    offsetMappingCalculator = offsetMappingCalculator
+                    offsetMappingCalculator = offsetMappingCalculator,
                 )
 
-            // This is the call to external code.
+            // This is a call to external code.
             with(outputTransformation) { buffer.transformOutput() }
 
+            val outputAnnotations =
+                if (
+                    outputTransformation is AnnotatedOutputTransformation && annotationScope != null
+                ) {
+                    annotationScope.reset(buffer)
+                    // This is another call to external code.
+                    with(outputTransformation) { annotationScope.annotateOutput() }
+                    // We need to create a new reference to this list because eventually it may
+                    // end up being committed into `TextFieldCharSequence`, then changes to it won't
+                    // trigger any restart scopes.
+                    @Suppress("ListIterator") annotationScope.annotationRangeList.toList()
+                } else {
+                    emptyList()
+                }
+
             // Avoid allocations + mapping if there weren't actually any transformations.
-            if (buffer.changes.changeCount == 0) {
+            if (buffer.changes.changeCount == 0 && outputAnnotations.isEmpty()) {
                 return null
             }
 
@@ -533,16 +562,17 @@ internal class TransformedTextFieldState(
                         mapToTransformed(
                             range = untransformedValue.selection,
                             mapping = offsetMappingCalculator,
-                            selectionWedgeAffinity = wedgeAffinity
+                            selectionWedgeAffinity = wedgeAffinity,
                         ),
                     composition =
                         untransformedValue.composition?.let {
                             mapToTransformed(
                                 range = it,
                                 mapping = offsetMappingCalculator,
-                                selectionWedgeAffinity = wedgeAffinity
+                                selectionWedgeAffinity = wedgeAffinity,
                             )
-                        }
+                        },
+                    outputAnnotations = outputAnnotations,
                 )
             return TransformedText(transformedTextWithSelection, offsetMappingCalculator)
         }
@@ -560,7 +590,7 @@ internal class TransformedTextFieldState(
         private fun calculateTransformedText(
             untransformedValue: TextFieldCharSequence,
             codepointTransformation: CodepointTransformation,
-            wedgeAffinity: SelectionWedgeAffinity
+            wedgeAffinity: SelectionWedgeAffinity,
         ): TransformedText? {
             val offsetMappingCalculator = OffsetMappingCalculator()
 
@@ -583,12 +613,12 @@ internal class TransformedTextFieldState(
                         mapToTransformed(
                             untransformedValue.selection,
                             offsetMappingCalculator,
-                            wedgeAffinity
+                            wedgeAffinity,
                         ),
                     composition =
                         untransformedValue.composition?.let {
                             mapToTransformed(it, offsetMappingCalculator, wedgeAffinity)
-                        }
+                        },
                 )
             return TransformedText(transformedTextWithSelection, offsetMappingCalculator)
         }
@@ -603,7 +633,7 @@ internal class TransformedTextFieldState(
         private fun mapToTransformed(
             range: TextRange,
             mapping: OffsetMappingCalculator,
-            selectionWedgeAffinity: SelectionWedgeAffinity? = null
+            selectionWedgeAffinity: SelectionWedgeAffinity? = null,
         ): TextRange {
             var transformedStart = mapping.mapFromSource(range.start)
             // Avoid calculating mapping again if it's going to be the same value.
@@ -655,7 +685,7 @@ internal class TransformedTextFieldState(
         @kotlin.jvm.JvmStatic
         private fun mapFromTransformed(
             range: TextRange,
-            mapping: OffsetMappingCalculator
+            mapping: OffsetMappingCalculator,
         ): TextRange {
             val untransformedStart = mapping.mapFromDest(range.start)
             // Avoid calculating mapping again if it's going to be the same value.
@@ -695,14 +725,14 @@ internal data class SelectionWedgeAffinity(
  */
 internal enum class WedgeAffinity {
     Start,
-    End
+    End,
 }
 
 internal enum class IndexTransformationType {
     Untransformed,
     Insertion,
     Replacement,
-    Deletion
+    Deletion,
 }
 
 /**
@@ -717,7 +747,7 @@ internal enum class IndexTransformationType {
  */
 internal inline fun <R> TransformedTextFieldState.getIndexTransformationType(
     transformedQueryIndex: Int,
-    onResult: (IndexTransformationType, untransformed: TextRange, retransformed: TextRange) -> R
+    onResult: (IndexTransformationType, untransformed: TextRange, retransformed: TextRange) -> R,
 ): R {
     val untransformed = mapFromTransformed(transformedQueryIndex)
     val retransformed = mapToTransformed(untransformed)

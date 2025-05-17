@@ -34,13 +34,16 @@ internal fun PlatformMetadata.toSdkMetadata(): Metadata {
         clientRecordId = clientRecordId,
         clientRecordVersion = clientRecordVersion,
         recordingMethod = recordingMethod.toSdkRecordingMethod(),
-        device = device.toSdkDevice()
+        device = device.toSdkDevice(),
     )
 }
 
-internal fun PlatformDevice.toSdkDevice(): Device {
-    @Suppress("WrongConstant") // Platform intdef and jetpack intdef match in value.
-    return Device(manufacturer = manufacturer, model = model, type = type)
+internal fun PlatformDevice.toSdkDevice(): Device? {
+    // Convert Platform default to null (Jetpack default). See b/368338084
+    if (this == PlatformDeviceBuilder().build()) {
+        return null
+    }
+    return Device(manufacturer = manufacturer, model = model, type = type.toSdkDevice())
 }
 
 internal fun PlatformDataOrigin.toSdkDataOrigin(): DataOrigin {

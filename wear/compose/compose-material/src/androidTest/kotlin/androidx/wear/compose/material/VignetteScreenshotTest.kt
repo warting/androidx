@@ -56,9 +56,9 @@ class VignetteScreenshotTest {
     @Test
     fun vignette_circular_top() = verifyScreenshot {
         DeviceConfigurationOverride(DeviceConfigurationOverride.RoundScreen(isScreenRound = true)) {
-            sampleVignette(
+            SampleVignette(
                 VignettePosition.Top,
-                modifier = Modifier.size(screenSize).clip(CircleShape)
+                modifier = Modifier.size(screenSize).clip(CircleShape),
             )
         }
     }
@@ -66,9 +66,9 @@ class VignetteScreenshotTest {
     @Test
     fun vignette_circular_bottom() = verifyScreenshot {
         DeviceConfigurationOverride(DeviceConfigurationOverride.RoundScreen(isScreenRound = true)) {
-            sampleVignette(
+            SampleVignette(
                 VignettePosition.Bottom,
-                modifier = Modifier.size(screenSize).clip(CircleShape)
+                modifier = Modifier.size(screenSize).clip(CircleShape),
             )
         }
     }
@@ -76,31 +76,31 @@ class VignetteScreenshotTest {
     @Test
     fun vignette_circular_top_and_bottom() = verifyScreenshot {
         DeviceConfigurationOverride(DeviceConfigurationOverride.RoundScreen(isScreenRound = true)) {
-            sampleVignette(
+            SampleVignette(
                 VignettePosition.TopAndBottom,
-                modifier = Modifier.size(screenSize).clip(CircleShape)
+                modifier = Modifier.size(screenSize).clip(CircleShape),
             )
         }
     }
 
-    @Test fun vignette_square_top() = verifyScreenshot { sampleVignette(VignettePosition.Top) }
+    @Test fun vignette_square_top() = verifyScreenshot { SampleVignette(VignettePosition.Top) }
 
     @Test
-    fun vignette_square_bottom() = verifyScreenshot { sampleVignette(VignettePosition.Bottom) }
+    fun vignette_square_bottom() = verifyScreenshot { SampleVignette(VignettePosition.Bottom) }
 
     @Test
     fun vignette_square_top_and_bottom() = verifyScreenshot {
-        sampleVignette(VignettePosition.TopAndBottom)
+        SampleVignette(VignettePosition.TopAndBottom)
     }
 
     @Composable
-    fun sampleVignette(
+    fun SampleVignette(
         vignettePosition: VignettePosition,
-        modifier: Modifier = Modifier.size(screenSize)
+        modifier: Modifier = Modifier.size(screenSize),
     ) {
         Scaffold(
             vignette = { Vignette(vignettePosition = vignettePosition) },
-            modifier = Modifier.testTag(TEST_TAG)
+            modifier = Modifier.testTag(TEST_TAG),
         ) {
             Box(modifier = modifier, contentAlignment = Alignment.Center) {}
         }

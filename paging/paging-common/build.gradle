@@ -23,7 +23,6 @@
  */
 
 
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -43,11 +42,6 @@ androidXMultiplatform {
     tvos()
     androidLibrary {
         namespace = "androidx.paging.common"
-        withAndroidTestOnDeviceBuilder {
-            it.compilationName = "instrumentedTest"
-            it.defaultSourceSetName = "androidInstrumentedTest"
-            it.sourceSetTreeName = "test"
-        }
     }
 
     defaultPlatform(PlatformIdentifier.JVM)
@@ -156,6 +150,5 @@ androidx {
     inceptionYear = "2017"
     description = "Android Paging-Common"
     legacyDisableKotlinStrictApiMode = true
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
     samples(project(":paging:paging-samples"))
 }

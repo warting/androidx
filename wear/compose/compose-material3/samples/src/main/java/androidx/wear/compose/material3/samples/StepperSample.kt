@@ -31,9 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.LevelIndicator
 import androidx.wear.compose.material3.Stepper
 import androidx.wear.compose.material3.StepperDefaults
+import androidx.wear.compose.material3.StepperLevelIndicator
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.rangeSemantics
 import androidx.wear.compose.material3.samples.icons.HeadphoneIcon
@@ -56,10 +56,10 @@ fun StepperSample() {
         ) {
             Text(String.format("Value: %.1f".format(value)))
         }
-        LevelIndicator(
+        StepperLevelIndicator(
             value = { value },
             valueRange = valueRange,
-            modifier = Modifier.align(Alignment.CenterStart)
+            modifier = Modifier.align(Alignment.CenterStart),
         )
     }
 }
@@ -79,10 +79,10 @@ fun StepperWithIntegerSample() {
         ) {
             Text(String.format("Value: %d".format(value)))
         }
-        LevelIndicator(
+        StepperLevelIndicator(
             value = { value },
             valueProgression = valueProgression,
-            modifier = Modifier.align(Alignment.CenterStart)
+            modifier = Modifier.align(Alignment.CenterStart),
         )
     }
 }
@@ -106,10 +106,10 @@ fun StepperWithRangeSemanticsSample() {
         ) {
             Text("Value: $value")
         }
-        LevelIndicator(
+        StepperLevelIndicator(
             value = { value },
             valueRange = valueRange,
-            modifier = Modifier.align(Alignment.CenterStart)
+            modifier = Modifier.align(Alignment.CenterStart),
         )
     }
 }
@@ -126,7 +126,7 @@ fun StepperWithButtonSample() {
             valueRange = valueRange,
             increaseIcon = { VolumeUpIcon(StepperDefaults.IconSize) },
             decreaseIcon = { VolumeDownIcon(StepperDefaults.IconSize) },
-            steps = 7
+            steps = 7,
         ) {
             Text(String.format("Value: %.1f".format(value)))
             Button(
@@ -137,10 +137,10 @@ fun StepperWithButtonSample() {
                 icon = { HeadphoneIcon(24.dp) },
             )
         }
-        LevelIndicator(
+        StepperLevelIndicator(
             value = { value },
             valueRange = valueRange,
-            modifier = Modifier.align(Alignment.CenterStart)
+            modifier = Modifier.align(Alignment.CenterStart),
         )
     }
 }

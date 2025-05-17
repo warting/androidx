@@ -56,7 +56,7 @@ internal interface TransformingLazyColumnMeasurementStrategy {
         coroutineScope: CoroutineScope,
         density: Density,
         scrollToBeConsumed: Float,
-        layout: (Int, Int, Placeable.PlacementScope.() -> Unit) -> MeasureResult
+        layout: (Int, Int, Placeable.PlacementScope.() -> Unit) -> MeasureResult,
     ): TransformingLazyColumnMeasureResult
 
     val leftContentPadding: Int
@@ -64,12 +64,12 @@ internal interface TransformingLazyColumnMeasurementStrategy {
 }
 
 internal fun MeasuredItemProvider.downwardMeasuredItem(index: Int, offset: Int, maxHeight: Int) =
-    measuredItem(index, offset) { height ->
+    measuredItem(index, offset, MeasurementDirection.DOWNWARD) { height ->
         bottomItemScrollProgress(offset = offset, height = height, containerHeight = maxHeight)
     }
 
 internal fun MeasuredItemProvider.upwardMeasuredItem(index: Int, offset: Int, maxHeight: Int) =
-    measuredItem(index, offset) { height ->
+    measuredItem(index, offset, MeasurementDirection.UPWARD) { height ->
             topItemScrollProgress(offset = offset, height = height, containerHeight = maxHeight)
         }
         .also { it.offset -= it.transformedHeight }
@@ -78,7 +78,7 @@ internal fun emptyMeasureResult(
     containerConstraints: Constraints,
     beforeContentPadding: Int,
     afterContentPadding: Int,
-    layout: (Int, Int, Placeable.PlacementScope.() -> Unit) -> MeasureResult
+    layout: (Int, Int, Placeable.PlacementScope.() -> Unit) -> MeasureResult,
 ): TransformingLazyColumnMeasureResult =
     TransformingLazyColumnMeasureResult(
         anchorItemIndex = 0,
@@ -93,5 +93,6 @@ internal fun emptyMeasureResult(
         beforeContentPadding = beforeContentPadding,
         afterContentPadding = afterContentPadding,
         itemSpacing = 0,
-        measureResult = layout(containerConstraints.maxWidth, containerConstraints.maxHeight) {}
+        childConstraints = Constraints(),
+        measureResult = layout(containerConstraints.maxWidth, containerConstraints.maxHeight) {},
     )

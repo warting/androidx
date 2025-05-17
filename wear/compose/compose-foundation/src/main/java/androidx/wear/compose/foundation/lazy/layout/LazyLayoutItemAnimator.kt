@@ -55,6 +55,8 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
 
     // stored to not allocate it every pass.
     private val movingAwayKeys = mutableScatterSetOf<Any>()
+    private val movingInFromStartBound = mutableListOf<T>()
+    private val movingInFromEndBound = mutableListOf<T>()
     private val disappearingItems = mutableListOf<LazyLayoutItemAnimation>()
     private var displayingNode: DrawModifierNode? = null
 
@@ -72,7 +74,7 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
         layoutMinOffset: Int,
         layoutMaxOffset: Int,
         coroutineScope: CoroutineScope,
-        graphicsContext: GraphicsContext
+        graphicsContext: GraphicsContext,
     ) {
         val previousKeyToIndexMap = this.keyIndexMap
         this.keyIndexMap = keyIndexMap
@@ -83,6 +85,9 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
             releaseAnimations()
             return
         }
+
+        val previousFirstVisibleIndex = firstVisibleIndex
+        firstVisibleIndex = positionedItems.firstOrNull()?.index ?: 0
 
         // Only setup animations when we have access to target value in the current pass, which
         // means lookahead pass, or regular pass when not in a lookahead scope.
@@ -118,15 +123,24 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
                         layoutMaxOffset,
                     )
                     keyToItemInfoMap[item.key] = newItemInfo
-                    initializeAnimation(
-                        item,
-                        item.getOffset(0).let { if (item.isVertical) it.y else it.x },
-                        newItemInfo
-                    )
-                    applyScrollWithoutAnimation(newItemInfo, scrollOffset)
 
-                    if (shouldAnimateAppearance) {
-                        newItemInfo.animations.forEach { it?.animateAppearance() }
+                    if (item.index != previousIndex && previousIndex != -1) {
+                        if (previousIndex < previousFirstVisibleIndex) {
+                            // the larger index will be in the start of the list
+                            movingInFromStartBound.add(item)
+                        } else {
+                            movingInFromEndBound.add(item)
+                        }
+                    } else {
+                        initializeAnimation(
+                            item,
+                            item.getOffset(0).let { if (item.isVertical) it.y else it.x },
+                            newItemInfo,
+                        )
+                        applyScrollWithoutAnimation(newItemInfo, scrollOffset)
+                        if (shouldAnimateAppearance) {
+                            newItemInfo.animations.forEach { it?.animateAppearance() }
+                        }
                     }
                 } else {
                     if (shouldSetupAnimation) {
@@ -154,6 +168,61 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
                 }
             } else {
                 removeInfoForKey(item.key)
+            }
+        }
+
+        if (shouldSetupAnimation && previousKeyToIndexMap != null) {
+            if (movingInFromStartBound.isNotEmpty()) {
+                var accumulatedOffset = 0
+                movingInFromStartBound.sortByDescending { previousKeyToIndexMap.getIndex(it.key) }
+                val startOffset =
+                    positionedItems
+                        .firstOrNull {
+                            // Find the item right below the first moving in item in previous order
+                            // as the anchor item.
+                            previousKeyToIndexMap.getIndex(it.key) ==
+                                previousKeyToIndexMap.getIndex(movingInFromStartBound[0].key) + 1
+                        }
+                        ?.let {
+                            getAnimation(it.key, 0)?.finalOffset?.run {
+                                if (it.isVertical) y else x
+                            }
+                        }
+                        // If the anchor item is removed, fallback to the layoutMinOffset.
+                        ?: layoutMinOffset
+                movingInFromStartBound.fastForEach { item ->
+                    accumulatedOffset += item.mainAxisSizeWithSpacings
+                    val mainAxisOffset = startOffset - accumulatedOffset
+                    initializeAnimation(item, mainAxisOffset)
+                    startPlacementAnimationsIfNeeded(item)
+                }
+            }
+            if (movingInFromEndBound.isNotEmpty()) {
+                var accumulatedOffset = 0
+                movingInFromEndBound.sortBy { previousKeyToIndexMap.getIndex(it.key) }
+                val startOffset =
+                    positionedItems
+                        .firstOrNull {
+                            // Find the item right above the first moving in item in previous order
+                            // as the anchor item.
+                            previousKeyToIndexMap.getIndex(it.key) ==
+                                previousKeyToIndexMap.getIndex(movingInFromEndBound[0].key) - 1
+                        }
+                        ?.let {
+                            getAnimation(it.key, 0)?.finalOffset?.run {
+                                it.mainAxisSizeWithSpacings + if (it.isVertical) y else x
+                            }
+                        }
+                        // If the anchor item is removed, fallback to the layoutMaxOffset.
+                        ?: layoutMaxOffset
+
+                movingInFromEndBound.fastForEach { item ->
+                    accumulatedOffset += item.mainAxisSizeWithSpacings
+                    val mainAxisOffset =
+                        startOffset + accumulatedOffset - item.mainAxisSizeWithSpacings
+                    initializeAnimation(item, mainAxisOffset)
+                    startPlacementAnimationsIfNeeded(item)
+                }
             }
         }
 
@@ -197,12 +266,14 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
             }
         }
 
+        movingInFromStartBound.clear()
+        movingInFromEndBound.clear()
         movingAwayKeys.clear()
     }
 
     private fun applyScrollWithoutAnimation(
         itemInfo: LazyLayoutItemAnimator<T>.ItemInfo,
-        scrollYOffset: Int
+        scrollYOffset: Int,
     ) {
         itemInfo.animations.forEach { animation ->
             if (
@@ -239,7 +310,7 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
     private fun initializeAnimation(
         item: T,
         mainAxisOffset: Int,
-        itemInfo: ItemInfo = keyToItemInfoMap[item.key]!!
+        itemInfo: ItemInfo = keyToItemInfoMap[item.key]!!,
     ) {
         val firstPlaceableOffset = item.getOffset(0)
 
@@ -314,7 +385,7 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
             graphicsContext: GraphicsContext,
             layoutMinOffset: Int,
             layoutMaxOffset: Int,
-            crossAxisOffset: Int = positionedItem.crossAxisOffset
+            crossAxisOffset: Int = positionedItem.crossAxisOffset,
         ) {
             if (!isRunningPlacement) {
                 this.layoutMinOffset = layoutMinOffset
@@ -343,12 +414,12 @@ internal class LazyLayoutItemAnimator<T : LazyLayoutMeasuredItem> {
                                     // invalidation in
                                     // order for the layer properties change to be applied:
                                     onLayerPropertyChanged = { displayingNode?.invalidateDraw() },
-                                    containerHeight = layoutMaxOffset - layoutMinOffset
+                                    containerHeight = layoutMaxOffset - layoutMinOffset,
+                                    transformedHeight = positionedItem.transformedHeight,
+                                    measuredHeight = positionedItem.measuredHeight,
+                                    measurementDirection = positionedItem.measurementDirection,
                                 )
-                                .also {
-                                    animations[index] = it
-                                    it.transformedHeight = positionedItem.mainAxisSizeWithSpacings
-                                }
+                                .also { animations[index] = it }
                     animation.fadeInSpec = specs.fadeInSpec
                     animation.placementSpec = specs.placementSpec
                     animation.fadeOutSpec = specs.fadeOutSpec

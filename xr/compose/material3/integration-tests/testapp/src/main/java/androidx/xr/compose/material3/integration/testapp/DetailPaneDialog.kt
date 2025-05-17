@@ -71,7 +71,7 @@ private fun MaterialAlertDialog() {
                     onClick = {
                         Toast.makeText(context, "Confirm button clicked", Toast.LENGTH_LONG).show()
                         showDialog.value = false
-                    },
+                    }
                 ) {
                     Text("Confirm")
                 }
@@ -84,9 +84,7 @@ private fun MaterialAlertDialog() {
 private fun XrElevatedDialog() {
     DialogWithShowButton("XR ElevatedDialog") { showDialog ->
         SpatialDialog(onDismissRequest = { showDialog.value = false }) {
-            Card(Modifier.fillMaxWidth(0.8f).fillMaxHeight(0.5f)) {
-                Text("This is an XR ElevatedDialog with a Material Card inside.")
-            }
+            Card { Text("This is an XR ElevatedDialog with a Material Card inside.") }
         }
     }
 }

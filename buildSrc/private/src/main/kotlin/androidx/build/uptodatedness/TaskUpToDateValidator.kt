@@ -221,10 +221,7 @@ abstract class TaskUpToDateValidator :
                 return true
             }
             val taskName = taskPath.substringAfterLast(":")
-            if (ALLOW_RERUNNING_TASKS.contains(taskName)) {
-                return true
-            }
-            return false
+            return ALLOW_RERUNNING_TASKS.contains(taskName)
         }
 
         private fun shouldTryRerunningTask(task: Task): Boolean {
@@ -247,7 +244,7 @@ abstract class TaskUpToDateValidator :
             val validatorProvider =
                 project.gradle.sharedServices.registerIfAbsent(
                     "TaskUpToDateValidator",
-                    TaskUpToDateValidator::class.java
+                    TaskUpToDateValidator::class.java,
                 ) { spec ->
                     spec.parameters.validate = validate
                 }

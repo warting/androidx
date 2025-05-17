@@ -37,7 +37,7 @@ internal constructor(
     /** The [WorkSpec] associated with this unit of work. */
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) val workSpec: WorkSpec,
     /** The tags associated with this unit of work. */
-    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) val tags: Set<String>
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) val tags: Set<String>,
 ) {
 
     /**
@@ -91,7 +91,7 @@ internal constructor(
         fun setBackoffCriteria(
             backoffPolicy: BackoffPolicy,
             backoffDelay: Long,
-            timeUnit: TimeUnit
+            timeUnit: TimeUnit,
         ): B {
             backoffCriteriaSet = true
             workSpec.backoffPolicy = backoffPolicy
@@ -194,6 +194,23 @@ internal constructor(
         }
 
         /**
+         * Specifies that the backoff policy (as specified via [setBackoffCriteria]) will be applied
+         * when work is interrupted by the system without the app requesting it. This might happen
+         * when the [ListenableWorker] runs longer than it should, or when constraints defined for a
+         * given [ListenableWorker] are unmet.
+         *
+         * @return The current [Builder]
+         * @see setBackoffCriteria
+         */
+        @ExperimentalWorkRequestBuilderApi
+        @Suppress("MissingGetterMatchingBuilder")
+        @SuppressWarnings("SetterReturnsThis")
+        fun setBackoffForSystemInterruptions(): B {
+            workSpec.backOffOnSystemInterruptions = true
+            return thisObject
+        }
+
+        /**
          * Specifies that the results of this work should be kept for at least the specified amount
          * of time. After this time has elapsed, the results may be pruned at the discretion of
          * WorkManager when this WorkRequest has reached a finished state (see
@@ -250,6 +267,13 @@ internal constructor(
         /**
          * Marks the [WorkRequest] as important to the user. In this case, WorkManager provides an
          * additional signal to the OS that this work is important.
+         *
+         * Note that although the execution time of this work won't be counted against your app's
+         * quota while your app is in the foreground, if the expedited work continues in the
+         * background, you are susceptible to quota. However, power management restrictions, such as
+         * Battery Saver and Doze, are less likely to affect expedited work. Because of this,
+         * expedited work is best suited for short tasks which need to start immediately and are
+         * important to the user or user-initiated.
          *
          * @param policy The [OutOfQuotaPolicy] to be used.
          */

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.util.lerp
+import androidx.wear.compose.foundation.LocalReduceMotion
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -106,10 +107,12 @@ public fun AnimatedText(
 ) {
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
+    val isReduceMotionEnabled = LocalReduceMotion.current
     val animatedTextState =
         remember(fontRegistry, layoutDirection, density) {
             AnimatedTextState(fontRegistry, layoutDirection, density)
         }
+
     // Update before composing Canvas to make sure size gets updated
     animatedTextState.updateText(text)
     Canvas(
@@ -117,11 +120,15 @@ public fun AnimatedText(
             apply { this.text = AnnotatedString(text) }
         }
     ) {
-        animatedTextState.draw(
-            drawContext.canvas.nativeCanvas,
-            contentAlignment,
-            progressFraction()
-        )
+        // Update text if ReduceMotion is enabled to make sure the new text value is used
+        if (isReduceMotionEnabled) {
+            animatedTextState.updateText(text)
+        }
+
+        // If ReduceMotion is enabled, show static text with the end font configuration.
+        val fraction = if (isReduceMotionEnabled) 1f else progressFraction()
+
+        animatedTextState.draw(drawContext.canvas.nativeCanvas, contentAlignment, fraction)
     }
 }
 
@@ -229,7 +236,7 @@ public class AnimatedTextFontRegistry(
                                 lerpFontVariationSettings(
                                     startFontVariationSettings,
                                     endFontVariationSettings,
-                                    snappedFraction
+                                    snappedFraction,
                                 )
                             )
                             .build()
@@ -308,7 +315,7 @@ public class AnimatedTextFontRegistry(
     private fun lerpFontVariationSettings(
         startFontVariationSettings: FontVariation.Settings,
         endFontVariationSettings: FontVariation.Settings,
-        fraction: Float
+        fraction: Float,
     ): Array<FontVariationAxis> {
         startFontVariationSettings.settings.indices.forEach { startIndex ->
             // Find the corresponding FontVariation.Setting in endFontVariationSettings
@@ -328,8 +335,8 @@ public class AnimatedTextFontRegistry(
                     lerp(
                         startFontVariationSettings.settings[startIndex].toVariationValue(density),
                         endSetting.toVariationValue(density),
-                        fraction
-                    )
+                        fraction,
+                    ),
                 )
         }
         return currentAxes
@@ -345,7 +352,7 @@ public class AnimatedTextFontRegistry(
                     lerpFontVariationSettings(
                         startFontVariationSettings,
                         endFontVariationSettings,
-                        1f
+                        1f,
                     )
                 )
                 .build()
@@ -368,7 +375,7 @@ public class AnimatedTextFontRegistry(
                 0f,
                 0f,
                 false, // Correct layout direction isn't needed for generating the font
-                startWorkingPaint
+                startWorkingPaint,
             )
         startFont =
             Font.Builder(glyphs.getFont(0))
@@ -376,7 +383,7 @@ public class AnimatedTextFontRegistry(
                     lerpFontVariationSettings(
                         startFontVariationSettings,
                         endFontVariationSettings,
-                        0f
+                        0f,
                     )
                 )
                 .build()
@@ -388,7 +395,7 @@ public class AnimatedTextFontRegistry(
 @RequiresApi(31)
 public object AnimatedTextDefaults {
     /** Default font cache size to be used in AnimatedTextFontRegistry. */
-    public const val CacheSize: Int = 5
+    public val CacheSize: Int = 5
 
     /**
      * Default step size used to snap progress fractions. Progress fractions will be rounded down to
@@ -396,7 +403,7 @@ public object AnimatedTextDefaults {
      *
      * 0.016f is chosen to divide a 1 second animation into 60 animation steps.
      */
-    internal const val FractionStep = 0.016f
+    internal val FractionStep = 0.016f
 }
 
 /**
@@ -442,14 +449,14 @@ internal constructor(
             contentAlignment.align(
                 IntSize(widthPx.roundToInt(), heightPx.roundToInt()),
                 intSize,
-                layoutDirection
+                layoutDirection,
             )
         canvas.translate(
             offset.x.toFloat(),
             offset.y.toFloat() +
                 heightPx / 2 +
                 lerp(startBaselineOffset, endBaselineOffset, fraction) / 2 +
-                lerp(startAscentPx, endAscentPx, fraction) / 4
+                lerp(startAscentPx, endAscentPx, fraction) / 4,
         )
         val currentFont = animatedFontRegistry.getFont(currentText, fraction)
         animatedFontRegistry.startWorkingPaint.textSize = animatedFontRegistry.getFontSize(fraction)
@@ -462,7 +469,7 @@ internal constructor(
                 0,
                 floatArrayOf(
                     lerp(startGlyphs.getGlyphX(i), endGlyphs.getGlyphX(i), fraction),
-                    lerp(startGlyphs.getGlyphY(i), endGlyphs.getGlyphY(i), fraction)
+                    lerp(startGlyphs.getGlyphY(i), endGlyphs.getGlyphY(i), fraction),
                 ),
                 0,
                 1,
@@ -546,7 +553,7 @@ internal constructor(
                 0f,
                 0f,
                 layoutDirection == LayoutDirection.Rtl,
-                animatedFontRegistry.startWorkingPaint
+                animatedFontRegistry.startWorkingPaint,
             )
         startWidthPx = startPositionedGlyphs!!.advance
         endPositionedGlyphs =
@@ -559,7 +566,7 @@ internal constructor(
                 0f,
                 0f,
                 layoutDirection == LayoutDirection.Rtl,
-                animatedFontRegistry.endWorkingPaint
+                animatedFontRegistry.endWorkingPaint,
             )
         endWidthPx = endPositionedGlyphs!!.advance
         return max(startWidthPx, endWidthPx)

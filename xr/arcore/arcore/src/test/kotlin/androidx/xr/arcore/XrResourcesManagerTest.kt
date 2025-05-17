@@ -17,11 +17,15 @@
 package androidx.xr.arcore
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.xr.runtime.internal.Earth as RuntimeEarth
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.testing.FakeRuntimeAnchor
+import androidx.xr.runtime.testing.FakeRuntimeEarth
 import androidx.xr.runtime.testing.FakeRuntimeHand
 import androidx.xr.runtime.testing.FakeRuntimePlane
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -32,9 +36,14 @@ class XrResourcesManagerTest {
 
     private lateinit var underTest: XrResourcesManager
 
+    private fun doBlocking(block: suspend CoroutineScope.() -> Unit) {
+        runBlocking(block = block)
+    }
+
     @Before
     fun setUp() {
         underTest = XrResourcesManager()
+        FakeRuntimeAnchor.anchorsCreated = 0
     }
 
     @After
@@ -123,5 +132,32 @@ class XrResourcesManagerTest {
         underTest.clear()
 
         assertThat(underTest.trackablesMap).isEmpty()
+    }
+
+    @Test
+    fun update_anchorDetached_andNotUpdated() = doBlocking {
+        val runtimeAnchor = FakeRuntimePlane().createAnchor(Pose()) as FakeRuntimeAnchor
+        check(runtimeAnchor.isAttached)
+        val anchor = Anchor(runtimeAnchor, underTest)
+        anchor.detach()
+        check(underTest.anchorsToDetachQueue.contains(anchor))
+
+        underTest.update()
+
+        assertThat(underTest.anchorsToDetachQueue).isEmpty()
+        assertThat(runtimeAnchor.isAttached).isFalse()
+    }
+
+    @Test
+    fun update_earthUpdated() = doBlocking {
+        val runtimeEarth = FakeRuntimeEarth()
+        underTest.initiateEarth(runtimeEarth)
+        underTest.update()
+        check(underTest.earth.state.value == Earth.State.Stopped)
+        runtimeEarth.state = RuntimeEarth.State.RUNNING
+
+        underTest.update()
+
+        assertThat(underTest.earth.state.value).isEqualTo(Earth.State.Running)
     }
 }

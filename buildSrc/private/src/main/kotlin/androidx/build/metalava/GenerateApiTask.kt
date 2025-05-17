@@ -80,9 +80,10 @@ internal abstract class GenerateApiTask @Inject constructor(workerExecutor: Work
 
         val levelsArgs =
             getGenerateApiLevelsArgs(
+                projectApiDirectory.asFile,
                 getPastApiFiles(),
                 currentVersion.get(),
-                apiLocation.get().apiLevelsFile
+                apiLocation.get().apiLevelsFile,
             )
 
         generateApi(
@@ -96,7 +97,7 @@ internal abstract class GenerateApiTask @Inject constructor(workerExecutor: Work
             k2UastEnabled.get(),
             kotlinSourceLevel.get(),
             workerExecutor,
-            manifestPath.orNull?.asFile?.absolutePath
+            manifestPath.orNull?.asFile?.absolutePath,
         )
     }
 }

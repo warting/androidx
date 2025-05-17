@@ -37,7 +37,7 @@ private val EmptyPersistentCompositionLocalMap: PersistentCompositionLocalMap =
  */
 @OptIn(InternalComposeApi::class, ExperimentalComposeRuntimeApi::class)
 abstract class CompositionContext internal constructor() {
-    internal abstract val compoundHashKey: Int
+    internal abstract val compositeKeyHashCode: CompositeKeyHashCode
     internal abstract val collectingParameterInformation: Boolean
     internal abstract val collectingSourceInformation: Boolean
     internal abstract val collectingCallByInformation: Boolean
@@ -53,19 +53,19 @@ abstract class CompositionContext internal constructor() {
 
     internal abstract fun composeInitial(
         composition: ControlledComposition,
-        content: @Composable () -> Unit
+        content: @Composable () -> Unit,
     )
 
     internal abstract fun composeInitialPaused(
         composition: ControlledComposition,
         shouldPause: ShouldPauseCallback,
-        content: @Composable () -> Unit
+        content: @Composable () -> Unit,
     ): ScatterSet<RecomposeScopeImpl>
 
     internal abstract fun recomposePaused(
         composition: ControlledComposition,
         shouldPause: ShouldPauseCallback,
-        invalidScopes: ScatterSet<RecomposeScopeImpl>
+        invalidScopes: ScatterSet<RecomposeScopeImpl>,
     ): ScatterSet<RecomposeScopeImpl>
 
     internal abstract fun reportPausedScope(scope: RecomposeScopeImpl)
@@ -98,7 +98,7 @@ abstract class CompositionContext internal constructor() {
     internal abstract fun movableContentStateReleased(
         reference: MovableContentStateReference,
         data: MovableContentState,
-        applier: Applier<*>
+        applier: Applier<*>,
     )
 
     internal open fun movableContentStateResolve(

@@ -67,7 +67,7 @@ abstract class CheckApiCompatibilityTask @Inject constructor(workerExecutor: Wor
             referenceApiLocation.publicApiFile,
             referenceApiLocation.restrictedApiFile,
             baselineApiLocation.publicApiFile,
-            baselineApiLocation.restrictedApiFile
+            baselineApiLocation.restrictedApiFile,
         )
     }
 
@@ -128,7 +128,6 @@ abstract class CheckApiCompatibilityTask @Inject constructor(workerExecutor: Wor
                     CompatibilityCheckError
                 },
                 "--warnings-as-errors",
-                "--format=v3"
             )
         if (baselineFile.exists()) {
             args = args + listOf("--baseline", baselineFile.toString())

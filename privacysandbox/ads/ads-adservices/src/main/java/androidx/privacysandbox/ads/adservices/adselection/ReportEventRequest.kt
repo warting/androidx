@@ -47,7 +47,9 @@ public constructor(
     val eventKey: String,
     val eventData: String,
     @ReportingDestination val reportingDestinations: Int,
-    @property:ExperimentalFeatures.Ext10OptIn val inputEvent: InputEvent? = null
+    // Note: public experimental properties are not allowed because the accessors will not appear
+    // experimental to Java clients. There is a public accessor for this property below.
+    @property:ExperimentalFeatures.Ext10OptIn private val inputEvent: InputEvent? = null,
 ) {
     init {
         require(
@@ -57,6 +59,12 @@ public constructor(
         ) {
             "Invalid reporting destinations bitfield."
         }
+    }
+
+    /** Gets the input event associated with the user interaction. */
+    @ExperimentalFeatures.Ext10OptIn
+    fun getInputEvent(): InputEvent? {
+        return inputEvent
     }
 
     /** Checks whether two [ReportImpressionRequest] objects contain the same information. */
@@ -94,8 +102,8 @@ public constructor(
         value =
             [
                 Companion.FLAG_REPORTING_DESTINATION_SELLER,
-                Companion.FLAG_REPORTING_DESTINATION_BUYER
-            ]
+                Companion.FLAG_REPORTING_DESTINATION_BUYER,
+            ],
     )
     annotation class ReportingDestination
 
@@ -130,7 +138,7 @@ public constructor(
                         request.adSelectionId,
                         request.eventKey,
                         request.eventData,
-                        request.reportingDestinations
+                        request.reportingDestinations,
                     )
                     .setInputEvent(request.inputEvent)
                     .build()
@@ -148,14 +156,14 @@ public constructor(
                 request.inputEvent?.let {
                     Log.w(
                         "ReportEventRequest",
-                        "inputEvent is ignored. Min version to use inputEvent is API 31 ext 10"
+                        "inputEvent is ignored. Min version to use inputEvent is API 31 ext 10",
                     )
                 }
                 return android.adservices.adselection.ReportEventRequest.Builder(
                         request.adSelectionId,
                         request.eventKey,
                         request.eventData,
-                        request.reportingDestinations
+                        request.reportingDestinations,
                     )
                     .build()
             }

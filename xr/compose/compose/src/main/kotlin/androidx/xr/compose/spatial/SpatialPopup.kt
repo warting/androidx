@@ -30,14 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -59,7 +58,7 @@ import androidx.xr.compose.platform.LocalSpatialCapabilities
  * @property clippingEnabled whether to allow the popup window to extend beyond the screen
  *   boundaries. Defaults to `true`. Setting this to false will allow windows to be accurately
  *   positioned.
- * @property spatialElevationLevel the resting level of the elevated popup. Defaults to
+ * @property elevation the resting level of the elevated popup. Defaults to
  *   [SpatialElevationLevel.Level3].
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
@@ -68,7 +67,7 @@ public class SpatialPopupProperties(
     @get:Suppress("GetterSetterNames") public val dismissOnBackPress: Boolean = true,
     @get:Suppress("GetterSetterNames") public val dismissOnClickOutside: Boolean = true,
     @get:Suppress("GetterSetterNames") public val clippingEnabled: Boolean = true,
-    public val spatialElevationLevel: SpatialElevationLevel = SpatialElevationLevel.Level3,
+    public val elevation: Dp = SpatialElevationLevel.Level3,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -78,7 +77,7 @@ public class SpatialPopupProperties(
         if (dismissOnBackPress != other.dismissOnBackPress) return false
         if (dismissOnClickOutside != other.dismissOnClickOutside) return false
         if (clippingEnabled != other.clippingEnabled) return false
-        if (spatialElevationLevel != other.spatialElevationLevel) return false
+        if (elevation != other.elevation) return false
 
         return true
     }
@@ -88,12 +87,12 @@ public class SpatialPopupProperties(
         result = 31 * result + dismissOnBackPress.hashCode()
         result = 31 * result + dismissOnClickOutside.hashCode()
         result = 31 * result + clippingEnabled.hashCode()
-        result = 31 * result + spatialElevationLevel.hashCode()
+        result = 31 * result + elevation.hashCode()
         return result
     }
 
     override fun toString(): String {
-        return "SpatialPopupProperties(focusable=$focusable, dismissOnBackPress=$dismissOnBackPress, dismissOnClickOutside=$dismissOnClickOutside, clippingEnabled=$clippingEnabled, spatialElevationLevel=$spatialElevationLevel)"
+        return "SpatialPopupProperties(focusable=$focusable, dismissOnBackPress=$dismissOnBackPress, dismissOnClickOutside=$dismissOnClickOutside, clippingEnabled=$clippingEnabled, spatialElevationLevel=$elevation)"
     }
 
     public fun copy(
@@ -101,14 +100,14 @@ public class SpatialPopupProperties(
         dismissOnBackPress: Boolean = this.dismissOnBackPress,
         dismissOnClickOutside: Boolean = this.dismissOnClickOutside,
         clippingEnabled: Boolean = this.clippingEnabled,
-        spatialElevationLevel: SpatialElevationLevel = this.spatialElevationLevel,
+        elevation: Dp = this.elevation,
     ): SpatialPopupProperties =
         SpatialPopupProperties(
             focusable = focusable,
             dismissOnBackPress = dismissOnBackPress,
             dismissOnClickOutside = dismissOnClickOutside,
             clippingEnabled = clippingEnabled,
-            spatialElevationLevel = spatialElevationLevel,
+            elevation = elevation,
         )
 }
 
@@ -207,7 +206,7 @@ private fun LayoutSpatialPopup(
     properties: SpatialPopupProperties = SpatialPopupProperties(),
     content: @Composable () -> Unit,
 ) {
-    val restingLevel by remember { mutableStateOf(properties.spatialElevationLevel) }
+    val restingLevel by remember { mutableStateOf(properties.elevation) }
     var contentSize: IntSize by remember { mutableStateOf(IntSize.Zero) }
     var parentLayoutDirection = LocalLayoutDirection.current
     var anchorBounds by remember { mutableStateOf(IntRect.Zero) }
@@ -245,7 +244,7 @@ private fun LayoutSpatialPopup(
     }
 
     ElevatedPanel(
-        spatialElevationLevel = restingLevel,
+        elevation = restingLevel,
         contentSize = contentSize,
         contentOffset = Offset(popupOffset.x.toFloat(), popupOffset.y.toFloat()),
     ) {
@@ -272,38 +271,6 @@ private fun LayoutSpatialPopup(
 @Composable
 private fun getWindowVisibleDisplayFrame(): Rect {
     return Rect().apply { LocalView.current.getWindowVisibleDisplayFrame(this) }
-}
-
-/**
- * Opens a popup with the given content.
- *
- * @param spatialElevationLevel the resting elevation level of the popup.
- * @param content the composable content to be displayed within the popup, along with a callback
- *   which is explicitly to be used for the [onGloballyPositioned] modifier of the Popup composable.
- */
-@Composable
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-public fun SpatialPopup(
-    spatialElevationLevel: SpatialElevationLevel = SpatialElevationLevel.Level0,
-    content: @Composable (onGloballyPositioned: (LayoutCoordinates) -> Unit) -> Unit,
-) {
-    var contentSize: IntSize by remember { mutableStateOf(IntSize.Zero) }
-    var contentOffset by remember { mutableStateOf(Offset.Zero) }
-
-    if (LocalSpatialCapabilities.current.isSpatialUiEnabled) {
-        ElevatedPanel(
-            spatialElevationLevel = spatialElevationLevel,
-            contentSize = contentSize,
-            contentOffset = contentOffset,
-        ) {
-            content { coordinates ->
-                contentSize = coordinates.size
-                contentOffset = coordinates.positionInRoot()
-            }
-        }
-    } else {
-        content {}
-    }
 }
 
 /** Calculates the position of a [Popup] on a screen. */

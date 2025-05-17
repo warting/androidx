@@ -29,6 +29,7 @@ import androidx.camera.core.DynamicRange;
 import androidx.camera.core.Logger;
 import androidx.camera.core.MirrorMode;
 import androidx.camera.core.impl.stabilization.StabilizationMode;
+import androidx.camera.core.internal.HighSpeedFpsModifier;
 import androidx.camera.core.internal.compat.workaround.SurfaceSorter;
 
 import com.google.auto.value.AutoValue;
@@ -53,7 +54,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * CaptureRequest}.
  */
 public final class SessionConfig {
-    public static final int DEFAULT_SESSION_TYPE = SessionConfiguration.SESSION_REGULAR;
+    /** Regular session type. */
+    public static final int SESSION_TYPE_REGULAR = SessionConfiguration.SESSION_REGULAR;
+    /** High-speed session type. */
+    public static final int SESSION_TYPE_HIGH_SPEED = SessionConfiguration.SESSION_HIGH_SPEED;
+    /** The default session type. */
+    public static final int DEFAULT_SESSION_TYPE = SESSION_TYPE_REGULAR;
     // Current supported session template values and the bigger index in the list, the
     // priority is higher.
     private static final List<Integer> SUPPORTED_TEMPLATE_PRIORITY = Arrays.asList(
@@ -957,6 +963,13 @@ public final class SessionConfig {
 
             List<OutputConfig> outputConfigs = new ArrayList<>(mOutputConfigs);
             mSurfaceSorter.sort(outputConfigs);
+
+            if (mSessionType == SESSION_TYPE_HIGH_SPEED) {
+                // HighSpeedFpsModifier may modify the expected frame rate range for
+                // mCaptureConfigBuilder.
+                new HighSpeedFpsModifier().modifyFpsForPreviewOnlyRepeating(outputConfigs,
+                        mCaptureConfigBuilder);
+            }
 
             ErrorListener errorListener = null;
             // Creates an error listener to notify errors to the underlying error listeners.

@@ -24,6 +24,9 @@ import android.os.IBinder
 import androidx.annotation.RestrictTo
 import androidx.pdf.PdfDocumentRemote
 import androidx.pdf.service.PdfDocumentServiceImpl
+import java.util.Queue
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -31,6 +34,11 @@ import kotlinx.coroutines.flow.update
 @RestrictTo(RestrictTo.Scope.LIBRARY)
 internal class PdfServiceConnectionImpl(override val context: Context) : PdfServiceConnection {
     private val _eventStateFlow: MutableStateFlow<ConnectionState> = MutableStateFlow(Disconnected)
+
+    override val pendingJobs: Queue<Job> = ConcurrentLinkedQueue()
+
+    private val isProcessing: Boolean
+        get() = pendingJobs.any { it.isActive }
 
     override var needsToReopenDocument: Boolean = false
 
@@ -48,6 +56,12 @@ internal class PdfServiceConnectionImpl(override val context: Context) : PdfServ
     override fun onServiceDisconnected(name: ComponentName?) {
         needsToReopenDocument = true
         _eventStateFlow.update { Disconnected }
+
+        // By this time, the system has disconnected the service. If we do not call unbind, then
+        // it will try to restart the service immediately. If no processing is active, we can unbind
+        // to save resources. Android system, otherwise, penalizes service-restarts by delaying
+        // them.
+        if (!isProcessing) disconnect()
     }
 
     override suspend fun connect(uri: Uri) {
@@ -58,16 +72,24 @@ internal class PdfServiceConnectionImpl(override val context: Context) : PdfServ
                 // See b/380140417
                 data = uri
             }
-        context.bindService(intent, /* conn= */ this, /* flags= */ Context.BIND_AUTO_CREATE)
-        _eventStateFlow.first { it is Connected }
-    }
+        /**
+         * Make [PdfDocumentServiceImpl] a started service so it could be kept alive for some
+         * duration after the last client unbinds from the service.
+         */
+        context.startService(intent)
 
-    override suspend fun blockUntilConnected() {
+        context.bindService(intent, /* conn= */ this, /* flags= */ Context.BIND_AUTO_CREATE)
         _eventStateFlow.first { it is Connected }
     }
 
     override fun disconnect() {
         if (isConnected) {
+            // Page releases are unnecessary after document closure; resources are released
+            // automatically server-side. Attempting a release on a closed document will result in
+            // an exception. To prevent such release calls, the connection is marked as disconnected
+            // before closing the document.
+            _eventStateFlow.update { Disconnected }
+
             documentBinder?.closePdfDocument()
             context.unbindService(this)
         }

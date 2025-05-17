@@ -18,7 +18,7 @@ package androidx.xr.compose.subspace.layout
 
 import androidx.annotation.FloatRange
 import androidx.annotation.RestrictTo
-import androidx.xr.compose.subspace.node.SubspaceModifierElement
+import androidx.xr.compose.subspace.node.SubspaceModifierNodeElement
 
 /**
  * Sets the opacity of this element (and its children) to a value between [0..1]. An alpha value of
@@ -33,7 +33,7 @@ public fun SubspaceModifier.alpha(
     @FloatRange(from = 0.0, to = 1.0) alpha: Float
 ): SubspaceModifier = this.then(AlphaElement(alpha))
 
-private class AlphaElement(private var alpha: Float) : SubspaceModifierElement<AlphaNode>() {
+private class AlphaElement(private var alpha: Float) : SubspaceModifierNodeElement<AlphaNode>() {
     init {
         alpha = alpha.coerceIn(0.0f, 1.0f)
     }
@@ -56,8 +56,8 @@ private class AlphaElement(private var alpha: Float) : SubspaceModifierElement<A
     }
 }
 
-private class AlphaNode(public var alpha: Float) : SubspaceModifier.Node(), CoreEntityNode {
-    override fun modifyCoreEntity(coreEntity: CoreEntity) {
-        coreEntity.setAlpha(alpha)
+private class AlphaNode(var alpha: Float) : SubspaceModifier.Node(), CoreEntityNode {
+    override fun CoreEntityScope.modifyCoreEntity() {
+        setOrAppendAlpha(alpha)
     }
 }

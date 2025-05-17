@@ -39,6 +39,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.isNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.concurrent.futures.await
@@ -72,9 +73,7 @@ import org.junit.runners.Parameterized
 class CameraXViewfinderTest(private val implName: String, private val cameraConfig: CameraXConfig) {
     @get:Rule
     val cameraPipeConfigTestRule =
-        CameraPipeConfigTestRule(
-            active = implName == CameraPipeConfig::class.simpleName,
-        )
+        CameraPipeConfigTestRule(active = implName == CameraPipeConfig::class.simpleName)
 
     @get:Rule
     val useCamera =
@@ -89,7 +88,7 @@ class CameraXViewfinderTest(private val implName: String, private val cameraConf
             currentSurfaceRequest?.let { surfaceRequest ->
                 CameraXViewfinder(
                     surfaceRequest = surfaceRequest,
-                    modifier = Modifier.testTag(CAMERAX_VIEWFINDER_TEST_TAG)
+                    modifier = Modifier.testTag(CAMERAX_VIEWFINDER_TEST_TAG),
                 )
             }
         }
@@ -119,7 +118,7 @@ class CameraXViewfinderTest(private val implName: String, private val cameraConf
                 CameraXViewfinder(
                     surfaceRequest = surfaceRequest,
                     implementationMode = implementationMode,
-                    modifier = Modifier.testTag(CAMERAX_VIEWFINDER_TEST_TAG)
+                    modifier = Modifier.testTag(CAMERAX_VIEWFINDER_TEST_TAG),
                 )
             }
         }
@@ -167,7 +166,7 @@ class CameraXViewfinderTest(private val implName: String, private val cameraConf
         composeTest.setContent {
             CameraXViewfinder(
                 surfaceRequest = surfaceRequest,
-                modifier = Modifier.testTag(CAMERAX_VIEWFINDER_TEST_TAG)
+                modifier = Modifier.testTag(CAMERAX_VIEWFINDER_TEST_TAG),
             )
         }
 
@@ -177,13 +176,66 @@ class CameraXViewfinderTest(private val implName: String, private val cameraConf
         composeTest.onNodeWithTag(CAMERAX_VIEWFINDER_TEST_TAG).assertIsNotDisplayed()
     }
 
+    @Test
+    fun removeViewfinder_andAddWithSameSurfaceRequest_invalidatesRequest() = runViewfinderTest {
+        var showContent by mutableStateOf(true)
+        composeTest.setContent {
+            val currentSurfaceRequest: SurfaceRequest? by surfaceRequests.collectAsState()
+            if (showContent) {
+                currentSurfaceRequest?.let { surfaceRequest ->
+                    CameraXViewfinder(
+                        surfaceRequest = surfaceRequest,
+                        modifier = Modifier.testTag(CAMERAX_VIEWFINDER_TEST_TAG),
+                    )
+                }
+            }
+        }
+
+        // Start the camera
+        startCamera()
+
+        // Wait for first SurfaceRequest
+        val firstSurfaceRequest = surfaceRequests.filterNotNull().first()
+
+        composeTest.awaitIdle()
+
+        // CameraXViewfinder should now have a child Viewfinder
+        composeTest
+            .onNodeWithTag(CAMERAX_VIEWFINDER_TEST_TAG)
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.hasChild())
+
+        // Remove the Viewfinder from the composition
+        showContent = false
+
+        composeTest.waitUntil(timeoutMillis = 5000) {
+            composeTest.onNodeWithTag(CAMERAX_VIEWFINDER_TEST_TAG).isNotDisplayed()
+        }
+
+        // Add the Viewfinder back to the composition
+        showContent = true
+
+        composeTest.awaitIdle()
+
+        // CameraXViewfinder should now be displayed with a child viewfinder
+        composeTest
+            .onNodeWithTag(CAMERAX_VIEWFINDER_TEST_TAG)
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.hasChild())
+
+        val newSurfaceRequest = surfaceRequests.filterNotNull().first()
+
+        // A new surface request should have been created since the old one was invalidated
+        assertThat(newSurfaceRequest).isNotEqualTo(firstSurfaceRequest)
+    }
+
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun data() =
             listOf(
                 arrayOf(Camera2Config::class.simpleName, Camera2Config.defaultConfig()),
-                arrayOf(CameraPipeConfig::class.simpleName, CameraPipeConfig.defaultConfig())
+                arrayOf(CameraPipeConfig::class.simpleName, CameraPipeConfig.defaultConfig()),
             )
 
         private const val CAMERAX_VIEWFINDER_TEST_TAG = "CameraXViewfinderTestTag"
@@ -230,7 +282,7 @@ class CameraXViewfinderTest(private val implName: String, private val cameraConf
                         cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             firstAvailableCameraSelector,
-                            preview
+                            preview,
                         )
                     }
                 }
@@ -240,7 +292,7 @@ class CameraXViewfinderTest(private val implName: String, private val cameraConf
                         surfaceRequests = surfaceRequests.asStateFlow(),
                         resetPreviewSurfaceProvider = resetPreviewSurfaceProvider,
                         startCamera = startCamera,
-                        coroutineContext = coroutineContext
+                        coroutineContext = coroutineContext,
                     )
                 ) {
                     block()
@@ -260,7 +312,7 @@ class CameraXViewfinderTest(private val implName: String, private val cameraConf
         val surfaceRequests: StateFlow<SurfaceRequest?>,
         val resetPreviewSurfaceProvider: suspend () -> Unit,
         val startCamera: suspend () -> Camera,
-        override val coroutineContext: CoroutineContext
+        override val coroutineContext: CoroutineContext,
     ) : CoroutineScope
 }
 

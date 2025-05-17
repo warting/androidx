@@ -16,7 +16,7 @@
 
 package androidx.build
 
-import com.android.build.api.variant.AndroidComponentsExtension
+import com.android.build.api.variant.LintLifecycleExtension
 import com.android.build.gradle.AppPlugin
 import com.android.build.gradle.LibraryPlugin
 import java.io.File
@@ -29,7 +29,7 @@ import org.gradle.kotlin.dsl.create
 import org.jetbrains.kotlin.gradle.plugin.CompilerPluginConfig
 import org.jetbrains.kotlin.gradle.plugin.KotlinBasePluginWrapper
 import org.jetbrains.kotlin.gradle.plugin.SubpluginOption
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompile
 
 const val zipComposeReportsTaskName = "zipComposeCompilerReports"
 const val zipComposeMetricsTaskName = "zipComposeCompilerMetrics"
@@ -54,10 +54,10 @@ class AndroidXComposeImplPlugin : Plugin<Project> {
 
     companion object {
         private fun Project.configureAndroidCommonOptions() {
-            extensions.findByType(AndroidComponentsExtension::class.java)!!.finalizeDsl { android ->
+            extensions.findByType(LintLifecycleExtension::class.java)!!.finalizeDsl { lint ->
                 val isPublished = androidXExtension.shouldPublish()
 
-                android.lint {
+                lint.run {
                     // These lint checks are normally a warning (or lower), but we ignore (in
                     // AndroidX)
                     // warnings in Lint, so we make it an error here so it will fail the build.
@@ -78,13 +78,25 @@ class AndroidXComposeImplPlugin : Plugin<Project> {
                             // Navigation libraries are not in performance critical paths, so we can
                             // ignore them.
                             "navigation:navigation-compose",
-                            "wear:compose:compose-navigation"
+                            "wear:compose:compose-navigation",
                         )
 
                     // Disable ListIterator if we are not in a matching path, or we are in an
                     // unpublished project
                     if (ignoreListIteratorFilter.any { path.contains(it) } || !isPublished) {
                         disable.add("ListIterator")
+                    }
+
+                    // b/333784604 Disable ConfigurationScreenWidthHeight for wear libraries, it
+                    // does not apply to wear
+                    if (path.startsWith(":wear:")) {
+                        disable.add("ConfigurationScreenWidthHeight")
+                    }
+
+                    // These checks are not required for samples projects.
+                    if (androidXExtension.type == SoftwareType.SAMPLES) {
+                        disable.add("ListIterator")
+                        disable.add("PrimitiveInCollection")
                     }
                 }
             }
@@ -97,9 +109,9 @@ class AndroidXComposeImplPlugin : Plugin<Project> {
                         mapOf(
                             "path" to ":compose:lint:internal-lint-checks",
                             // TODO(b/206617878) remove this shadow configuration
-                            "configuration" to "shadow"
+                            "configuration" to "shadow",
                         )
-                    )
+                    ),
                 )
             }
         }
@@ -124,7 +136,7 @@ private fun configureComposeCompilerPlugin(project: Project, extension: AndroidX
         val compilerPluginVersion = project.getVersionByName("kotlin")
         project.dependencies.add(
             COMPILER_PLUGIN_CONFIGURATION,
-            "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:$compilerPluginVersion"
+            "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:$compilerPluginVersion",
         )
 
         if (
@@ -138,7 +150,7 @@ private fun configureComposeCompilerPlugin(project: Project, extension: AndroidX
                 val compilerMavenDirectory =
                     File(
                         compilerProject.projectDir,
-                        "compiler/compose-compiler-snapshot-repository"
+                        "compiler/compose-compiler-snapshot-repository",
                     )
                 project.repositories.maven { it.url = compilerMavenDirectory.toURI() }
                 project.configurations.configureEach {
@@ -163,7 +175,7 @@ private fun configureComposeCompilerPlugin(project: Project, extension: AndroidX
                         view.attributes { attributes ->
                             attributes.attribute(
                                 Attribute.of("artifactType", String::class.java),
-                                ArtifactTypeDefinition.JAR_TYPE
+                                ArtifactTypeDefinition.JAR_TYPE,
                             )
                         }
                     }
@@ -173,7 +185,7 @@ private fun configureComposeCompilerPlugin(project: Project, extension: AndroidX
         val enableMetrics = project.enableComposeCompilerMetrics()
         val enableReports = project.enableComposeCompilerReports()
 
-        val compileTasks = project.tasks.withType(KotlinCompile::class.java)
+        val compileTasks = project.tasks.withType(AbstractKotlinCompile::class.java)
 
         compileTasks.configureEach { compile ->
             compile.inputs.property("composeMetricsEnabled", enableMetrics)
@@ -196,7 +208,7 @@ private fun configureComposeCompilerPlugin(project: Project, extension: AndroidX
             compileTasks.configureEach { compile ->
                 compile.addPluginOption(
                     ComposeCompileOptions.MetricsOption,
-                    metricsIntermediateDir.path
+                    metricsIntermediateDir.path,
                 )
             }
         }
@@ -209,32 +221,28 @@ private fun configureComposeCompilerPlugin(project: Project, extension: AndroidX
             compileTasks.configureEach { compile ->
                 compile.addPluginOption(
                     ComposeCompileOptions.ReportsOption,
-                    reportsIntermediateDir.path
+                    reportsIntermediateDir.path,
                 )
             }
         }
     }
 }
 
-private fun KotlinCompile.addPluginOption(
+private fun AbstractKotlinCompile<*>.addPluginOption(
     composeCompileOptions: ComposeCompileOptions,
-    value: String
+    value: String,
 ) =
     pluginOptions.add(
         CompilerPluginConfig().apply {
             addPluginArgument(
                 composeCompileOptions.pluginId,
-                SubpluginOption(composeCompileOptions.key, value)
+                SubpluginOption(composeCompileOptions.key, value),
             )
         }
     )
 
-private fun KotlinCompile.enableFeatureFlag(featureFlag: ComposeFeatureFlag) {
+private fun AbstractKotlinCompile<*>.enableFeatureFlag(featureFlag: ComposeFeatureFlag) {
     addPluginOption(ComposeCompileOptions.FeatureFlagOption, featureFlag.featureName)
-}
-
-private fun KotlinCompile.disableFeatureFlag(featureFlag: ComposeFeatureFlag) {
-    addPluginOption(ComposeCompileOptions.FeatureFlagOption, "-${featureFlag.featureName}")
 }
 
 internal fun Project.zipComposeCompilerMetrics() {
