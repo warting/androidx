@@ -35,6 +35,8 @@ import androidx.pdf.content.PdfPageGotoLinkContent
 import androidx.pdf.content.PdfPageLinkContent
 import androidx.pdf.content.PdfPageTextContent
 import androidx.pdf.content.SelectionBoundary
+import androidx.pdf.models.FormEditRecord
+import androidx.pdf.models.FormWidgetInfo
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -70,7 +72,7 @@ internal open class FakePdfDocument(
     private val searchResults: SparseArray<List<PageMatchBounds>> = SparseArray(),
     override val uri: Uri = Uri.parse("content://test.app/document.pdf"),
     private val pageLinks: Map<Int, PdfDocument.PdfPageLinks> = mapOf(),
-    private val textContents: List<PdfPageTextContent> = emptyList()
+    private val textContents: List<PdfPageTextContent> = emptyList(),
 ) : PdfDocument {
     override val pageCount: Int = pages.size
 
@@ -89,6 +91,18 @@ internal open class FakePdfDocument(
         return FakeBitmapSource(pageNumber)
     }
 
+    override suspend fun getFormWidgetInfos(pageNum: Int): List<FormWidgetInfo> {
+        return listOf()
+    }
+
+    override suspend fun getFormWidgetInfos(pageNum: Int, types: IntArray): List<FormWidgetInfo> {
+        return listOf()
+    }
+
+    override suspend fun applyEdit(pageNum: Int, record: FormEditRecord): List<Rect> {
+        return listOf()
+    }
+
     override suspend fun getPageLinks(pageNumber: Int): PdfDocument.PdfPageLinks {
         return pageLinks[pageNumber] ?: PdfDocument.PdfPageLinks(emptyList(), emptyList())
     }
@@ -99,7 +113,7 @@ internal open class FakePdfDocument(
         if (pageNumber in pages.indices && pageNumber < textContents.size) {
             return PdfDocument.PdfPageContent(
                 textContents = listOf(textContents[pageNumber]),
-                imageContents = emptyList()
+                imageContents = emptyList(),
             )
         }
 
@@ -111,15 +125,24 @@ internal open class FakePdfDocument(
     override suspend fun getSelectionBounds(
         pageNumber: Int,
         start: PointF,
-        stop: PointF
+        stop: PointF,
     ): PageSelection {
         // TODO(b/376136631) provide a useful implementation when it's needed for testing
         return PageSelection(0, SelectionBoundary(0), SelectionBoundary(0), listOf())
     }
 
+    override suspend fun getSelectAllSelectionBounds(pageNumber: Int): PageSelection? {
+        return PageSelection(
+            0,
+            SelectionBoundary(0),
+            SelectionBoundary(Int.MAX_VALUE),
+            listOf(textContents[pageNumber]),
+        )
+    }
+
     override suspend fun searchDocument(
         query: String,
-        pageRange: IntRange
+        pageRange: IntRange,
     ): SparseArray<List<PageMatchBounds>> {
         return searchResults
     }
@@ -128,7 +151,21 @@ internal open class FakePdfDocument(
         return pageRange.map { getPageInfo(it) }
     }
 
+    override suspend fun getPageInfos(
+        pageRange: IntRange,
+        pageInfoFlags: PdfDocument.PageInfoFlags,
+    ): List<PdfDocument.PageInfo> {
+        return listOf()
+    }
+
     override suspend fun getPageInfo(pageNumber: Int): PdfDocument.PageInfo {
+        return getPageInfo(pageNumber, PdfDocument.PageInfoFlags.of(0))
+    }
+
+    override suspend fun getPageInfo(
+        pageNumber: Int,
+        pageInfoFlags: PdfDocument.PageInfoFlags,
+    ): PdfDocument.PageInfo {
         layoutReach = maxOf(pageNumber, layoutReach)
         val size = pages[pageNumber]
         return PdfDocument.PageInfo(pageNumber, size.y, size.x)
@@ -157,7 +194,7 @@ internal open class FakePdfDocument(
                         255,
                         colorRng.nextInt(256),
                         colorRng.nextInt(256),
-                        colorRng.nextInt(256)
+                        colorRng.nextInt(256),
                     )
                 )
             }
@@ -201,7 +238,7 @@ internal open class FakePdfDocument(
                     List(10) { index ->
                         PdfPageTextContent(
                             bounds = listOf(RectF(0f, 0f, 100f, 200f)),
-                            text = "Sample text for page ${index + 1}"
+                            text = "Sample text for page ${index + 1}",
                         )
                     },
                 pageLinks =
@@ -217,19 +254,19 @@ internal open class FakePdfDocument(
                                                     pageNumber = VALID_PAGE_NUMBER,
                                                     xCoordinate = 10f,
                                                     yCoordinate = 40f,
-                                                    zoom = 1f
-                                                )
+                                                    zoom = 1f,
+                                                ),
                                         )
                                     ),
                                 externalLinks =
                                     listOf(
                                         PdfPageLinkContent(
                                             bounds = listOf(RectF(25f, 60f, 75f, 80f)),
-                                            uri = Uri.parse(URI_WITH_VALID_SCHEME)
+                                            uri = Uri.parse(URI_WITH_VALID_SCHEME),
                                         )
                                     ),
                             )
-                    )
+                    ),
             )
     }
 }

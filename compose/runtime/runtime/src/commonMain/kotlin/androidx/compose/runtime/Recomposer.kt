@@ -41,6 +41,8 @@ import androidx.compose.runtime.snapshots.ReaderKind
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshots.SnapshotApplyResult
 import androidx.compose.runtime.snapshots.StateObjectImpl
+import androidx.compose.runtime.snapshots.TransparentObserverMutableSnapshot
+import androidx.compose.runtime.snapshots.TransparentObserverSnapshot
 import androidx.compose.runtime.snapshots.fastAll
 import androidx.compose.runtime.snapshots.fastAny
 import androidx.compose.runtime.snapshots.fastFilterIndexed
@@ -51,6 +53,8 @@ import androidx.compose.runtime.snapshots.fastMapNotNull
 import androidx.compose.runtime.tooling.CompositionData
 import androidx.compose.runtime.tooling.CompositionObserverHandle
 import androidx.compose.runtime.tooling.CompositionRegistrationObserver
+import androidx.compose.runtime.tooling.ObservableComposition
+import androidx.compose.runtime.tooling.observe
 import kotlin.collections.removeLast as removeLastKt
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
@@ -75,7 +79,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
 // TODO: Can we use rootKey for this since all compositions will have an eventual Recomposer parent?
-private const val RecomposerCompoundHashKey = 1000
+private inline val RecomposerCompoundHashKey
+    get() = CompositeKeyHashCode(1000)
 
 /**
  * Runs [block] with a new, active [Recomposer] applying changes in the calling [CoroutineContext].
@@ -117,6 +122,15 @@ interface RecomposerInfo {
      * composition did not produce changes to apply.
      */
     val changeCount: Long
+
+    /**
+     * Register an observer to be notified when a composition is added to or removed from the given
+     * [Recomposer]. When this method is called, the observer will be notified of all currently
+     * registered compositions per the documentation in
+     * [CompositionRegistrationObserver.onCompositionRegistered].
+     */
+    @ExperimentalComposeRuntimeApi
+    fun observe(observer: CompositionRegistrationObserver): CompositionObserverHandle? = null
 }
 
 /** Read only information about [Recomposer] error state. */
@@ -155,7 +169,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                     if (_state.value <= State.ShuttingDown)
                         throw CancellationException(
                             "Recomposer shutdown; frame clock awaiter will never resume",
-                            closeCause
+                            closeCause,
                         )
                 }
             }
@@ -204,7 +218,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
          * be presented to known composers to check for invalidated compositions, or coroutines
          * awaiting a frame using the Recomposer's [MonotonicFrameClock].
          */
-        PendingWork
+        PendingWork,
     }
 
     private val stateLock = makeSynchronizedObject()
@@ -214,17 +228,6 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     private var closeCause: Throwable? = null
     private val _knownCompositions = mutableListOf<ControlledComposition>()
     private var _knownCompositionsCache: List<ControlledComposition>? = null
-    private val knownCompositions
-        get() =
-            _knownCompositionsCache
-                ?: run {
-                    val compositions = _knownCompositions
-                    val newCache =
-                        if (compositions.isEmpty()) emptyList() else ArrayList(compositions)
-                    _knownCompositionsCache = newCache
-                    newCache
-                }
-
     private var snapshotInvalidations = MutableScatterSet<Any>()
     private val compositionInvalidations = mutableVectorOf<ControlledComposition>()
     private val compositionsAwaitingApply = mutableListOf<ControlledComposition>()
@@ -313,7 +316,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     private val hasBroadcastFrameClockAwaiters: Boolean
         get() = synchronized(stateLock) { hasBroadcastFrameClockAwaitersLocked }
 
-    @ExperimentalComposeRuntimeApi
+    @OptIn(ExperimentalComposeRuntimeApi::class)
     private var registrationObservers: MutableObjectList<CompositionRegistrationObserver>? = null
 
     /**
@@ -350,7 +353,8 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                     compositionsAwaitingApply.isNotEmpty() ||
                     movableContentAwaitingInsert.isNotEmpty() ||
                     concurrentCompositionsOutstanding > 0 ||
-                    hasBroadcastFrameClockAwaitersLocked -> State.PendingWork
+                    hasBroadcastFrameClockAwaitersLocked ||
+                    movableContentRemoved.isNotEmpty() -> State.PendingWork
                 else -> State.Idle
             }
 
@@ -388,17 +392,19 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
         val currentError: RecomposerErrorInfo?
             get() = synchronized(stateLock) { this@Recomposer.errorState }
 
+        @OptIn(ExperimentalComposeRuntimeApi::class)
+        override fun observe(observer: CompositionRegistrationObserver): CompositionObserverHandle =
+            this@Recomposer.observe(observer)
+
         fun invalidateGroupsWithKey(key: Int) {
-            val compositions: List<ControlledComposition> =
-                synchronized(stateLock) { knownCompositions }
+            val compositions: List<ControlledComposition> = knownCompositions()
             compositions
                 .fastMapNotNull { it as? CompositionImpl }
                 .fastForEach { it.invalidateGroupsWithKey(key) }
         }
 
         fun saveStateAndDisposeForHotReload(): List<HotReloadable> {
-            val compositions: List<ControlledComposition> =
-                synchronized(stateLock) { knownCompositions }
+            val compositions: List<ControlledComposition> = knownCompositions()
             return compositions
                 .fastMapNotNull { it as? CompositionImpl }
                 .fastMap { HotReloadable(it).apply { clearContent() } }
@@ -431,7 +437,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
     private class RecomposerErrorState(
         override val recoverable: Boolean,
-        override val cause: Throwable
+        override val cause: Throwable,
     ) : RecomposerErrorInfo
 
     private val recomposerInfo = RecomposerInfoImpl()
@@ -445,14 +451,15 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
      * @return `true` if the frame has work to do (e.g. [hasFrameWorkLocked])
      */
     private fun recordComposerModifications(): Boolean {
+        var compositions: List<ControlledComposition> = emptyList()
         val changes =
             synchronized(stateLock) {
                 if (snapshotInvalidations.isEmpty()) return hasFrameWorkLocked
+                compositions = knownCompositionsLocked()
                 snapshotInvalidations.wrapIntoSet().also {
                     snapshotInvalidations = MutableScatterSet()
                 }
             }
-        val compositions = synchronized(stateLock) { knownCompositions }
         var complete = false
         try {
             run {
@@ -464,7 +471,6 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                     if (_state.value <= State.ShuttingDown) return@run
                 }
             }
-            synchronized(stateLock) { snapshotInvalidations = MutableScatterSet() }
             complete = true
         } finally {
             if (!complete) {
@@ -493,7 +499,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                 }
                 .wrapIntoSet()
         if (changes.isNotEmpty()) {
-            knownCompositions.fastForEach { composition ->
+            knownCompositionsLocked().fastForEach { composition ->
                 composition.recordModificationsOf(changes)
             }
         }
@@ -633,7 +639,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                         // composition that was otherwise valid.
                         if (modifiedValues.isNotEmpty() || compositionInvalidations.isNotEmpty()) {
                             synchronized(stateLock) {
-                                knownCompositions.fastForEach { value ->
+                                knownCompositionsLocked().fastForEach { value ->
                                     if (
                                         value !in alreadyComposed &&
                                             value.observesAnyOf(modifiedValuesSet)
@@ -671,47 +677,55 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                         }
                     }
 
-                    if (toApply.isNotEmpty()) {
-                        changeCount++
+                    // This is an optimization to avoid reallocating TransparentSnapshot for each
+                    // observeChanges within `apply`. Many modifiers use observation in `onAttach`
+                    // and other lifecycle methods, and allocations can be mitigated by updating
+                    // read observer in the snapshot allocated here.
+                    withTransparentSnapshot {
+                        if (toApply.isNotEmpty()) {
+                            changeCount++
 
-                        // Perform apply changes
-                        try {
-                            // We could do toComplete += toApply but doing it like below
-                            // avoids unnecessary allocations since toApply is a mutable list
-                            // toComplete += toApply
-                            toApply.fastForEach { composition -> toComplete.add(composition) }
-                            toApply.fastForEach { composition -> composition.applyChanges() }
-                        } catch (e: Throwable) {
-                            processCompositionError(e)
-                            clearRecompositionState()
-                            return@withFrameNanos
-                        } finally {
-                            toApply.clear()
+                            // Perform apply changes
+                            try {
+                                // We could do toComplete += toApply but doing it like below
+                                // avoids unnecessary allocations since toApply is a mutable list
+                                // toComplete += toApply
+                                toApply.fastForEach { composition -> toComplete.add(composition) }
+                                toApply.fastForEach { composition -> composition.applyChanges() }
+                            } catch (e: Throwable) {
+                                processCompositionError(e)
+                                clearRecompositionState()
+                                return@withFrameNanos
+                            } finally {
+                                toApply.clear()
+                            }
                         }
-                    }
 
-                    if (toLateApply.isNotEmpty()) {
-                        try {
-                            toComplete += toLateApply
-                            toLateApply.forEach { composition -> composition.applyLateChanges() }
-                        } catch (e: Throwable) {
-                            processCompositionError(e)
-                            clearRecompositionState()
-                            return@withFrameNanos
-                        } finally {
-                            toLateApply.clear()
+                        if (toLateApply.isNotEmpty()) {
+                            try {
+                                toComplete += toLateApply
+                                toLateApply.forEach { composition ->
+                                    composition.applyLateChanges()
+                                }
+                            } catch (e: Throwable) {
+                                processCompositionError(e)
+                                clearRecompositionState()
+                                return@withFrameNanos
+                            } finally {
+                                toLateApply.clear()
+                            }
                         }
-                    }
 
-                    if (toComplete.isNotEmpty()) {
-                        try {
-                            toComplete.forEach { composition -> composition.changesApplied() }
-                        } catch (e: Throwable) {
-                            processCompositionError(e)
-                            clearRecompositionState()
-                            return@withFrameNanos
-                        } finally {
-                            toComplete.clear()
+                        if (toComplete.isNotEmpty()) {
+                            try {
+                                toComplete.forEach { composition -> composition.changesApplied() }
+                            } catch (e: Throwable) {
+                                processCompositionError(e)
+                                clearRecompositionState()
+                                return@withFrameNanos
+                            } finally {
+                                toComplete.clear()
+                            }
                         }
                     }
 
@@ -781,11 +795,58 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
         }
     }
 
+    private inline fun withTransparentSnapshot(block: () -> Unit) {
+        val currentSnapshot = Snapshot.current
+
+        val snapshot =
+            if (currentSnapshot is MutableSnapshot) {
+                TransparentObserverMutableSnapshot(
+                    currentSnapshot,
+                    null,
+                    null,
+                    mergeParentObservers = true,
+                    ownsParentSnapshot = false,
+                )
+            } else {
+                TransparentObserverSnapshot(
+                    currentSnapshot,
+                    null,
+                    mergeParentObservers = true,
+                    ownsParentSnapshot = false,
+                )
+            }
+        try {
+            snapshot.enter(block)
+        } finally {
+            snapshot.dispose()
+        }
+    }
+
+    /**
+     * Returns a cached copy of the list of known compositions that can be iterated safely without
+     * holding the `stateLock`.
+     */
+    private fun knownCompositions(): List<ControlledComposition> {
+        return synchronized(stateLock) { knownCompositionsLocked() }
+    }
+
+    private fun knownCompositionsLocked(): List<ControlledComposition> {
+        val cache = _knownCompositionsCache
+        if (cache != null) return cache
+
+        val compositions = _knownCompositions
+        val newCache = if (compositions.isEmpty()) emptyList() else ArrayList(compositions)
+        _knownCompositionsCache = newCache
+        return newCache
+    }
+
     @OptIn(ExperimentalComposeRuntimeApi::class)
     private fun clearKnownCompositionsLocked() {
         registrationObservers?.forEach { observer ->
-            knownCompositions.forEach { composition ->
-                observer.onCompositionUnregistered(this, composition)
+            knownCompositionsLocked().forEach { composition ->
+                if (composition is ObservableComposition) {
+                    observer.onCompositionUnregistered(composition)
+                }
             }
         }
         _knownCompositions.clear()
@@ -796,7 +857,11 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     private fun removeKnownCompositionLocked(composition: ControlledComposition) {
         if (_knownCompositions.remove(composition)) {
             _knownCompositionsCache = null
-            registrationObservers?.forEach { it.onCompositionUnregistered(this, composition) }
+            registrationObservers?.forEach {
+                if (composition is ObservableComposition) {
+                    it.onCompositionUnregistered(composition)
+                }
+            }
         }
     }
 
@@ -804,10 +869,14 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     private fun addKnownCompositionLocked(composition: ControlledComposition) {
         _knownCompositions += composition
         _knownCompositionsCache = null
-        registrationObservers?.forEach { it.onCompositionRegistered(this, composition) }
+        registrationObservers?.forEach {
+            if (composition is ObservableComposition) {
+                it.onCompositionRegistered(composition)
+            }
+        }
     }
 
-    @ExperimentalComposeRuntimeApi
+    @OptIn(ExperimentalComposeRuntimeApi::class)
     internal fun addCompositionRegistrationObserver(
         observer: CompositionRegistrationObserver
     ): CompositionObserverHandle {
@@ -820,7 +889,9 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
             observers += observer
             _knownCompositions.fastForEach { composition ->
-                observer.onCompositionRegistered(this@Recomposer, composition)
+                if (composition is ObservableComposition) {
+                    observer.onCompositionRegistered(composition)
+                }
             }
         }
 
@@ -933,7 +1004,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
     private suspend fun runFrameLoop(
         parentFrameClock: MonotonicFrameClock,
-        frameSignal: ProduceFrameSignal
+        frameSignal: ProduceFrameSignal,
     ) {
         val toRecompose = mutableListOf<ControlledComposition>()
         val toApply = mutableListOf<ControlledComposition>()
@@ -1066,7 +1137,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
             try {
                 // Invalidate all registered composers when we start since we weren't observing
                 // snapshot changes on their behalf. Assume anything could have changed.
-                synchronized(stateLock) { knownCompositions }.fastForEach { it.invalidateAll() }
+                knownCompositions().fastForEach { it.invalidateAll() }
 
                 coroutineScope { block(parentFrameClock) }
             } finally {
@@ -1124,7 +1195,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
     internal override fun composeInitial(
         composition: ControlledComposition,
-        content: @Composable () -> Unit
+        content: @Composable () -> Unit,
     ) {
         val composerWasComposing = composition.isComposing
         try {
@@ -1141,7 +1212,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
         synchronized(stateLock) {
             if (_state.value > State.ShuttingDown) {
-                if (composition !in knownCompositions) {
+                if (composition !in knownCompositionsLocked()) {
                     addKnownCompositionLocked(composition)
                 }
             }
@@ -1172,7 +1243,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     internal override fun composeInitialPaused(
         composition: ControlledComposition,
         shouldPause: ShouldPauseCallback,
-        content: @Composable () -> Unit
+        content: @Composable () -> Unit,
     ): ScatterSet<RecomposeScopeImpl> {
         return try {
             composition.pausable(shouldPause) {
@@ -1187,7 +1258,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     internal override fun recomposePaused(
         composition: ControlledComposition,
         shouldPause: ShouldPauseCallback,
-        invalidScopes: ScatterSet<RecomposeScopeImpl>
+        invalidScopes: ScatterSet<RecomposeScopeImpl>,
     ): ScatterSet<RecomposeScopeImpl> {
         return try {
             recordComposerModifications()
@@ -1244,7 +1315,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
     private fun performRecompose(
         composition: ControlledComposition,
-        modifiedValues: MutableScatterSet<Any>?
+        modifiedValues: MutableScatterSet<Any>?,
     ): ControlledComposition? {
         if (
             composition.isComposing ||
@@ -1272,7 +1343,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     @OptIn(ExperimentalComposeApi::class)
     private fun performInsertValues(
         references: List<MovableContentStateReference>,
-        modifiedValues: MutableScatterSet<Any>?
+        modifiedValues: MutableScatterSet<Any>?,
     ): List<ControlledComposition> {
         val tasks = references.fastGroupBy { it.composition }
         for ((composition, refs) in tasks) {
@@ -1315,7 +1386,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                                             val container = nestedContentReference.container
                                             movableContentNestedExtractionsPending.add(
                                                 container,
-                                                content
+                                                content,
                                             )
                                             pair.first to content
                                         } else pair
@@ -1386,7 +1457,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
     private fun writeObserverOf(
         composition: ControlledComposition,
-        modifiedValues: MutableScatterSet<Any>?
+        modifiedValues: MutableScatterSet<Any>?,
     ): (Any) -> Unit {
         return { value ->
             composition.recordWriteOf(value)
@@ -1397,12 +1468,12 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     private inline fun <T> composing(
         composition: ControlledComposition,
         modifiedValues: MutableScatterSet<Any>?,
-        block: () -> T
+        block: () -> T,
     ): T {
         val snapshot =
             Snapshot.takeMutableSnapshot(
                 readObserverOf(composition),
-                writeObserverOf(composition, modifiedValues)
+                writeObserverOf(composition, modifiedValues),
             )
         try {
             return snapshot.enter(block)
@@ -1436,11 +1507,15 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
                     compositionInvalidations.isNotEmpty() ||
                     concurrentCompositionsOutstanding > 0 ||
                     compositionsAwaitingApply.isNotEmpty() ||
-                    hasBroadcastFrameClockAwaitersLocked
+                    hasBroadcastFrameClockAwaitersLocked ||
+                    movableContentRemoved.isNotEmpty()
             }
 
     private val hasFrameWorkLocked: Boolean
-        get() = compositionInvalidations.isNotEmpty() || hasBroadcastFrameClockAwaitersLocked
+        get() =
+            compositionInvalidations.isNotEmpty() ||
+                hasBroadcastFrameClockAwaitersLocked ||
+                movableContentRemoved.isNotEmpty()
 
     private val hasConcurrentFrameWorkLocked: Boolean
         get() = compositionsAwaitingApply.isNotEmpty() || hasBroadcastFrameClockAwaitersLocked
@@ -1491,7 +1566,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
     }
 
     // Recomposer always starts with a constant compound hash
-    internal override val compoundHashKey: Int
+    internal override val compositeKeyHashCode: CompositeKeyHashCode
         get() = RecomposerCompoundHashKey
 
     internal override val collectingCallByInformation: Boolean
@@ -1502,7 +1577,7 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
         get() = false
 
     internal override val collectingSourceInformation: Boolean
-        get() = compositionStackTraceEnabled
+        get() = composeStackTraceEnabled
 
     internal override fun recordInspectionTable(table: MutableSet<CompositionData>) {
         // TODO: The root recomposer might be a better place to set up inspection
@@ -1549,21 +1624,23 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
 
     internal override fun deletedMovableContent(reference: MovableContentStateReference) {
         synchronized(stateLock) {
-            movableContentRemoved.add(reference.content, reference)
-            if (reference.nestedReferences != null) {
-                val container = reference
-                fun recordNestedStatesOf(reference: MovableContentStateReference) {
-                    reference.nestedReferences?.fastForEach { nestedReference ->
-                        movableContentNestedStatesAvailable.add(
-                            nestedReference.content,
-                            NestedMovableContent(nestedReference, container)
-                        )
-                        recordNestedStatesOf(nestedReference)
+                movableContentRemoved.add(reference.content, reference)
+                if (reference.nestedReferences != null) {
+                    val container = reference
+                    fun recordNestedStatesOf(reference: MovableContentStateReference) {
+                        reference.nestedReferences?.fastForEach { nestedReference ->
+                            movableContentNestedStatesAvailable.add(
+                                nestedReference.content,
+                                NestedMovableContent(nestedReference, container),
+                            )
+                            recordNestedStatesOf(nestedReference)
+                        }
                     }
+                    recordNestedStatesOf(reference)
                 }
-                recordNestedStatesOf(reference)
+                deriveStateLocked()
             }
-        }
+            ?.resume(Unit)
     }
 
     internal override fun movableContentStateReleased(
@@ -1607,7 +1684,6 @@ class Recomposer(effectCoroutineContext: CoroutineContext) : CompositionContext(
      *
      * This annotation WILL BE REMOVED with the new memory model of Kotlin/Native.
      */
-    @Suppress("OPTIONAL_DECLARATION_USAGE_IN_NON_COMMON_SOURCE")
     @kotlin.native.concurrent.ThreadLocal
     companion object {
 
@@ -1785,5 +1861,5 @@ private class NestedContentMap {
 @InternalComposeApi
 private class NestedMovableContent(
     val content: MovableContentStateReference,
-    val container: MovableContentStateReference
+    val container: MovableContentStateReference,
 )

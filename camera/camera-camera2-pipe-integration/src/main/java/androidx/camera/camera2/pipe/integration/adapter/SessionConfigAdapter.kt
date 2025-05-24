@@ -23,7 +23,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.camera.camera2.pipe.OutputStream
 import androidx.camera.camera2.pipe.core.Log
 import androidx.camera.camera2.pipe.core.Log.debug
-import androidx.camera.camera2.pipe.integration.adapter.SessionConfigAdapter.Companion.getSessionConfig
 import androidx.camera.camera2.pipe.integration.impl.Camera2ImplConfig
 import androidx.camera.camera2.pipe.integration.impl.STREAM_USE_HINT_OPTION
 import androidx.camera.camera2.pipe.integration.internal.StreamUseCaseUtil
@@ -36,6 +35,7 @@ import androidx.camera.core.impl.SessionConfig
 import androidx.camera.core.impl.StreamSpec
 import androidx.camera.core.impl.UseCaseConfig
 import androidx.camera.core.streamsharing.StreamSharing
+import java.util.Collections
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -87,7 +87,14 @@ public class SessionConfigAdapter(
     public val deferrableSurfaces: List<DeferrableSurface> by lazy {
         check(validatingBuilder.isValid)
 
-        sessionConfig.surfaces
+        sessionConfig.postviewOutputConfig?.let {
+            Collections.unmodifiableList(
+                mutableListOf<DeferrableSurface>().apply {
+                    addAll(sessionConfig.surfaces)
+                    add(it.surface)
+                }
+            )
+        } ?: sessionConfig.surfaces
     }
 
     public fun getValidSessionConfigOrNull(): SessionConfig? {
@@ -151,7 +158,7 @@ public class SessionConfigAdapter(
         StreamUseCaseUtil.populateSurfaceToStreamUseCaseMapping(
             sessionConfigs,
             useCaseConfigs,
-            mapping
+            mapping,
         )
 
         return mapping
@@ -181,6 +188,8 @@ public class SessionConfigAdapter(
                         sessionConfig.implementationOptions.retrieveOption(STREAM_USE_HINT_OPTION)!!
                     continue
                 }
+
+                mapping[surface] = getStreamUseHintForContainerClass(surface.containerClass)
             }
         }
         return mapping
@@ -197,10 +206,26 @@ public class SessionConfigAdapter(
         }
     }
 
+    /**
+     * Determines the appropriate [OutputStream.StreamUseHint] value based on the provided container
+     * class.
+     *
+     * StreamUseHint is used for the following purposes:
+     *
+     * (1) **Surface Ordering:** To ensure [MediaCodec] surfaces are placed at the end of the output
+     * list within [androidx.camera.camera2.pipe.graph.StreamGraphImpl]. Note: [StreamSharing] uses
+     * [android.graphics.SurfaceTexture], not [MediaCodec] surface.
+     *
+     * (2) **High-Speed Session Operation:** To identify the presence of a [MediaCodec] surface in
+     * high-speed capture session scenarios within
+     * [androidx.camera.camera2.pipe.compat.Camera2CaptureSequenceProcessor].
+     *
+     * @param kClass The Kotlin [Class] of the container.
+     * @return The corresponding [OutputStream.StreamUseHint] value.
+     */
     private fun getStreamUseHintForContainerClass(kClass: Class<*>?): Long {
         return when (kClass) {
             MediaCodec::class.java -> OutputStream.StreamUseHint.VIDEO_RECORD.value
-            StreamSharing::class.java -> OutputStream.StreamUseHint.VIDEO_RECORD.value
             else -> OutputStream.StreamUseHint.DEFAULT.value
         }
     }

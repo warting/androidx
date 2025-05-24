@@ -17,6 +17,7 @@
 package androidx.ink.strokes
 
 import androidx.annotation.RestrictTo
+import androidx.ink.brush.ExperimentalInkCustomBrushApi
 import androidx.ink.brush.InputToolType
 import androidx.ink.nativeloader.NativeLoader
 import androidx.ink.nativeloader.UsedByNative
@@ -33,9 +34,7 @@ import androidx.ink.nativeloader.UsedByNative
 @Suppress("NotCloseable") // Finalize is only used to free the native peer.
 public abstract class StrokeInputBatch internal constructor(nativePointer: Long) {
 
-    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-    public var nativePointer: Long = nativePointer
-        private set
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) public val nativePointer: Long = nativePointer
 
     /** Number of [StrokeInput] objects in the batch. */
     public val size: Int
@@ -92,6 +91,15 @@ public abstract class StrokeInputBatch internal constructor(nativePointer: Long)
     public fun hasOrientation(): Boolean = StrokeInputBatchNative.hasOrientation(nativePointer)
 
     /**
+     * Returns the seed value that should be used for seeding any noise generators for brush
+     * behaviors when a full stroke is regenerated with this input batch. If no seed value has yet
+     * been set for this input batch, returns the default seed of zero.
+     */
+    @ExperimentalInkCustomBrushApi
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) // PublicApiNotReadyForJetpackReview
+    public fun getNoiseSeed(): Int = StrokeInputBatchNative.getNoiseSeed(nativePointer)
+
+    /**
      * Gets the value of the i-th input. Requires that [index] is positive and less than [size].
      *
      * In performance-sensitive code, prefer to use [populate] to pass in a pre-allocated instance
@@ -109,7 +117,7 @@ public abstract class StrokeInputBatch internal constructor(nativePointer: Long)
             nativePointer,
             index,
             outStrokeInput,
-            InputToolType::class.java
+            InputToolType::class.java,
         )
         return outStrokeInput
     }
@@ -119,9 +127,7 @@ public abstract class StrokeInputBatch internal constructor(nativePointer: Long)
 
     protected fun finalize() {
         // NOMUTANTS--Not tested post garbage collection.
-        if (nativePointer == 0L) return
-        StrokeInputBatchNative.freeNativePeer(nativePointer)
-        nativePointer = 0
+        StrokeInputBatchNative.free(nativePointer)
     }
 
     // Declared as a target for extension functions.
@@ -132,14 +138,8 @@ public abstract class StrokeInputBatch internal constructor(nativePointer: Long)
  * An immutable implementation of [StrokeInputBatch]. For a mutable alternative, see
  * [MutableStrokeInputBatch].
  */
-public class ImmutableStrokeInputBatch
-/**
- * Constructor for Kotlin [ImmutableStrokeInputBatch] objects that are originally created in native
- * code and later surfaced to Kotlin. The underlying memory will be freed upon finalize() of this
- * [ImmutableStrokeInputBatch] object.
- */
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-constructor(nativePointer: Long) : StrokeInputBatch(nativePointer) {
+public class ImmutableStrokeInputBatch private constructor(nativePointer: Long) :
+    StrokeInputBatch(nativePointer) {
 
     @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) // NonPublicApi
     public override fun asImmutable(): ImmutableStrokeInputBatch = this
@@ -147,10 +147,16 @@ constructor(nativePointer: Long) : StrokeInputBatch(nativePointer) {
     public override fun toString(): String = "ImmutableStrokeInputBatch(size=$size)"
 
     public companion object {
+        /** Wrap a native `ink::StrokeInputBatch` with an [ImmutableStrokeInputBatch]. */
+        @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+        public fun wrapNative(nativePointer: Long): ImmutableStrokeInputBatch {
+            return ImmutableStrokeInputBatch(nativePointer)
+        }
+
         /** An empty [ImmutableStrokeInputBatch]. */
         @JvmField
         public val EMPTY: ImmutableStrokeInputBatch =
-            ImmutableStrokeInputBatch(StrokeInputBatchNative.createNativePeer())
+            ImmutableStrokeInputBatch(StrokeInputBatchNative.create())
     }
 }
 
@@ -176,21 +182,23 @@ constructor(nativePointer: Long) : StrokeInputBatch(nativePointer) {
  *    [0, 2π) or be [StrokeInput.NO_ORIENTATION].
  * 7) The [toolType] and [strokeUnitLengthCm] values must be the same across all inputs.
  */
-public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.createNativePeer()) {
+public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.create()) {
 
     public fun clear(): Unit = MutableStrokeInputBatchNative.clear(nativePointer)
 
     /**
-     * Validates and appends an [input]. Invalid [input] will result in no change. An exception will
-     * be thrown for invalid additions.
+     * Validates and appends an [input]. Invalid [input] will result in no change.
+     *
+     * Inputs are invalid if they contain values out of the valid range, duplicate a previous input,
+     * have an elapsed time before a previous input, or have a different tool type than the inputs
+     * already in the batch.
+     *
+     * Throws an appopriate subclass of [RuntimeException] if the input is invalid.
      */
     public fun addOrThrow(input: StrokeInput): MutableStrokeInputBatch =
         add(input, throwOnError = true)
 
-    /**
-     * Validates and appends an input. Invalid input will result in no change. An exception will be
-     * thrown for invalid additions.
-     */
+    /** Variant of [addOrThrow] that takes individual parameters instead of a [StrokeInput]. */
     @JvmOverloads
     public fun addOrThrow(
         type: InputToolType,
@@ -215,16 +223,14 @@ public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.c
         )
 
     /**
-     * Validates and appends an [input]. Invalid [input] will result in no change. No exception will
-     * be thrown for invalid additions.
+     * Validates and appends an [input]. Will ignore an invalid input, skipping the exception thrown
+     * by [addOrThrow]. Use this method when skipping invalid inputs (e.g. out of order or duplicate
+     * inputs) is the desired behavior.
      */
     public fun addOrIgnore(input: StrokeInput): MutableStrokeInputBatch =
         add(input, throwOnError = false)
 
-    /**
-     * Validates and appends an input. Invalid input will result in no change. No exception will be
-     * thrown for invalid additions.
-     */
+    /** Variant of [addOrIgnore] that takes individual parameters instead of a [StrokeInput]. */
     @JvmOverloads
     public fun addOrIgnore(
         type: InputToolType,
@@ -281,7 +287,7 @@ public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.c
         orientationRadians: Float,
         throwOnError: Boolean,
     ): MutableStrokeInputBatch {
-        val errorMessage =
+        val success =
             MutableStrokeInputBatchNative.appendSingle(
                 nativePointer,
                 type.value,
@@ -292,10 +298,9 @@ public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.c
                 pressure,
                 tiltRadians,
                 orientationRadians,
+                throwOnError,
             )
-        if (throwOnError) {
-            require(errorMessage == null) { errorMessage!! }
-        }
+        require(success || !throwOnError) { "Should have thrown an exception if add failed." }
         return this
     }
 
@@ -319,11 +324,13 @@ public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.c
      * additions.
      */
     private fun add(inputBatchNativePointer: Long, throwOnError: Boolean): MutableStrokeInputBatch {
-        val errorMessage =
-            MutableStrokeInputBatchNative.appendBatch(nativePointer, inputBatchNativePointer)
-        if (throwOnError) {
-            require(errorMessage == null) { errorMessage!! }
-        }
+        val success =
+            MutableStrokeInputBatchNative.appendBatch(
+                nativePointer,
+                inputBatchNativePointer,
+                throwOnError,
+            )
+        check(success || !throwOnError) { "Should have thrown an exception if add failed." }
         return this
     }
 
@@ -350,14 +357,12 @@ public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.c
         throwOnError: Boolean = false,
     ): MutableStrokeInputBatch {
         val tempBatchBuilder = MutableStrokeInputBatch()
-        var errorMessage: String?
 
         // Confirm all inputs are valid by first adding them to their own StrokeInputBatch in order
         // to
-        // perform a group add operation to *this*
-        // batch.
+        // perform a group add operation to *this* batch.
         for (input in inputs) {
-            errorMessage =
+            val success =
                 MutableStrokeInputBatchNative.appendSingle(
                     tempBatchBuilder.nativePointer,
                     input.toolType.value,
@@ -368,40 +373,53 @@ public class MutableStrokeInputBatch : StrokeInputBatch(StrokeInputBatchNative.c
                     input.pressure,
                     input.tiltRadians,
                     input.orientationRadians,
+                    throwOnError,
                 )
-            if (throwOnError) {
-                require(errorMessage == null) { errorMessage!! }
-            }
+            require(success || !throwOnError) { "Should have thrown an exception if add failed." }
         }
-        errorMessage =
-            MutableStrokeInputBatchNative.appendBatch(nativePointer, tempBatchBuilder.nativePointer)
-        if (throwOnError) {
-            require(errorMessage == null) { errorMessage!! }
-        }
+        val success =
+            MutableStrokeInputBatchNative.appendBatch(
+                nativePointer,
+                tempBatchBuilder.nativePointer,
+                throwOnError,
+            )
+        require(success || !throwOnError) { "Should have thrown an exception if add failed." }
         return this
     }
+
+    /**
+     * Sets the per-stroke seed value that should be used when regenerating a stroke from this input
+     * batch.
+     */
+    @ExperimentalInkCustomBrushApi
+    public fun setNoiseSeed(seed: Int): Unit =
+        MutableStrokeInputBatchNative.setNoiseSeed(nativePointer, seed)
 
     /** Create [ImmutableStrokeInputBatch] with the accumulated StrokeInputs. */
     @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) // NonPublicApi
     public override fun asImmutable(): ImmutableStrokeInputBatch =
-        if (isEmpty()) {
+        @OptIn(ExperimentalInkCustomBrushApi::class)
+        if (isEmpty() && getNoiseSeed() == 0) {
             ImmutableStrokeInputBatch.EMPTY
         } else {
-            ImmutableStrokeInputBatch(MutableStrokeInputBatchNative.copy(nativePointer))
+            ImmutableStrokeInputBatch.wrapNative(
+                MutableStrokeInputBatchNative.newCopy(nativePointer)
+            )
         }
 
     public override fun toString(): String = "MutableStrokeInputBatch(size=$size)"
 }
 
+@UsedByNative
 private object StrokeInputBatchNative {
 
     init {
         NativeLoader.load()
     }
 
-    @UsedByNative external fun createNativePeer(): Long
+    @UsedByNative external fun create(): Long
 
-    @UsedByNative external fun freeNativePeer(nativePointer: Long)
+    @UsedByNative external fun free(nativePointer: Long)
 
     @UsedByNative external fun getSize(nativePointer: Long): Int
 
@@ -419,6 +437,8 @@ private object StrokeInputBatchNative {
 
     @UsedByNative external fun hasOrientation(nativePointer: Long): Boolean
 
+    @UsedByNative external fun getNoiseSeed(nativePointer: Long): Int
+
     /**
      * The [toolTypeClass] parameter is passed as a convenience to native JNI code, to avoid it
      * needing to do a reflection-based FindClass lookup.
@@ -432,6 +452,7 @@ private object StrokeInputBatchNative {
     )
 }
 
+@UsedByNative
 private object MutableStrokeInputBatchNative {
     init {
         NativeLoader.load()
@@ -439,6 +460,7 @@ private object MutableStrokeInputBatchNative {
 
     @UsedByNative external fun clear(nativePointer: Long)
 
+    /** Returns whether the input was successfully added. */
     @UsedByNative
     external fun appendSingle(
         nativePointer: Long,
@@ -450,9 +472,18 @@ private object MutableStrokeInputBatchNative {
         pressure: Float,
         tilt: Float,
         orientation: Float,
-    ): String?
+        throwOnError: Boolean,
+    ): Boolean
 
-    @UsedByNative external fun appendBatch(nativePointer: Long, addedNativePointer: Long): String?
+    /** Returns whether the inputs were successfully added. */
+    @UsedByNative
+    external fun appendBatch(
+        nativePointer: Long,
+        addedNativePointer: Long,
+        throwOnError: Boolean,
+    ): Boolean
 
-    @UsedByNative external fun copy(nativePointer: Long): Long
+    @UsedByNative external fun newCopy(nativePointer: Long): Long
+
+    @UsedByNative external fun setNoiseSeed(nativePointer: Long, seed: Int)
 }

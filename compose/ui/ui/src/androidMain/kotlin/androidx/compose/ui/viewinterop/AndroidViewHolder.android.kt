@@ -20,6 +20,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.graphics.Region
 import android.os.Build
+import android.os.Build.VERSION.SDK_INT
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewParent
@@ -32,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
@@ -114,14 +114,14 @@ internal open class AndroidViewHolder(
             object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
                 override fun onStart(
                     animation: WindowInsetsAnimationCompat,
-                    bounds: WindowInsetsAnimationCompat.BoundsCompat
+                    bounds: WindowInsetsAnimationCompat.BoundsCompat,
                 ): WindowInsetsAnimationCompat.BoundsCompat = insetBounds(bounds)
 
                 override fun onProgress(
                     insets: WindowInsetsCompat,
-                    runningAnimations: MutableList<WindowInsetsAnimationCompat>
+                    runningAnimations: MutableList<WindowInsetsAnimationCompat>,
                 ): WindowInsetsCompat = insetToLayoutPosition(insets)
-            }
+            },
         )
         ViewCompat.setOnApplyWindowInsetsListener(this, this)
     }
@@ -187,6 +187,7 @@ internal open class AndroidViewHolder(
 
     private val position = IntArray(2)
     private var size = IntSize.Zero
+    private var insets: WindowInsetsCompat? = null
 
     /**
      * The [OwnerSnapshotObserver] of this holder's [Owner]. Will be null when this view is not
@@ -255,7 +256,7 @@ internal open class AndroidViewHolder(
         if (view.parent !== this) {
             setMeasuredDimension(
                 MeasureSpec.getSize(widthMeasureSpec),
-                MeasureSpec.getSize(heightMeasureSpec)
+                MeasureSpec.getSize(heightMeasureSpec),
             )
             return
         }
@@ -307,7 +308,7 @@ internal open class AndroidViewHolder(
     // When there is no hardware acceleration invalidates are intercepted using this method,
     // otherwise using onDescendantInvalidated. Return null to avoid invalidating the
     // AndroidComposeView or the handler.
-    @Suppress("Deprecation")
+    @Suppress("OVERRIDE_DEPRECATION", "Deprecation")
     override fun invalidateChildInParent(location: IntArray?, dirty: Rect?): ViewParent? {
         super.invalidateChildInParent(location, dirty)
         invalidateOrDefer()
@@ -353,7 +354,7 @@ internal open class AndroidViewHolder(
             location[1],
             location[0] + width,
             location[1] + height,
-            Region.Op.DIFFERENCE
+            Region.Op.DIFFERENCE,
         )
         return true
     }
@@ -365,14 +366,6 @@ internal open class AndroidViewHolder(
     val layoutNode: LayoutNode = run {
         // Prepare layout node that proxies measure and layout passes to the View.
         val layoutNode = LayoutNode()
-
-        // there is an issue in how SurfaceViews being drawn into the new layers. this flag is
-        // a workaround until we find a better solution. it allows us to create an extra rendernode
-        // wrapping android views using the old implementation of layers, where we don't do
-        // layer persistence logic, as it causes SurfaceView flickering.
-        // we should find a better fix as part of b/348144529
-        layoutNode.forceUseOldLayers = true
-
         @OptIn(InternalComposeUiApi::class)
         layoutNode.interopViewFactoryHolder = this@AndroidViewHolder
 
@@ -380,15 +373,13 @@ internal open class AndroidViewHolder(
             Modifier.nestedScroll(NoOpScrollConnection, dispatcher)
                 .semantics(true) {}
                 .pointerInteropFilter(this)
-                // we don't normally need an extra layer here, it is a workaround for b/348144529
-                .graphicsLayer()
                 .drawBehind {
                     drawIntoCanvas { canvas ->
                         if (view.visibility != GONE) {
                             isDrawing = true
                             (layoutNode.owner as? AndroidComposeView)?.drawAndroidView(
                                 this@AndroidViewHolder,
-                                canvas.nativeCanvas
+                                canvas.nativeCanvas,
                             )
                             isDrawing = false
                         }
@@ -404,8 +395,27 @@ internal open class AndroidViewHolder(
                     view.getLocationOnScreen(position)
                     val oldSize = size
                     size = it.size
-                    if (previousX != position[0] || previousY != position[1] || oldSize != size) {
-                        view.requestApplyInsets()
+                    val previouslyDispatchedInsets = insets
+                    if (previouslyDispatchedInsets != null) {
+                        if (
+                            previousX != position[0] || previousY != position[1] || oldSize != size
+                        ) {
+                            // If we have previously been dispatched insets (no parents consumed
+                            // the insets already), we need to dispatch the insets again when the
+                            // view is moved as this could cause the insets (once we account for
+                            // the layout position) to change.
+                            insetToLayoutPosition(previouslyDispatchedInsets)
+                                .toWindowInsets()
+                                ?.let { translatedInsets ->
+                                    // Re-dispatch the insets - we do this instead of calling
+                                    // requestApplyInsets() as that schedules a full traversal of
+                                    // the
+                                    // view hierarchy - there is no need to do that when only the
+                                    // AndroidView moved. Other changes that cause insets to change
+                                    // will be dispatched as normal.
+                                    view.dispatchApplyWindowInsets(translatedInsets)
+                                }
+                        }
                     }
                 }
         layoutNode.compositeKeyHash = compositeKeyHash
@@ -432,7 +442,7 @@ internal open class AndroidViewHolder(
             object : MeasurePolicy {
                 override fun MeasureScope.measure(
                     measurables: List<Measurable>,
-                    constraints: Constraints
+                    constraints: Constraints,
                 ): MeasureResult {
                     if (childCount == 0) {
                         return layout(constraints.minWidth, constraints.minHeight) {}
@@ -449,49 +459,49 @@ internal open class AndroidViewHolder(
                         obtainMeasureSpec(
                             constraints.minWidth,
                             constraints.maxWidth,
-                            layoutParams!!.width
+                            layoutParams!!.width,
                         ),
                         obtainMeasureSpec(
                             constraints.minHeight,
                             constraints.maxHeight,
-                            layoutParams!!.height
-                        )
+                            layoutParams!!.height,
+                        ),
                     )
                     return layout(measuredWidth, measuredHeight) { layoutAccordingTo(layoutNode) }
                 }
 
                 override fun IntrinsicMeasureScope.minIntrinsicWidth(
                     measurables: List<IntrinsicMeasurable>,
-                    height: Int
+                    height: Int,
                 ) = intrinsicWidth(height)
 
                 override fun IntrinsicMeasureScope.maxIntrinsicWidth(
                     measurables: List<IntrinsicMeasurable>,
-                    height: Int
+                    height: Int,
                 ) = intrinsicWidth(height)
 
                 private fun intrinsicWidth(height: Int): Int {
                     measure(
                         MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                        obtainMeasureSpec(0, height, layoutParams!!.height)
+                        obtainMeasureSpec(0, height, layoutParams!!.height),
                     )
                     return measuredWidth
                 }
 
                 override fun IntrinsicMeasureScope.minIntrinsicHeight(
                     measurables: List<IntrinsicMeasurable>,
-                    width: Int
+                    width: Int,
                 ) = intrinsicHeight(width)
 
                 override fun IntrinsicMeasureScope.maxIntrinsicHeight(
                     measurables: List<IntrinsicMeasurable>,
-                    width: Int
+                    width: Int,
                 ) = intrinsicHeight(width)
 
                 private fun intrinsicHeight(width: Int): Int {
                     measure(
                         obtainMeasureSpec(0, width, layoutParams!!.width),
-                        MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+                        MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
                     )
                     return measuredHeight
                 }
@@ -554,14 +564,14 @@ internal open class AndroidViewHolder(
         dxUnconsumed: Int,
         dyUnconsumed: Int,
         type: Int,
-        consumed: IntArray
+        consumed: IntArray,
     ) {
         if (!isNestedScrollingEnabled) return
         val consumedByParent =
             dispatcher.dispatchPostScroll(
                 consumed = Offset(dxConsumed.toComposeOffset(), dyConsumed.toComposeOffset()),
                 available = Offset(dxUnconsumed.toComposeOffset(), dyUnconsumed.toComposeOffset()),
-                source = toNestedScrollSource(type)
+                source = toNestedScrollSource(type),
             )
         consumed[0] = composeToViewOffset(consumedByParent.x)
         consumed[1] = composeToViewOffset(consumedByParent.y)
@@ -573,13 +583,13 @@ internal open class AndroidViewHolder(
         dyConsumed: Int,
         dxUnconsumed: Int,
         dyUnconsumed: Int,
-        type: Int
+        type: Int,
     ) {
         if (!isNestedScrollingEnabled) return
         dispatcher.dispatchPostScroll(
             consumed = Offset(dxConsumed.toComposeOffset(), dyConsumed.toComposeOffset()),
             available = Offset(dxUnconsumed.toComposeOffset(), dyUnconsumed.toComposeOffset()),
-            source = toNestedScrollSource(type)
+            source = toNestedScrollSource(type),
         )
     }
 
@@ -588,7 +598,7 @@ internal open class AndroidViewHolder(
         val consumedByParent =
             dispatcher.dispatchPreScroll(
                 available = Offset(dx.toComposeOffset(), dy.toComposeOffset()),
-                source = toNestedScrollSource(type)
+                source = toNestedScrollSource(type),
             )
         consumed[0] = composeToViewOffset(consumedByParent.x)
         consumed[1] = composeToViewOffset(consumedByParent.y)
@@ -598,7 +608,7 @@ internal open class AndroidViewHolder(
         target: View,
         velocityX: Float,
         velocityY: Float,
-        consumed: Boolean
+        consumed: Boolean,
     ): Boolean {
         if (!isNestedScrollingEnabled) return false
         val viewVelocity = Velocity(velocityX.toComposeVelocity(), velocityY.toComposeVelocity())
@@ -624,6 +634,8 @@ internal open class AndroidViewHolder(
     }
 
     override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        // Cache a copy of the last known insets
+        this.insets = WindowInsetsCompat(insets)
         return insetToLayoutPosition(insets)
     }
 
@@ -665,7 +677,7 @@ internal open class AndroidViewHolder(
             (this.left - left).fastCoerceAtLeast(0),
             (this.top - top).fastCoerceAtLeast(0),
             (this.right - right).fastCoerceAtLeast(0),
-            (this.bottom - bottom).fastCoerceAtLeast(0)
+            (this.bottom - bottom).fastCoerceAtLeast(0),
         )
     }
 

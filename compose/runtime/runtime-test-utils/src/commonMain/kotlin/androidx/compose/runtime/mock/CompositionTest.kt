@@ -25,7 +25,7 @@ import androidx.compose.runtime.Recomposer
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.tooling.CompositionObserver
 import androidx.compose.runtime.tooling.CompositionObserverHandle
-import androidx.compose.runtime.tooling.observe
+import androidx.compose.runtime.tooling.setObserver
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
@@ -36,14 +36,11 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 
 @OptIn(InternalComposeApi::class, ExperimentalCoroutinesApi::class)
-fun compositionTest(
-    recomposeInvoker: suspend (block: suspend () -> Unit) -> Unit = { it() },
-    block: suspend CompositionTestScope.() -> Unit,
-) = runTest {
+fun compositionTest(block: suspend CompositionTestScope.() -> Unit) = runTest {
     withContext(TestMonotonicFrameClock(this)) {
         // Start the recomposer
         val recomposer = Recomposer(coroutineContext)
-        launch { recomposeInvoker { recomposer.runRecomposeAndApplyChanges() } }
+        launch { recomposer.runRecomposeAndApplyChanges() }
         testScheduler.runCurrent()
 
         // Create a test scope for the test using the test scope passed in by runTest
@@ -69,13 +66,13 @@ fun compositionTest(
                 @OptIn(ExperimentalComposeRuntimeApi::class)
                 override fun compose(
                     observer: CompositionObserver,
-                    block: @Composable () -> Unit
+                    block: @Composable () -> Unit,
                 ): CompositionObserverHandle? {
                     check(!composed) { "Compose should only be called once" }
                     composed = true
                     root = View().apply { name = "root" }
                     val composition = Composition(ViewApplier(root), recomposer)
-                    val result = composition.observe(observer)
+                    val result = composition.setObserver(observer)
                     this.composition = composition
                     composition.setContent(block)
                     return result
@@ -105,9 +102,16 @@ fun compositionTest(
                 override var validator: (MockViewValidator.() -> Unit)? = null
             }
         scope.block()
-        scope.composition?.dispose()
-        recomposer.cancel()
-        recomposer.join()
+
+        try {
+            scope.composition?.dispose()
+        } catch (_: Throwable) {
+            // suppress
+        } finally {
+            scope.composition = null
+            recomposer.cancel()
+            recomposer.join()
+        }
     }
 }
 
@@ -125,7 +129,7 @@ interface CompositionTestScope : CoroutineScope {
     @OptIn(ExperimentalComposeRuntimeApi::class)
     fun compose(
         observer: CompositionObserver,
-        block: @Composable () -> Unit
+        block: @Composable () -> Unit,
     ): CompositionObserverHandle?
 
     /**
@@ -150,7 +154,7 @@ interface CompositionTestScope : CoroutineScope {
     var validator: (MockViewValidator.() -> Unit)?
 
     /** Access to the composition created for the call to [compose] */
-    val composition: Composition?
+    var composition: Composition?
 }
 
 /** Create a mock view validator and validate the view. */

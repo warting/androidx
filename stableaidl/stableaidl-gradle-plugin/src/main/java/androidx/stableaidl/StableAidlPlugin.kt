@@ -17,6 +17,7 @@
 package androidx.stableaidl
 
 import androidx.stableaidl.api.StableAidlExtension
+import com.android.build.api.dsl.CommonExtension
 import com.android.build.api.dsl.SdkComponents
 import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.DslExtension
@@ -51,16 +52,15 @@ abstract class StableAidlPlugin : Plugin<Project> {
         }
     }
 
-    @Suppress("UnstableApiUsage") // for SdkComponents.getAidl(), Aidl, and DSL extension methods
+    // Suppress UnstableApiUsage for SdkComponents.getAidl(), Aidl, and DSL extension methods
+    @Suppress("UnstableApiUsage")
     private fun applyAfterAgp(project: Project) {
         val androidComponents = project.extensions.getByType(AndroidComponentsExtension::class.java)
-
         val extension =
             project.extensions.create(EXTENSION_NAME, StableAidlExtensionImpl::class.java)
 
         val aidl = androidComponents.sdkComponents.aidl.get()
         val aidlExecutable = aidl.executable
-        val aidlFramework = aidl.framework
         val aidlVersion = aidl.version
 
         // Extend the android sourceSet.
@@ -90,18 +90,43 @@ abstract class StableAidlPlugin : Plugin<Project> {
             val builtApiDir = project.layout.buildDirectory.dir(apiDirName)
             val frozenApiDir = project.layout.projectDirectory.dir("$apiDirName/$CURRENT_API_DIR")
 
+            // The framework supports Stable AIDL definitions starting in SDK 36. Prior to that,
+            // we'll need to use manually-defined stubs.
+            val compileSdkProvider =
+                project.provider {
+                    project.extensions.getByType(CommonExtension::class.java).compileSdk
+                        ?: throw RuntimeException("Failed to obtain compile SDK")
+                }
+            val aidlFramework =
+                compileSdkProvider.flatMap { compileSdk ->
+                    if (compileSdk >= 36) {
+                        aidl.framework
+                    } else {
+                        project.objects.fileProperty()
+                    }
+                }
+            val shadowFramework =
+                compileSdkProvider.flatMap { compileSdk ->
+                    if (compileSdk < 36) {
+                        extension.shadowFrameworkDir
+                    } else {
+                        project.objects.directoryProperty()
+                    }
+                }
+
             val compileAidlApiTask =
                 registerCompileAidlApi(
                     project,
                     variant,
                     aidlExecutable,
                     aidlFramework,
+                    shadowFramework,
                     aidlVersion,
                     sourceDir,
                     packagedDir,
                     importsDir,
                     depImports,
-                    outputDir
+                    outputDir,
                 )
 
             // To avoid using the same output directory as AGP's AidlCompile task, we need to
@@ -114,12 +139,13 @@ abstract class StableAidlPlugin : Plugin<Project> {
                     variant,
                     aidlExecutable,
                     aidlFramework,
+                    shadowFramework,
                     aidlVersion,
                     sourceDir,
                     importsDir,
                     depImports,
                     builtApiDir,
-                    compileAidlApiTask
+                    compileAidlApiTask,
                 )
             val checkAidlApiReleaseTask =
                 registerCheckApiAidlRelease(
@@ -127,10 +153,11 @@ abstract class StableAidlPlugin : Plugin<Project> {
                     variant,
                     aidlExecutable,
                     aidlFramework,
+                    shadowFramework,
                     importsDir,
                     depImports,
                     frozenApiDir,
-                    generateAidlApiTask
+                    generateAidlApiTask,
                 )
             val checkAidlApiTask =
                 registerCheckAidlApi(
@@ -138,11 +165,12 @@ abstract class StableAidlPlugin : Plugin<Project> {
                     variant,
                     aidlExecutable,
                     aidlFramework,
+                    shadowFramework,
                     importsDir,
                     depImports,
                     frozenApiDir,
                     generateAidlApiTask,
-                    checkAidlApiReleaseTask
+                    checkAidlApiReleaseTask,
                 )
             val updateAidlApiTask =
                 registerUpdateAidlApi(
@@ -150,7 +178,7 @@ abstract class StableAidlPlugin : Plugin<Project> {
                     variant,
                     frozenApiDir,
                     generateAidlApiTask,
-                    checkAidlApiReleaseTask
+                    checkAidlApiReleaseTask,
                 )
 
             if (variant.name == DEFAULT_VARIANT_NAME) {
@@ -168,7 +196,7 @@ abstract class StableAidlPlugin : Plugin<Project> {
                     generateAidlApiTask,
                     checkAidlApiReleaseTask,
                     checkAidlApiTask,
-                    updateAidlApiTask
+                    updateAidlApiTask,
                 )
         }
     }

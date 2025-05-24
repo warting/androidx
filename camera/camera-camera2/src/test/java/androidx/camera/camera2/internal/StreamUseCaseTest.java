@@ -24,6 +24,7 @@ import static androidx.camera.core.DynamicRange.BIT_DEPTH_10_BIT;
 import static androidx.camera.core.DynamicRange.BIT_DEPTH_8_BIT;
 import static androidx.camera.core.ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY;
 import static androidx.camera.core.ImageCapture.CAPTURE_MODE_ZERO_SHUTTER_LAG;
+import static androidx.camera.core.impl.StreamSpec.FRAME_RATE_RANGE_UNSPECIFIED;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -238,11 +239,13 @@ public class StreamUseCaseTest {
     public void shouldUseStreamUseCase_cameraModeNotSupported() {
         FeatureSettings featureSettings = FeatureSettings.of(
                 CameraMode.CONCURRENT_CAMERA,
+                /*hasVideoCapture=*/ false,
                 BIT_DEPTH_8_BIT,
                 /*isPreviewStabilizationOn=*/false,
                 /*isUltraHdrOn=*/ false,
-                /*isHighSpeedOn=*/ false
-        );
+                /*isHighSpeedOn=*/ false,
+                /*requiresFeatureComboQuery=*/ false,
+                /*targetFpsRange=*/ FRAME_RATE_RANGE_UNSPECIFIED);
         assertFalse(shouldUseStreamUseCase(featureSettings));
     }
 
@@ -250,11 +253,13 @@ public class StreamUseCaseTest {
     public void shouldUseStreamUseCase_bitDepthNotSupported() {
         FeatureSettings featureSettings = FeatureSettings.of(
                 CameraMode.DEFAULT,
+                /*hasVideoCapture=*/ false,
                 BIT_DEPTH_10_BIT,
                 /*isPreviewStabilizationOn=*/false,
                 /*isUltraHdrOn=*/ false,
-                /*isHighSpeedOn=*/ false
-        );
+                /*isHighSpeedOn=*/ false,
+                /*requiresFeatureComboQuery=*/ false,
+                /*targetFpsRange=*/ FRAME_RATE_RANGE_UNSPECIFIED);
         assertFalse(shouldUseStreamUseCase(featureSettings));
     }
 
@@ -519,7 +524,8 @@ public class StreamUseCaseTest {
                         DynamicRange.SDR,
                         captureTypes,
                         /*implementationOptions=*/null,
-                        /*targetFrameRate=*/null));
+                        FRAME_RATE_RANGE_UNSPECIFIED,
+                        FRAME_RATE_RANGE_UNSPECIFIED));
 
         assertTrue(StreamUseCaseUtil.areCaptureTypesEligible(surfaceConfigAttachedSurfaceInfoMap,
                 surfaceConfigUseCaseConfigMap, surfaceConfigsWithStreamUseCase));
@@ -549,7 +555,8 @@ public class StreamUseCaseTest {
                         DynamicRange.SDR,
                         captureTypes,
                         /*implementationOptions=*/null,
-                        /*targetFrameRate=*/null));
+                        FRAME_RATE_RANGE_UNSPECIFIED,
+                        FRAME_RATE_RANGE_UNSPECIFIED));
 
         assertFalse(StreamUseCaseUtil.areCaptureTypesEligible(surfaceConfigAttachedSurfaceInfoMap,
                 surfaceConfigUseCaseConfigMap, surfaceConfigsWithStreamUseCase));
@@ -667,7 +674,8 @@ public class StreamUseCaseTest {
                 DynamicRange.SDR,
                 captureTypes,
                 StreamUseCaseUtil.getStreamSpecImplementationOptions(useCaseConfig),
-                /*targetFrameRate=*/null);
+                FRAME_RATE_RANGE_UNSPECIFIED,
+                FRAME_RATE_RANGE_UNSPECIFIED);
     }
 
     private StreamSpec getFakeStreamSpecFromFakeUseCaseConfig(UseCaseConfig<?> fakeUseCaseConfig) {

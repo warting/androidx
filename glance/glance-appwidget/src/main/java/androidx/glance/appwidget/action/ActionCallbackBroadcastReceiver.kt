@@ -31,7 +31,7 @@ import androidx.glance.appwidget.logException
 import kotlinx.coroutines.CancellationException
 
 /** Responds to broadcasts from [RunCallbackAction] clicks by executing the associated action. */
-open class ActionCallbackBroadcastReceiver : BroadcastReceiver() {
+public open class ActionCallbackBroadcastReceiver : BroadcastReceiver() {
 
     @Suppress("DEPRECATION")
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -85,7 +85,7 @@ open class ActionCallbackBroadcastReceiver : BroadcastReceiver() {
         internal fun createIntent(
             translationContext: TranslationContext,
             callbackClass: Class<out ActionCallback>,
-            parameters: ActionParameters
+            parameters: ActionParameters,
         ) =
             Intent()
                 .setComponent(translationContext.glanceComponents.actionCallbackBroadcastReceiver)

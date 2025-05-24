@@ -1,22 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<issues format="6" by="lint 8.8.0-alpha01" type="baseline" client="gradle" dependencies="false" name="AGP (8.8.0-alpha01)" variant="all" version="8.8.0-alpha01">
+<issues format="6" by="lint 8.11.0-alpha10" type="baseline" client="gradle" dependencies="false" name="AGP (8.11.0-alpha10)" variant="all" version="8.11.0-alpha10">
 
     <issue
-        id="ExperimentalPropertyAnnotation"
-        message="This property does not have all required annotations to correctly mark it as experimental."
-        errorLine1="    @InternalComposeApi"
-        errorLine2="    ~~~~~~~~~~~~~~~~~~~">
+        id="ListIterator"
+        message="Creating an unnecessary Iterator to iterate through a List"
+        errorLine1="    if (suppressedExceptions.none { it is DiagnosticComposeException }) {"
+        errorLine2="                             ~~~~">
         <location
-            file="src/commonMain/kotlin/androidx/compose/runtime/Composer.kt"/>
+            file="src/commonMain/kotlin/androidx/compose/runtime/tooling/ComposeStackTrace.kt"/>
     </issue>
 
     <issue
-        id="ExperimentalPropertyAnnotation"
-        message="This property does not have all required annotations to correctly mark it as experimental."
-        errorLine1="@InternalComposeApi"
-        errorLine2="~~~~~~~~~~~~~~~~~~~">
+        id="ListIterator"
+        message="Creating an unnecessary Iterator to iterate through a List"
+        errorLine1="                .map { it.substringBefore(&apos;@&apos;).substringAfter(&apos;*&apos;).toInt() + 1 }"
+        errorLine2="                 ~~~">
         <location
-            file="src/commonMain/kotlin/androidx/compose/runtime/internal/LiveLiteral.kt"/>
+            file="src/commonMain/kotlin/androidx/compose/runtime/tooling/ComposeStackTraceBuilder.kt"/>
+    </issue>
+
+    <issue
+        id="ListIterator"
+        message="Creating an unnecessary Iterator to iterate through a List"
+        errorLine1="    getCurrentCompositionErrors().mapNotNull { (cause, recoverable) ->"
+        errorLine2="                                  ~~~~~~~~~~">
+        <location
+            file="src/commonMain/kotlin/androidx/compose/runtime/HotReloader.kt"/>
+    </issue>
+
+    <issue
+        id="ListIterator"
+        message="Creating an unnecessary Iterator to iterate through a List"
+        errorLine1="                    val tail = it.drop(1)"
+        errorLine2="                                  ~~~~">
+        <location
+            file="src/commonMain/kotlin/androidx/compose/runtime/changelist/Operation.kt"/>
+    </issue>
+
+    <issue
+        id="ListIterator"
+        message="Creating an unnecessary Iterator to iterate through a List"
+        errorLine1="            knownCompositions.forEach { composition ->"
+        errorLine2="                              ~~~~~~~">
+        <location
+            file="src/commonMain/kotlin/androidx/compose/runtime/Recomposer.kt"/>
+    </issue>
+
+    <issue
+        id="ListIterator"
+        message="Creating an unnecessary Iterator to iterate through a List"
+        errorLine1="                                    pairs.map { pair ->"
+        errorLine2="                                          ~~~">
+        <location
+            file="src/commonMain/kotlin/androidx/compose/runtime/Recomposer.kt"/>
     </issue>
 
     <issue
@@ -26,24 +62,6 @@
         errorLine2="                ^">
         <location
             file="src/jvmMain/kotlin/androidx/compose/runtime/reflect/ComposableMethod.jvm.kt"/>
-    </issue>
-
-    <issue
-        id="PrimitiveInCollection"
-        message="field intParams with type List&lt;IntParameter>: replace with IntList"
-        errorLine1="        val intParams = List(ints) { index -> IntParameter(index) }"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/commonMain/kotlin/androidx/compose/runtime/changelist/Operation.kt"/>
-    </issue>
-
-    <issue
-        id="PrimitiveInCollection"
-        message="return type List&lt;IntParameter> of getIntParams: replace with IntList"
-        errorLine1="        val intParams = List(ints) { index -> IntParameter(index) }"
-        errorLine2="            ~~~~~~~~~">
-        <location
-            file="src/commonMain/kotlin/androidx/compose/runtime/changelist/Operation.kt"/>
     </issue>
 
     <issue
@@ -188,33 +206,6 @@
         errorLine2="                     ~~~~~~~~~~~">
         <location
             file="src/commonMain/kotlin/androidx/compose/runtime/SlotTable.kt"/>
-    </issue>
-
-    <issue
-        id="PrimitiveInCollection"
-        message="constructor PrioritySet has parameter list with type List&lt;Integer>: replace with IntList"
-        errorLine1="internal class PrioritySet(private val list: MutableList&lt;Int> = mutableListOf()) {"
-        errorLine2="                                             ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/commonMain/kotlin/androidx/compose/runtime/SlotTable.kt"/>
-    </issue>
-
-    <issue
-        id="PrimitiveInCollection"
-        message="field list with type List&lt;Integer>: replace with IntList"
-        errorLine1="internal class PrioritySet(private val list: MutableList&lt;Int> = mutableListOf()) {"
-        errorLine2="                                             ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/commonMain/kotlin/androidx/compose/runtime/SlotTable.kt"/>
-    </issue>
-
-    <issue
-        id="PrimitiveInCollection"
-        message="variable newBelowBound with type List&lt;Integer>: replace with IntList"
-        errorLine1="                var newBelowBound: MutableList&lt;Int>? = null"
-        errorLine2="                                   ~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/commonMain/kotlin/androidx/compose/runtime/snapshots/SnapshotIdSet.kt"/>
     </issue>
 
     <issue

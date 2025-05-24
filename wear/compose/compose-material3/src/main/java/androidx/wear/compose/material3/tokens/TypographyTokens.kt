@@ -42,8 +42,7 @@ internal object TypographyTokens {
                     .toFontFamily(),
             fontWeight = FontWeight(TypeScaleTokens.ArcLargeWeight.toInt()),
             fontSize = TypeScaleTokens.ArcLargeSize,
-            // TODO: http://b/392091195
-            // lineHeight = TypeScaleTokens.ArcLargeLineHeight,
+            lineHeight = TypeScaleTokens.ArcLargeLineHeight,
             letterSpacing = TypeScaleTokens.ArcLargeTrackingTop,
             letterSpacingCounterClockwise = TypeScaleTokens.ArcLargeTrackingBottom,
         )
@@ -53,14 +52,12 @@ internal object TypographyTokens {
                 Font(
                         DeviceFontFamilyName(TypeScaleTokens.ArcMediumFont.name),
                         weight = FontWeight(TypeScaleTokens.ArcMediumWeight.toInt()),
-                        variationSettings =
-                            TypographyVariableFontsTokens.ArcMediumVariationSettings,
+                        variationSettings = TypographyVariableFontsTokens.ArcMediumVariationSettings,
                     )
                     .toFontFamily(),
             fontWeight = FontWeight(TypeScaleTokens.ArcMediumWeight.toInt()),
             fontSize = TypeScaleTokens.ArcMediumSize,
-            // TODO: http://b/392091195
-            // lineHeight = TypeScaleTokens.ArcMediumLineHeight,
+            lineHeight = TypeScaleTokens.ArcMediumLineHeight,
             letterSpacing = TypeScaleTokens.ArcMediumTrackingTop,
             letterSpacingCounterClockwise = TypeScaleTokens.ArcMediumTrackingBottom,
         )
@@ -75,8 +72,7 @@ internal object TypographyTokens {
                     .toFontFamily(),
             fontWeight = FontWeight(TypeScaleTokens.ArcSmallWeight.toInt()),
             fontSize = TypeScaleTokens.ArcSmallSize,
-            // TODO: http://b/392091195
-            // lineHeight = TypeScaleTokens.ArcSmallLineHeight,
+            lineHeight = TypeScaleTokens.ArcSmallLineHeight,
             letterSpacing = TypeScaleTokens.ArcSmallTrackingTop,
             letterSpacingCounterClockwise = TypeScaleTokens.ArcSmallTrackingBottom,
         )
@@ -101,8 +97,7 @@ internal object TypographyTokens {
                 Font(
                         DeviceFontFamilyName(TypeScaleTokens.BodyLargeFont.name),
                         weight = FontWeight(TypeScaleTokens.BodyLargeWeight.toInt()),
-                        variationSettings =
-                            TypographyVariableFontsTokens.BodyLargeVariationSettings,
+                        variationSettings = TypographyVariableFontsTokens.BodyLargeVariationSettings,
                     )
                     .toFontFamily(),
             fontWeight = FontWeight(TypeScaleTokens.BodyLargeWeight.toInt()),
@@ -131,8 +126,7 @@ internal object TypographyTokens {
                 Font(
                         DeviceFontFamilyName(TypeScaleTokens.BodySmallFont.name),
                         weight = FontWeight(TypeScaleTokens.BodySmallWeight.toInt()),
-                        variationSettings =
-                            TypographyVariableFontsTokens.BodySmallVariationSettings,
+                        variationSettings = TypographyVariableFontsTokens.BodySmallVariationSettings,
                     )
                     .toFontFamily(),
             fontWeight = FontWeight(TypeScaleTokens.BodySmallWeight.toInt()),

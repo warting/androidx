@@ -89,7 +89,8 @@ internal data class ViewInfo(
     val bounds: IntRect,
     val location: SourceLocation?,
     val children: List<ViewInfo>,
-    val layoutInfo: Any?
+    val layoutInfo: Any?,
+    val name: String?,
 ) {
     fun hasBounds(): Boolean = bounds.bottom != 0 && bounds.right != 0
 
@@ -192,7 +193,7 @@ internal class ComposeViewAdapter : FrameLayout {
     constructor(
         context: Context,
         attrs: AttributeSet,
-        defStyleAttr: Int
+        defStyleAttr: Int,
     ) : super(context, attrs, defStyleAttr) {
         init(attrs)
     }
@@ -229,7 +230,8 @@ internal class ComposeViewAdapter : FrameLayout {
             box,
             location,
             childrenViewInfo,
-            layoutInfo
+            layoutInfo,
+            name,
         )
     }
 
@@ -324,7 +326,7 @@ internal class ComposeViewAdapter : FrameLayout {
                 DESIGN_INFO_METHOD,
                 Integer.TYPE,
                 Integer.TYPE,
-                String::class.java
+                String::class.java,
             )
         } catch (e: NoSuchMethodException) {
             null
@@ -362,7 +364,7 @@ internal class ComposeViewAdapter : FrameLayout {
                                 it.bounds.left,
                                 it.bounds.top,
                                 it.bounds.right,
-                                it.bounds.bottom
+                                it.bounds.bottom,
                             )
                         drawRect(pxBounds, debugBoundsPaint)
                     }
@@ -424,7 +426,7 @@ internal class ComposeViewAdapter : FrameLayout {
         lookForDesignInfoProviders: Boolean = false,
         designInfoProvidersArgument: String? = null,
         onCommit: () -> Unit = {},
-        onDraw: () -> Unit = {}
+        onDraw: () -> Unit = {},
     ) {
         this.debugPaintBounds = debugPaintBounds
         this.debugViewInfos = debugViewInfos
@@ -452,8 +454,8 @@ internal class ComposeViewAdapter : FrameLayout {
                                 composer,
                                 *getPreviewProviderParameters(
                                     parameterProvider,
-                                    parameterProviderIndex
-                                )
+                                    parameterProviderIndex,
+                                ),
                             )
                         } catch (t: Throwable) {
                             // If there is an exception, store it for later but do not catch it so
@@ -551,10 +553,10 @@ internal class ComposeViewAdapter : FrameLayout {
                 attrs.getAttributeBooleanValue(
                     TOOLS_NS_URI,
                     "findDesignInfoProviders",
-                    lookForDesignInfoProviders
+                    lookForDesignInfoProviders,
                 ),
             designInfoProvidersArgument =
-                attrs.getAttributeValue(TOOLS_NS_URI, "designInfoProvidersArgument")
+                attrs.getAttributeValue(TOOLS_NS_URI, "designInfoProvidersArgument"),
         )
     }
 
@@ -599,7 +601,7 @@ internal class ComposeViewAdapter : FrameLayout {
                         requestCode: Int,
                         contract: ActivityResultContract<I, O>,
                         input: I,
-                        options: ActivityOptionsCompat?
+                        options: ActivityOptionsCompat?,
                     ) {
                         throw IllegalStateException("Calling launch() is not supported in Preview")
                     }

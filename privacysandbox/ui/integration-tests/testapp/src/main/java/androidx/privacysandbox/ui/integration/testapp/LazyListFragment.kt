@@ -34,8 +34,9 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import androidx.privacysandbox.ui.client.SandboxedUiAdapterFactory
-import androidx.privacysandbox.ui.client.view.SandboxedSdkUi
+import androidx.privacysandbox.ui.client.compose.SandboxedSdkUi
 import androidx.privacysandbox.ui.core.SandboxedUiAdapter
+import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.AdFormat
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -44,10 +45,12 @@ class LazyListFragment : BaseFragment() {
     private var adapters by mutableStateOf(listOf<AdAdapterItem>())
 
     override fun handleLoadAdFromDrawer(
+        adFormat: Int,
         adType: Int,
         mediationOption: Int,
-        drawViewabilityLayer: Boolean
+        drawViewabilityLayer: Boolean,
     ) {
+        currentAdFormat = adFormat
         currentAdType = adType
         currentMediationOption = mediationOption
         shouldDrawViewabilityLayer = drawViewabilityLayer
@@ -57,7 +60,7 @@ class LazyListFragment : BaseFragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         initializeBannerAdAdapter(count = 10)
         return ComposeView(requireContext()).apply {
@@ -76,12 +79,12 @@ class LazyListFragment : BaseFragment() {
             items(
                 items = adAdapters,
                 key = { adapterWithId -> adapterWithId.id },
-                contentType = { adapterItem -> adapterItem.contentType }
+                contentType = { adapterItem -> adapterItem.contentType },
             ) { adapterWithId ->
                 SandboxedSdkUi(
                     adapterWithId.adapter,
                     Modifier.fillParentMaxSize(),
-                    providerUiOnTop = providerUiOnTop
+                    providerUiOnTop = providerUiOnTop,
                 )
             }
         }
@@ -98,13 +101,14 @@ class LazyListFragment : BaseFragment() {
                         adapter =
                             SandboxedUiAdapterFactory.createFromCoreLibInfo(
                                 getSdkApi()
-                                    .loadBannerAd(
+                                    .loadAd(
+                                        AdFormat.BANNER_AD,
                                         currentAdType,
                                         currentMediationOption,
                                         false,
                                         shouldDrawViewabilityLayer,
                                     )
-                            )
+                            ),
                     )
                 )
             }
@@ -123,13 +127,14 @@ class LazyListFragment : BaseFragment() {
                         adapter =
                             SandboxedUiAdapterFactory.createFromCoreLibInfo(
                                 getSdkApi()
-                                    .loadBannerAd(
+                                    .loadAd(
+                                        AdFormat.BANNER_AD,
                                         currentAdType,
                                         currentMediationOption,
                                         false,
                                         shouldDrawViewabilityLayer,
                                     )
-                            )
+                            ),
                     )
                 )
             }
@@ -142,6 +147,6 @@ class LazyListFragment : BaseFragment() {
         // TODO(b/391558988): Specify content type for PoolingContainer CUJ
         // in View world for consistency
         val contentType: String = "BannerAd_$id",
-        val adapter: SandboxedUiAdapter
+        val adapter: SandboxedUiAdapter,
     )
 }

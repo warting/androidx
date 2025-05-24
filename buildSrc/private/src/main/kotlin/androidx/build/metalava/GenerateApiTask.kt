@@ -67,6 +67,12 @@ internal abstract class GenerateApiTask @Inject constructor(workerExecutor: Work
         return getFilesForApiLevels(projectApiDirectory.asFileTree.files, currentVersion.get())
     }
 
+    /**
+     * Temporary property to control whether to generate bytecode only APIs by passing the
+     * [compiledSources] to metalava.
+     */
+    @get:Input abstract val includeBytecodeApis: Property<Boolean>
+
     @TaskAction
     fun exec() {
         check(bootClasspath.files.isNotEmpty()) { "Android boot classpath not set." }
@@ -80,15 +86,24 @@ internal abstract class GenerateApiTask @Inject constructor(workerExecutor: Work
 
         val levelsArgs =
             getGenerateApiLevelsArgs(
+                projectApiDirectory.asFile,
                 getPastApiFiles(),
                 currentVersion.get(),
-                apiLocation.get().apiLevelsFile
+                apiLocation.get().apiLevelsFile,
             )
+
+        val optionalCompiledSources =
+            if (includeBytecodeApis.get()) {
+                compiledSources.files.singleOrNull()
+            } else {
+                null
+            }
 
         generateApi(
             metalavaClasspath,
             createProjectXmlFile(),
             sourcePaths.files,
+            optionalCompiledSources,
             apiLocation.get(),
             ApiLintMode.CheckBaseline(baselines.get().apiLintFile, targetsJavaConsumers.get()),
             generateRestrictToLibraryGroupAPIs,
@@ -96,7 +111,7 @@ internal abstract class GenerateApiTask @Inject constructor(workerExecutor: Work
             k2UastEnabled.get(),
             kotlinSourceLevel.get(),
             workerExecutor,
-            manifestPath.orNull?.asFile?.absolutePath
+            manifestPath.orNull?.asFile?.absolutePath,
         )
     }
 }

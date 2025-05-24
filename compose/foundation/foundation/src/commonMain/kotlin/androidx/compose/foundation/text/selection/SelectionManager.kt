@@ -21,6 +21,8 @@ import androidx.collection.LongObjectMap
 import androidx.collection.emptyLongObjectMap
 import androidx.collection.mutableLongIntMapOf
 import androidx.collection.mutableLongObjectMapOf
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitAllPointersUpWithSlopDetection
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -30,13 +32,20 @@ import androidx.compose.foundation.internal.requirePrecondition
 import androidx.compose.foundation.internal.requirePreconditionNotNull
 import androidx.compose.foundation.text.Handle
 import androidx.compose.foundation.text.TextDragObserver
+import androidx.compose.foundation.text.contextmenu.modifier.ToolbarRequester
+import androidx.compose.foundation.text.contextmenu.modifier.ToolbarRequesterImpl
+import androidx.compose.foundation.text.contextmenu.modifier.textContextMenuGestures
+import androidx.compose.foundation.text.contextmenu.modifier.textContextMenuToolbarHandler
+import androidx.compose.foundation.text.contextmenu.modifier.translateRootToDestination
 import androidx.compose.foundation.text.input.internal.coerceIn
 import androidx.compose.foundation.text.isPositionInsideSelection
 import androidx.compose.foundation.text.selection.Selection.AnchorInfo
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -124,6 +133,8 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
     /** [TextToolbar] to show floating toolbar(post-M) or primary toolbar(pre-M). */
     var textToolbar: TextToolbar? = null
 
+    @VisibleForTesting internal var toolbarRequester: ToolbarRequester = ToolbarRequesterImpl()
+
     /** Focus requester used to request focus when selection becomes active. */
     var focusRequester: FocusRequester = FocusRequester()
 
@@ -157,6 +168,26 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
                     }
                 }
                 .then(if (shouldShowMagnifier) Modifier.selectionMagnifier(this) else Modifier)
+                .addContextMenuComponents()
+
+    private val derivedContentRect: Rect? by derivedStateOf { getContentRect() }
+
+    val contextMenuAreaModifier
+        get() =
+            Modifier.textContextMenuGestures()
+                .textContextMenuToolbarHandler(
+                    requester = toolbarRequester,
+                    computeContentBounds = { destinationCoordinates ->
+                        val rootBounds =
+                            derivedContentRect ?: return@textContextMenuToolbarHandler null
+                        val localCoordinates = checkPreconditionNotNull(containerLayoutCoordinates)
+                        translateRootToDestination(
+                            rootContentBounds = rootBounds,
+                            localCoordinates = localCoordinates,
+                            destinationCoordinates = destinationCoordinates,
+                        )
+                    },
+                )
 
     private var previousPosition: Offset? = null
 
@@ -173,6 +204,9 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
                 }
             }
         }
+
+    /** Updated whenever a position change is received on a selected text. */
+    private var positionChangeState by mutableStateOf(Unit, neverEqualPolicy())
 
     /**
      * The beginning position of the drag gesture. Every time a new drag gesture starts, it wil be
@@ -242,6 +276,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
     init {
         selectionRegistrar.onPositionChangeCallback = { selectableId ->
             if (selectableId in selectionRegistrar.subselections) {
+                positionChangeState = Unit
                 updateHandleOffsets()
                 updateSelectionToolbar()
             }
@@ -266,7 +301,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
                     startSelection(
                         position = positionInContainer,
                         isStartHandle = false,
-                        adjustment = selectionMode
+                        adjustment = selectionMode,
                     )
 
                     focusRequester.requestFocus()
@@ -276,10 +311,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
 
         selectionRegistrar.onSelectionUpdateSelectAll = { isInTouchMode, selectableId ->
             val (newSelection, newSubselection) =
-                selectAllInSelectable(
-                    selectableId = selectableId,
-                    previousSelection = selection,
-                )
+                selectAllInSelectable(selectableId = selectableId, previousSelection = selection)
             if (newSelection != selection) {
                 selectionRegistrar.subselections = newSubselection
                 onSelectionChange(newSelection)
@@ -308,7 +340,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
                     newPosition = newPositionInContainer,
                     previousPosition = previousPositionInContainer,
                     isStartHandle = isStartHandle,
-                    adjustment = selectionMode
+                    adjustment = selectionMode,
                 )
             }
 
@@ -415,7 +447,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
 
     internal fun selectAllInSelectable(
         selectableId: Long,
-        previousSelection: Selection?
+        previousSelection: Selection?,
     ): Pair<Selection?, LongObjectMap<Selection>> {
         val subselections = mutableLongObjectMapOf<Selection>()
         val newSelection =
@@ -542,19 +574,28 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
         }
 
         return buildAnnotatedString {
+            var started = false
             selectionRegistrar.sort(requireContainerCoordinates()).fastForEach { selectable ->
                 selectionRegistrar.subselections[selectable.selectableId]?.let { subSelection ->
+                    // We need to add line separators between different selectable nodes' contents.
+                    // However we cannot be sure whether the appended text will be the last in this
+                    // iteration. So we add the separator in the next iteration's beginning.
+                    if (started) {
+                        append('\n')
+                    } else {
+                        started = true
+                    }
                     val currentText = selectable.getText()
                     val currentSelectedText =
                         if (subSelection.handlesCrossed) {
                             currentText.subSequence(
                                 subSelection.end.offset,
-                                subSelection.start.offset
+                                subSelection.start.offset,
                             )
                         } else {
                             currentText.subSequence(
                                 subSelection.start.offset,
-                                subSelection.end.offset
+                                subSelection.end.offset,
                             )
                         }
 
@@ -585,11 +626,25 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
         onRelease()
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
     private fun updateSelectionToolbar() {
         if (!hasFocus) {
             return
         }
 
+        if (ComposeFoundationFlags.isNewContextMenuEnabled) {
+            if (showToolbar && isInTouchMode) {
+                derivedContentRect ?: return
+                toolbarRequester.show()
+            } else {
+                toolbarRequester.hide()
+            }
+        } else {
+            updateSelectionTextToolbar()
+        }
+    }
+
+    private fun updateSelectionTextToolbar() {
         val textToolbar = textToolbar ?: return
         if (showToolbar && isInTouchMode) {
             val rect = getContentRect() ?: return
@@ -597,7 +652,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
                 rect = rect,
                 onCopyRequested = if (isNonEmptySelection()) ::toolbarCopy else null,
                 onSelectAllRequested = if (isEntireContainerSelected()) null else ::selectAll,
-                onAutofillRequested = null
+                onAutofillRequested = null,
             )
         } else if (textToolbar.status == TextToolbarStatus.Shown) {
             textToolbar.hide()
@@ -609,6 +664,10 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
      * entire selection, coerced into visible bounds.
      */
     private fun getContentRect(): Rect? {
+        // TODO(grantapher) Instead of a useless state read, the state should be incorporated into
+        //   the selectables themselves.
+        positionChangeState // State read. Updated when a selected text position changes.
+
         selection ?: return null
         val containerCoordinates = containerLayoutCoordinates ?: return null
         if (!containerCoordinates.isAttached) return null
@@ -724,7 +783,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
                         newPosition = endPosition,
                         previousPosition = dragBeginPosition,
                         isStartHandle = isStartHandle,
-                        adjustment = SelectionAdjustment.CharacterWithWordAccelerate
+                        adjustment = SelectionAdjustment.CharacterWithWordAccelerate,
                     )
                 if (consumed) {
                     dragBeginPosition = endPosition
@@ -744,6 +803,12 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
 
             override fun onCancel() = done()
         }
+
+    @OptIn(ExperimentalFoundationApi::class)
+    private fun Modifier.addContextMenuComponents(): Modifier =
+        if (ComposeFoundationFlags.isNewContextMenuEnabled)
+            addSelectionContainerTextContextMenuComponents(this@SelectionManager)
+        else this
 
     /** Clear the selection on up event that isn't a drag-end. */
     private fun Modifier.onClearSelectionRequested(block: () -> Unit): Modifier =
@@ -766,7 +831,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
 
     private fun convertToContainerCoordinates(
         layoutCoordinates: LayoutCoordinates,
-        offset: Offset
+        offset: Offset,
     ): Offset {
         val coordinates = containerLayoutCoordinates
         if (coordinates == null || !coordinates.isAttached) return Offset.Unspecified
@@ -787,14 +852,14 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
     private fun startSelection(
         position: Offset,
         isStartHandle: Boolean,
-        adjustment: SelectionAdjustment
+        adjustment: SelectionAdjustment,
     ) {
         previousSelectionLayout = null
         updateSelection(
             position = position,
             previousHandlePosition = Offset.Unspecified,
             isStartHandle = isStartHandle,
-            adjustment = adjustment
+            adjustment = adjustment,
         )
     }
 
@@ -820,7 +885,7 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
             position = newPosition,
             previousHandlePosition = previousPosition,
             isStartHandle = isStartHandle,
-            adjustment = adjustment
+            adjustment = adjustment,
         )
     }
 
@@ -930,14 +995,14 @@ internal class SelectionManager(private val selectionRegistrar: SelectionRegistr
                 val textLayoutResult = selectable.textLayoutResult() ?: return@fastAny false
                 textLayoutResult.isPositionInsideSelection(
                     position = positionInSelectable,
-                    selectionRange = selection.toTextRange()
+                    selectionRange = selection.toTextRange(),
                 )
             }
         if (!isClickedPositionInsideSelection) {
             startSelection(
                 position = position,
                 isStartHandle = true,
-                adjustment = SelectionAdjustment.Word
+                adjustment = SelectionAdjustment.Word,
             )
         }
     }
@@ -951,12 +1016,16 @@ internal expect fun isCopyKeyEvent(keyEvent: KeyEvent): Boolean
 
 internal expect fun Modifier.selectionMagnifier(manager: SelectionManager): Modifier
 
+internal expect fun Modifier.addSelectionContainerTextContextMenuComponents(
+    selectionManager: SelectionManager
+): Modifier
+
 private val invertedInfiniteRect =
     Rect(
         left = Float.POSITIVE_INFINITY,
         top = Float.POSITIVE_INFINITY,
         right = Float.NEGATIVE_INFINITY,
-        bottom = Float.NEGATIVE_INFINITY
+        bottom = Float.NEGATIVE_INFINITY,
     )
 
 private fun <T> List<T>.firstAndLast(): List<T> =
@@ -1018,7 +1087,7 @@ internal fun getSelectedRegionRect(
 
 internal fun calculateSelectionMagnifierCenterAndroid(
     manager: SelectionManager,
-    magnifierSize: IntSize
+    magnifierSize: IntSize,
 ): Offset {
     val selection = manager.selection ?: return Offset.Unspecified
     return when (manager.draggingHandle) {
@@ -1032,7 +1101,7 @@ internal fun calculateSelectionMagnifierCenterAndroid(
 private fun getMagnifierCenter(
     manager: SelectionManager,
     magnifierSize: IntSize,
-    anchor: AnchorInfo
+    anchor: AnchorInfo,
 ): Offset {
     val selectable = manager.getAnchorSelectable(anchor) ?: return Offset.Unspecified
     val containerCoordinates = manager.containerLayoutCoordinates ?: return Offset.Unspecified
@@ -1089,7 +1158,7 @@ private fun getMagnifierCenter(
 
     return containerCoordinates.localPositionOf(
         sourceCoordinates = selectableCoordinates,
-        relativeToSource = Offset(textConstrainedX, lineCenterY)
+        relativeToSource = Offset(textConstrainedX, lineCenterY),
     )
 }
 

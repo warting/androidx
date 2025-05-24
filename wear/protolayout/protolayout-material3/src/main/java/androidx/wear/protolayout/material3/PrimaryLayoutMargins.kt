@@ -111,7 +111,7 @@ public abstract class PrimaryLayoutMargins internal constructor() {
          */
         public fun customizedPrimaryLayoutMargin(
             @FloatRange(from = 0.0, to = 1.0) start: Float,
-            @FloatRange(from = 0.0, to = 1.0) end: Float
+            @FloatRange(from = 0.0, to = 1.0) end: Float,
         ): PrimaryLayoutMargins = CustomPrimaryLayoutMargins(start = start, end = end)
 
         /**
@@ -138,7 +138,7 @@ public abstract class PrimaryLayoutMargins internal constructor() {
         public fun customizedPrimaryLayoutMargin(
             @FloatRange(from = 0.0, to = 1.0) start: Float,
             @FloatRange(from = 0.0, to = 1.0) end: Float,
-            @FloatRange(from = 0.0, to = 1.0) bottom: Float
+            @FloatRange(from = 0.0, to = 1.0) bottom: Float,
         ): PrimaryLayoutMargins =
             CustomPrimaryLayoutMargins(start = start, end = end, bottom = bottom)
     }
@@ -185,7 +185,7 @@ internal class CustomPrimaryLayoutMargins
  */
 (
     @FloatRange(from = 0.0, to = 1.0) internal val start: Float,
-    @FloatRange(from = 0.0, to = 1.0) internal val end: Float
+    @FloatRange(from = 0.0, to = 1.0) internal val end: Float,
 ) : PrimaryLayoutMargins() {
     internal var bottom: Float = NaN
 
@@ -201,7 +201,7 @@ internal class CustomPrimaryLayoutMargins
     constructor(
         @FloatRange(from = 0.0, to = 1.0) start: Float,
         @FloatRange(from = 0.0, to = 1.0) end: Float,
-        @FloatRange(from = 0.0, to = 1.0) bottom: Float
+        @FloatRange(from = 0.0, to = 1.0) bottom: Float,
     ) : this(start = start, end = end) {
         this.bottom = bottom
     }
@@ -232,17 +232,21 @@ internal object PredefinedPrimaryLayoutMargins {
     fun MaterialScope.defaultPrimaryLayoutMargins(): Padding =
         if (layoutSlotsPresence.isTitleSlotPresent) {
             if (layoutSlotsPresence.isBottomSlotPresent) {
-                if (layoutSlotsPresence.isBottomSlotEdgeButton)
+                if (layoutSlotsPresence.isBottomSlotEdgeButton) {
                     defaultPrimaryLayoutMarginsWithTitleWithEdgeButton()
-                else defaultPrimaryLayoutMarginsWithBottomSlotAsOther()
+                } else {
+                    defaultPrimaryLayoutMarginsWithBottomSlotAsOther()
+                }
             } else {
                 defaultPrimaryLayoutMarginsWithTitleWithoutBottomSlot()
             }
         } else {
             if (layoutSlotsPresence.isBottomSlotPresent) {
-                if (layoutSlotsPresence.isBottomSlotEdgeButton)
+                if (layoutSlotsPresence.isBottomSlotEdgeButton) {
                     defaultPrimaryLayoutMarginsWithoutTitleWithEdgeButton()
-                else defaultPrimaryLayoutMarginsWithBottomSlotAsOther()
+                } else {
+                    defaultPrimaryLayoutMarginsWithBottomSlotAsOther()
+                }
             } else {
                 defaultPrimaryLayoutMarginsWithoutTitleWithoutBottomSlot()
             }
@@ -259,8 +263,11 @@ internal object PredefinedPrimaryLayoutMargins {
     internal fun MaterialScope.minPrimaryLayoutMargins(): Padding =
         // Values are the same regardless of title slot presence.
         if (layoutSlotsPresence.isBottomSlotPresent) {
-            if (layoutSlotsPresence.isBottomSlotEdgeButton) minPrimaryLayoutMarginsWithEdgeButton()
-            else minPrimaryLayoutMarginsWithBottomSlotAsOther()
+            if (layoutSlotsPresence.isBottomSlotEdgeButton) {
+                minPrimaryLayoutMarginsWithEdgeButton()
+            } else {
+                minPrimaryLayoutMarginsWithBottomSlotAsOther()
+            }
         } else {
             minPrimaryLayoutMarginsWithoutBottomSlot()
         }
@@ -276,17 +283,21 @@ internal object PredefinedPrimaryLayoutMargins {
     internal fun MaterialScope.midPrimaryLayoutMargins(): Padding =
         if (layoutSlotsPresence.isTitleSlotPresent) {
             if (layoutSlotsPresence.isBottomSlotPresent) {
-                if (layoutSlotsPresence.isBottomSlotEdgeButton)
+                if (layoutSlotsPresence.isBottomSlotEdgeButton) {
                     midPrimaryLayoutMarginsWithTitleWithEdgeButton()
-                else midPrimaryLayoutMarginsWithTitleWithBottomSlotAsOther()
+                } else {
+                    midPrimaryLayoutMarginsWithTitleWithBottomSlotAsOther()
+                }
             } else {
                 midPrimaryLayoutMarginsWithTitleWithoutBottomSlot()
             }
         } else {
             if (layoutSlotsPresence.isBottomSlotPresent) {
-                if (layoutSlotsPresence.isBottomSlotEdgeButton)
+                if (layoutSlotsPresence.isBottomSlotEdgeButton) {
                     midPrimaryLayoutMarginsWithoutTitleWithEdgeButton()
-                else midPrimaryLayoutMarginsWithoutTitleWithBottomSlotAsOther()
+                } else {
+                    midPrimaryLayoutMarginsWithoutTitleWithBottomSlotAsOther()
+                }
             } else {
                 midPrimaryLayoutMarginsWithoutTitleWithoutBottomSlot()
             }
@@ -303,17 +314,21 @@ internal object PredefinedPrimaryLayoutMargins {
     internal fun MaterialScope.maxPrimaryLayoutMargins(): Padding =
         if (layoutSlotsPresence.isTitleSlotPresent) {
             if (layoutSlotsPresence.isBottomSlotPresent) {
-                if (layoutSlotsPresence.isBottomSlotEdgeButton)
+                if (layoutSlotsPresence.isBottomSlotEdgeButton) {
                     maxPrimaryLayoutMarginsWithTitleWithEdgeButton()
-                else maxPrimaryLayoutMarginsWithTitleWithBottomSlotAsOther()
+                } else {
+                    maxPrimaryLayoutMarginsWithTitleWithBottomSlotAsOther()
+                }
             } else {
                 maxPrimaryLayoutMarginsWithTitleWithoutBottomSlot()
             }
         } else {
             if (layoutSlotsPresence.isBottomSlotPresent) {
-                if (layoutSlotsPresence.isBottomSlotEdgeButton)
+                if (layoutSlotsPresence.isBottomSlotEdgeButton) {
                     maxPrimaryLayoutMarginsWithoutTitleWithEdgeButton()
-                else maxPrimaryLayoutMarginsWithoutTitleWithBottomSlotAsOther()
+                } else {
+                    maxPrimaryLayoutMarginsWithoutTitleWithBottomSlotAsOther()
+                }
             } else {
                 maxPrimaryLayoutMarginsWithoutTitleWithoutBottomSlot()
             }

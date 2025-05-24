@@ -135,15 +135,17 @@ data class WorkSpec(
     @ColumnInfo(name = "stop_reason", defaultValue = "${WorkInfo.STOP_REASON_NOT_STOPPED}")
     val stopReason: Int = WorkInfo.STOP_REASON_NOT_STOPPED,
     @ColumnInfo(name = "trace_tag") var traceTag: String? = null,
+    @ColumnInfo(name = "backoff_on_system_interruptions")
+    var backOffOnSystemInterruptions: Boolean? = false,
 ) {
     constructor(
         id: String,
-        workerClassName_: String
+        workerClassName_: String,
     ) : this(id = id, workerClassName = workerClassName_)
 
     constructor(
         newId: String,
-        other: WorkSpec
+        other: WorkSpec,
     ) : this(
         id = newId,
         workerClassName = other.workerClassName,
@@ -168,6 +170,7 @@ data class WorkSpec(
         nextScheduleTimeOverrideGeneration = other.nextScheduleTimeOverrideGeneration,
         stopReason = other.stopReason,
         traceTag = other.traceTag,
+        backOffOnSystemInterruptions = other.backOffOnSystemInterruptions,
     )
 
     /** @param backoffDelayDuration The backoff delay duration in milliseconds */
@@ -182,7 +185,7 @@ data class WorkSpec(
         this.backoffDelayDuration =
             backoffDelayDuration.coerceIn(
                 WorkRequest.MIN_BACKOFF_MILLIS,
-                WorkRequest.MAX_BACKOFF_MILLIS
+                WorkRequest.MAX_BACKOFF_MILLIS,
             )
     }
 
@@ -203,12 +206,12 @@ data class WorkSpec(
                 .warning(
                     TAG,
                     "Interval duration lesser than minimum allowed value; " +
-                        "Changed to $MIN_PERIODIC_INTERVAL_MILLIS"
+                        "Changed to $MIN_PERIODIC_INTERVAL_MILLIS",
                 )
         }
         setPeriodic(
             intervalDuration.coerceAtLeast(MIN_PERIODIC_INTERVAL_MILLIS),
-            intervalDuration.coerceAtLeast(MIN_PERIODIC_INTERVAL_MILLIS)
+            intervalDuration.coerceAtLeast(MIN_PERIODIC_INTERVAL_MILLIS),
         )
     }
 
@@ -224,7 +227,7 @@ data class WorkSpec(
                 .warning(
                     TAG,
                     "Interval duration lesser than minimum allowed value; " +
-                        "Changed to $MIN_PERIODIC_INTERVAL_MILLIS"
+                        "Changed to $MIN_PERIODIC_INTERVAL_MILLIS",
                 )
         }
 
@@ -235,14 +238,14 @@ data class WorkSpec(
                 .warning(
                     TAG,
                     "Flex duration lesser than minimum allowed value; " +
-                        "Changed to $MIN_PERIODIC_FLEX_MILLIS"
+                        "Changed to $MIN_PERIODIC_FLEX_MILLIS",
                 )
         }
         if (flexDuration > this.intervalDuration) {
             Logger.get()
                 .warning(
                     TAG,
-                    "Flex duration greater than interval duration; Changed to $intervalDuration"
+                    "Flex duration greater than interval duration; Changed to $intervalDuration",
                 )
         }
         this.flexDuration = flexDuration.coerceIn(MIN_PERIODIC_FLEX_MILLIS, this.intervalDuration)
@@ -285,7 +288,7 @@ data class WorkSpec(
             initialDelay = initialDelay,
             flexDuration = flexDuration,
             intervalDuration = intervalDuration,
-            nextScheduleTimeOverride = nextScheduleTimeOverride
+            nextScheduleTimeOverride = nextScheduleTimeOverride,
         )
     }
 
@@ -327,7 +330,7 @@ data class WorkSpec(
             parentColumn = "id",
             entityColumn = "work_spec_id",
             entity = WorkTag::class,
-            projection = ["tag"]
+            projection = ["tag"],
         )
         val tags: List<String>,
 
@@ -337,7 +340,7 @@ data class WorkSpec(
             parentColumn = "id",
             entityColumn = "work_spec_id",
             entity = WorkProgress::class,
-            projection = ["progress"]
+            projection = ["progress"],
         )
         val progress: List<Data>,
     ) {
@@ -387,7 +390,7 @@ data class WorkSpec(
                     initialDelay = initialDelay,
                     flexDuration = flexDuration,
                     intervalDuration = intervalDuration,
-                    nextScheduleTimeOverride = nextScheduleTimeOverride
+                    nextScheduleTimeOverride = nextScheduleTimeOverride,
                 )
             else Long.MAX_VALUE
         }

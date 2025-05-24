@@ -150,7 +150,7 @@ internal interface Owner : PositionCalculator {
 
     @Deprecated(
         "fontLoader is deprecated, use fontFamilyResolver",
-        replaceWith = ReplaceWith("fontFamilyResolver")
+        replaceWith = ReplaceWith("fontFamilyResolver"),
     )
     @Suppress("DEPRECATION")
     val fontLoader: Font.ResourceLoader
@@ -174,7 +174,7 @@ internal interface Owner : PositionCalculator {
         layoutNode: LayoutNode,
         affectsLookahead: Boolean = false,
         forceRequest: Boolean = false,
-        scheduleMeasureAndLayout: Boolean = true
+        scheduleMeasureAndLayout: Boolean = true,
     )
 
     /**
@@ -187,7 +187,7 @@ internal interface Owner : PositionCalculator {
     fun onRequestRelayout(
         layoutNode: LayoutNode,
         affectsLookahead: Boolean = false,
-        forceRequest: Boolean = false
+        forceRequest: Boolean = false,
     )
 
     /**
@@ -269,7 +269,6 @@ internal interface Owner : PositionCalculator {
         drawBlock: (canvas: Canvas, parentLayer: GraphicsLayer?) -> Unit,
         invalidateParentLayer: () -> Unit,
         explicitLayer: GraphicsLayer? = null,
-        forceUseOldLayers: Boolean = false
     ): OwnedLayer
 
     /**
@@ -369,6 +368,26 @@ internal interface Owner : PositionCalculator {
      * (username, password etc) to remote viewer during screen share.
      */
     fun decrementSensitiveComponentCount() {}
+
+    /** Increments count of modifiers requesting to stop the screen from going to sleep */
+    fun incrementKeepScreenOnCount() {}
+
+    /** Decrements count of modifiers requesting to stop the screen from going to sleep */
+    fun decrementKeepScreenOnCount() {}
+
+    /** On Android it is only available when the view is attached. */
+    val outOfFrameExecutor: OutOfFrameExecutor?
+        get() = null
+
+    /** This can be used to Vote for a preferred frame rate. */
+    fun voteFrameRate(frameRate: Float) {}
+
+    /**
+     * Dispatches a callback when something in this hierarchy scrolls.
+     *
+     * @param offset Delta scrolled.
+     */
+    fun dispatchOnScrollChanged(delta: Offset) {}
 
     companion object {
         /**

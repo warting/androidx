@@ -18,6 +18,8 @@ package androidx.compose.foundation.text.input.internal
 
 import android.graphics.Typeface
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.AnnotatedOutputTransformation
+import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setSelectionCoerced
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
@@ -70,7 +72,7 @@ class TextFieldLayoutStateCacheTest {
         TransformedTextFieldState(
             textFieldState,
             inputTransformation = null,
-            codepointTransformation = null
+            codepointTransformation = null,
         )
     private var textStyle = TextStyle()
     private var singleLine = false
@@ -119,6 +121,34 @@ class TextFieldLayoutStateCacheTest {
     }
 
     @Test
+    fun updateNonMeasureInputs_invalidatesSnapshot_whenAnnotatedOutputTransformation_readChanges() {
+        var color by mutableStateOf(Color.Red)
+        transformedTextFieldState =
+            TransformedTextFieldState(
+                textFieldState = textFieldState,
+                outputTransformation =
+                    AnnotatedOutputTransformation {
+                        addStyle(SpanStyle(color = color), 0, text.length)
+                    },
+            )
+        assertInvalidationsOnChange(1) { color = Color.Blue }
+    }
+
+    @Test
+    fun updateNonMeasureInputs_invalidatesSnapshot_whenOutputTransformationChanges() {
+        assertInvalidationsOnChange(1) {
+            val outputTransformation = OutputTransformation {}
+            transformedTextFieldState =
+                TransformedTextFieldState(
+                    textFieldState,
+                    inputTransformation = null,
+                    outputTransformation = outputTransformation,
+                )
+            updateNonMeasureInputs()
+        }
+    }
+
+    @Test
     fun updateNonMeasureInputs_invalidatesSnapshot_whenTextSelectionChanged() {
         textFieldState.edit {
             append("hello")
@@ -135,7 +165,7 @@ class TextFieldLayoutStateCacheTest {
                 TransformedTextFieldState(
                     textFieldState,
                     inputTransformation = null,
-                    codepointTransformation
+                    codepointTransformation,
                 )
             updateNonMeasureInputs()
         }
@@ -334,7 +364,7 @@ class TextFieldLayoutStateCacheTest {
             TransformedTextFieldState(
                 textFieldState,
                 inputTransformation = null,
-                codepointTransformation
+                codepointTransformation,
             )
         // Transformation isn't applied if there's no text. Keep this at 1 char to make the math
         // simpler.
@@ -362,7 +392,7 @@ class TextFieldLayoutStateCacheTest {
                 onValueChangedForScope = {
                     primaryInvalidations++
                     assertVisualText()
-                }
+                },
             ) {
                 assertVisualText()
             }
@@ -374,7 +404,7 @@ class TextFieldLayoutStateCacheTest {
                 onValueChangedForScope = {
                     secondaryInvalidations++
                     assertVisualText()
-                }
+                },
             ) {
                 assertVisualText()
             }
@@ -406,7 +436,7 @@ class TextFieldLayoutStateCacheTest {
             TransformedTextFieldState(
                 textFieldState,
                 inputTransformation = null,
-                codepointTransformation
+                codepointTransformation,
             )
         // Transformation isn't applied if there's no text. Keep this at 1 char to make the math
         // simpler.
@@ -434,7 +464,7 @@ class TextFieldLayoutStateCacheTest {
                 onValueChangedForScope = {
                     primaryInvalidations++
                     assertVisualText()
-                }
+                },
             ) {
                 assertVisualText()
             }
@@ -446,7 +476,7 @@ class TextFieldLayoutStateCacheTest {
                 onValueChangedForScope = {
                     secondaryInvalidations++
                     assertVisualText()
-                }
+                },
             ) {
                 assertVisualText()
             }
@@ -479,7 +509,7 @@ class TextFieldLayoutStateCacheTest {
                     replace(0, length, "hello")
                     placeCursorBeforeCharAt(0)
                 }
-            },
+            }
         ) { old, new ->
             assertThat(old.layoutInput.text.text).isEqualTo("h")
             assertThat(new.layoutInput.text.text).isEqualTo("hello")
@@ -495,7 +525,7 @@ class TextFieldLayoutStateCacheTest {
         assertLayoutChange(
             change = {
                 textFieldState.editAsUser(inputTransformation = null) { setComposition(2, 3) }
-            },
+            }
         ) { old, new ->
             assertThat(
                     old.multiParagraph.intrinsics.annotatedString.spanStyles.any {
@@ -534,7 +564,7 @@ class TextFieldLayoutStateCacheTest {
             setComposition(
                 0,
                 5,
-                listOf(AnnotatedString.Range(SpanStyle(background = Color.Blue), 0, 5))
+                listOf(AnnotatedString.Range(SpanStyle(background = Color.Blue), 0, 5)),
             )
         }
         // change composing region but not the annotations.
@@ -544,10 +574,10 @@ class TextFieldLayoutStateCacheTest {
                     setComposition(
                         0,
                         5,
-                        listOf(AnnotatedString.Range(SpanStyle(background = Color.Red), 0, 5))
+                        listOf(AnnotatedString.Range(SpanStyle(background = Color.Red), 0, 5)),
                     )
                 }
-            },
+            }
         ) { old, new ->
             assertThat(
                     old.multiParagraph.intrinsics.annotatedString.spanStyles.any {
@@ -572,7 +602,7 @@ class TextFieldLayoutStateCacheTest {
             setComposition(
                 0,
                 5,
-                listOf(AnnotatedString.Range(SpanStyle(background = Color.Red), 0, 5))
+                listOf(AnnotatedString.Range(SpanStyle(background = Color.Red), 0, 5)),
             )
         }
         updateNonMeasureInputs()
@@ -604,7 +634,7 @@ class TextFieldLayoutStateCacheTest {
             TransformedTextFieldState(
                 textFieldState,
                 inputTransformation = null,
-                codepointTransformation
+                codepointTransformation,
             )
         assertLayoutChange(
             change = {
@@ -613,7 +643,7 @@ class TextFieldLayoutStateCacheTest {
                     TransformedTextFieldState(
                         textFieldState,
                         inputTransformation = null,
-                        codepointTransformation
+                        codepointTransformation,
                     )
                 updateNonMeasureInputs()
             }
@@ -631,7 +661,7 @@ class TextFieldLayoutStateCacheTest {
             TransformedTextFieldState(
                 textFieldState,
                 inputTransformation = null,
-                codepointTransformation
+                codepointTransformation,
             )
         assertLayoutChange(
             change = {
@@ -640,7 +670,7 @@ class TextFieldLayoutStateCacheTest {
                     TransformedTextFieldState(
                         textFieldState,
                         inputTransformation = null,
-                        codepointTransformation
+                        codepointTransformation,
                     )
                 updateNonMeasureInputs()
             }
@@ -920,7 +950,7 @@ class TextFieldLayoutStateCacheTest {
 
     private fun assertLayoutChange(
         change: () -> Unit,
-        compare: (old: TextLayoutResult, new: TextLayoutResult) -> Unit
+        compare: (old: TextLayoutResult, new: TextLayoutResult) -> Unit,
     ) {
         updateNonMeasureInputs()
         updateMeasureInputs()
@@ -934,10 +964,7 @@ class TextFieldLayoutStateCacheTest {
         compare(initialLayout, newLayout)
     }
 
-    private fun assertInvalidationsOnChange(
-        expectedInvalidations: Int,
-        update: () -> Unit,
-    ) {
+    private fun assertInvalidationsOnChange(expectedInvalidations: Int, update: () -> Unit) {
         updateNonMeasureInputs()
         updateMeasureInputs()
         var invalidations = 0
@@ -948,7 +975,7 @@ class TextFieldLayoutStateCacheTest {
             observer.observeReads(
                 scope = Unit,
                 onValueChangedForScope = { invalidations++ },
-                block = { cache.value }
+                block = { cache.value },
             )
             update()
             // Ensure any changes made by block are processed.
@@ -968,7 +995,7 @@ class TextFieldLayoutStateCacheTest {
             textStyle = textStyle,
             singleLine = singleLine,
             softWrap = softWrap,
-            keyboardOptions = keyboardOptions
+            keyboardOptions = keyboardOptions,
         )
     }
 
@@ -977,7 +1004,7 @@ class TextFieldLayoutStateCacheTest {
             density = density,
             layoutDirection = layoutDirection,
             fontFamilyResolver = fontFamilyResolver,
-            constraints = constraints
+            constraints = constraints,
         )
     }
 }

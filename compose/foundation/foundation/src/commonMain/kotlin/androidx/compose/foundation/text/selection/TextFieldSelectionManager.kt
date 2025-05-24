@@ -16,6 +16,10 @@
 
 package androidx.compose.foundation.text.selection
 
+import androidx.annotation.VisibleForTesting
+import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.internal.checkPreconditionNotNull
 import androidx.compose.foundation.internal.hasText
 import androidx.compose.foundation.internal.readAnnotatedString
 import androidx.compose.foundation.internal.toClipEntry
@@ -29,6 +33,11 @@ import androidx.compose.foundation.text.LegacyTextFieldState
 import androidx.compose.foundation.text.TextDragObserver
 import androidx.compose.foundation.text.UndoManager
 import androidx.compose.foundation.text.ValidatingEmptyOffsetMappingIdentity
+import androidx.compose.foundation.text.contextmenu.modifier.ToolbarRequester
+import androidx.compose.foundation.text.contextmenu.modifier.ToolbarRequesterImpl
+import androidx.compose.foundation.text.contextmenu.modifier.textContextMenuGestures
+import androidx.compose.foundation.text.contextmenu.modifier.textContextMenuToolbarHandler
+import androidx.compose.foundation.text.contextmenu.modifier.translateRootToDestination
 import androidx.compose.foundation.text.detectDownAndDragGesturesWithObserver
 import androidx.compose.foundation.text.getLineHeight
 import androidx.compose.foundation.text.isPositionInsideSelection
@@ -37,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
@@ -45,6 +55,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
@@ -171,6 +182,37 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
     /** The previous [SelectionLayout] where [SelectionLayout.shouldRecomputeSelection] was true. */
     private var previousSelectionLayout: SelectionLayout? = null
 
+    // TODO(grantapher) android ClipboardManager has a way to notify primary clip changes.
+    //  That could possibly be used so that this doesn't have to be updated manually.
+    /** The current clip entry. Updated via [updateClipboardEntry]. */
+    private var clipEntry: ClipEntry? by mutableStateOf(null)
+
+    @VisibleForTesting internal var toolbarRequester: ToolbarRequester = ToolbarRequesterImpl()
+
+    val contextMenuAreaModifier
+        get() =
+            if (!enabled) Modifier
+            else
+                Modifier.textContextMenuGestures(onPreShowContextMenu = { updateClipboardEntry() })
+                    .textContextMenuToolbarHandler(
+                        requester = toolbarRequester,
+                        onShow = {
+                            updateClipboardEntry()
+                            textToolbarShownViaProvider = true
+                        },
+                        onHide = { textToolbarShownViaProvider = false },
+                        computeContentBounds = { destinationCoordinates ->
+                            val rootBounds = getContentRect()
+                            val localCoordinates =
+                                checkPreconditionNotNull(state?.layoutCoordinates)
+                            translateRootToDestination(
+                                rootContentBounds = rootBounds,
+                                localCoordinates = localCoordinates,
+                                destinationCoordinates = destinationCoordinates,
+                            )
+                        },
+                    )
+
     /** [TextDragObserver] for long press and drag to select in TextField. */
     internal val touchSelectionObserver =
         object : TextDragObserver {
@@ -202,7 +244,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                         val newValue =
                             createTextFieldValue(
                                 annotatedString = value.annotatedString,
-                                selection = TextRange(offset, offset)
+                                selection = TextRange(offset, offset),
                             )
 
                         enterSelectionMode(showFloatingToolbar = false)
@@ -282,12 +324,12 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                             dragBeginOffsetInText
                                 ?: layoutResult.getOffsetForPosition(
                                     position = dragBeginPosition,
-                                    coerceInVisibleBounds = false
+                                    coerceInVisibleBounds = false,
                                 )
                         val endOffset =
                             layoutResult.getOffsetForPosition(
                                 position = currentDragPosition!!,
-                                coerceInVisibleBounds = false
+                                coerceInVisibleBounds = false,
                             )
 
                         if (dragBeginOffsetInText == null && startOffset == endOffset) {
@@ -529,7 +571,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                     onValueChange(
                         createTextFieldValue(
                             annotatedString = value.annotatedString,
-                            selection = newSelection
+                            selection = newSelection,
                         )
                     )
                 }
@@ -607,6 +649,38 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         state?.selectionPreviewHighlightRange = TextRange.Zero
     }
 
+    internal var textToolbarShownViaProvider = false
+
+    @OptIn(ExperimentalFoundationApi::class)
+    internal val textToolbarShown
+        get() =
+            if (ComposeFoundationFlags.isNewContextMenuEnabled) {
+                textToolbarShownViaProvider
+            } else {
+                textToolbar?.status == TextToolbarStatus.Shown
+            }
+
+    private val isPassword: Boolean
+        get() = visualTransformation is PasswordVisualTransformation
+
+    private val hasSelection: Boolean
+        get() = !value.selection.collapsed
+
+    internal fun canCopy(): Boolean = hasSelection && !isPassword
+
+    internal suspend fun updateClipboardEntry() {
+        clipEntry = clipboard?.getClipEntry()
+    }
+
+    /** Only fully accurate if [updateClipboardEntry] has been called. */
+    internal fun canPaste(): Boolean = editable && clipEntry?.hasText() == true
+
+    internal fun canCut(): Boolean = hasSelection && editable && !isPassword
+
+    internal fun canSelectAll(): Boolean = value.selection.length != value.text.length
+
+    internal fun canAutofill(): Boolean = editable && value.selection.collapsed
+
     /**
      * The method for copying text.
      *
@@ -628,7 +702,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
             val newValue =
                 createTextFieldValue(
                     annotatedString = value.annotatedString,
-                    selection = TextRange(newCursorOffset, newCursorOffset)
+                    selection = TextRange(newCursorOffset, newCursorOffset),
                 )
             onValueChange(newValue)
             setHandleState(None)
@@ -655,7 +729,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
             val newValue =
                 createTextFieldValue(
                     annotatedString = newText,
-                    selection = TextRange(newCursorOffset, newCursorOffset)
+                    selection = TextRange(newCursorOffset, newCursorOffset),
                 )
             onValueChange(newValue)
             setHandleState(None)
@@ -684,7 +758,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
             val newValue =
                 createTextFieldValue(
                     annotatedString = newText,
-                    selection = TextRange(newCursorOffset, newCursorOffset)
+                    selection = TextRange(newCursorOffset, newCursorOffset),
                 )
             onValueChange(newValue)
             setHandleState(None)
@@ -696,7 +770,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         val newValue =
             createTextFieldValue(
                 annotatedString = value.annotatedString,
-                selection = TextRange(0, value.text.length)
+                selection = TextRange(0, value.text.length),
             )
         onValueChange(newValue)
         oldValue = oldValue.copy(selection = newValue.selection)
@@ -721,7 +795,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
             textLayoutResult = textLayoutResult,
             offset = offsetMapping.originalToTransformed(offset),
             isStart = isStartHandle,
-            areHandlesCrossed = value.selection.reversed
+            areHandlesCrossed = value.selection.reversed,
         )
     }
 
@@ -752,62 +826,84 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         if (show) showSelectionToolbar() else hideSelectionToolbar()
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
+    internal fun showSelectionToolbar() {
+        // Because this is called once in CoreTextField composition,
+        // disable read observation to avoid reading states and landing in a composition loop.
+        Snapshot.withoutReadObservation { if (!enabled || state?.isInTouchMode == false) return }
+
+        if (ComposeFoundationFlags.isNewContextMenuEnabled) {
+            toolbarRequester.show()
+        } else {
+            showSelectionToolbarViaTextToolbar()
+        }
+    }
+
     /**
      * This function get the selected region as a Rectangle region, and pass it to [TextToolbar] to
      * make the FloatingToolbar show up in the proper place. In addition, this function passes the
      * copy, paste and cut method as callbacks when "copy", "cut" or "paste" is clicked.
      */
-    internal fun showSelectionToolbar() =
+    private fun showSelectionToolbarViaTextToolbar() =
         coroutineScope?.launch(start = CoroutineStart.UNDISPATCHED) {
-            if (!enabled || state?.isInTouchMode == false) return@launch
-            val isPassword = visualTransformation is PasswordVisualTransformation
-            val copy: (() -> Unit)? =
-                if (!value.selection.collapsed && !isPassword) {
-                    {
-                        coroutineScope?.launch(start = CoroutineStart.UNDISPATCHED) { copy() }
-                        hideSelectionToolbar()
-                    }
-                } else null
+            // Because this is undispatched and the above is called once in CoreTextField
+            // composition, disable read observation to avoid reading many states and landing
+            // in a composition loop.
+            Snapshot.withoutReadObservation {
+                val copy: (() -> Unit)? =
+                    if (canCopy()) {
+                        {
+                            coroutineScope?.launch(start = CoroutineStart.UNDISPATCHED) { copy() }
+                            hideSelectionToolbar()
+                        }
+                    } else null
 
-            val cut: (() -> Unit)? =
-                if (!value.selection.collapsed && editable && !isPassword) {
-                    {
-                        coroutineScope?.launch(start = CoroutineStart.UNDISPATCHED) { cut() }
-                        hideSelectionToolbar()
-                    }
-                } else null
+                val cut: (() -> Unit)? =
+                    if (canCut()) {
+                        {
+                            coroutineScope?.launch(start = CoroutineStart.UNDISPATCHED) { cut() }
+                            hideSelectionToolbar()
+                        }
+                    } else null
 
-            val paste: (() -> Unit)? =
-                if (editable && clipboard?.getClipEntry()?.hasText() == true) {
-                    {
-                        coroutineScope?.launch(start = CoroutineStart.UNDISPATCHED) { paste() }
-                        hideSelectionToolbar()
-                    }
-                } else null
+                updateClipboardEntry()
+                val paste: (() -> Unit)? =
+                    if (canPaste()) {
+                        {
+                            coroutineScope?.launch(start = CoroutineStart.UNDISPATCHED) { paste() }
+                            hideSelectionToolbar()
+                        }
+                    } else null
 
-            val selectAll: (() -> Unit)? =
-                if (value.selection.length != value.text.length) {
-                    { selectAll() }
-                } else null
+                val selectAll: (() -> Unit)? =
+                    if (canSelectAll()) {
+                        { selectAll() }
+                    } else null
 
-            val autofill: (() -> Unit)? =
-                if (editable && value.selection.collapsed) {
-                    { autofill() }
-                } else null
+                val autofill: (() -> Unit)? =
+                    if (canAutofill()) {
+                        { autofill() }
+                    } else null
 
-            textToolbar?.showMenu(
-                rect = getContentRect(),
-                onCopyRequested = copy,
-                onPasteRequested = paste,
-                onCutRequested = cut,
-                onSelectAllRequested = selectAll,
-                onAutofillRequested = autofill
-            )
+                textToolbar?.showMenu(
+                    rect = getContentRect(),
+                    onCopyRequested = copy,
+                    onPasteRequested = paste,
+                    onCutRequested = cut,
+                    onSelectAllRequested = selectAll,
+                    onAutofillRequested = autofill,
+                )
+            }
         }
 
+    @OptIn(ExperimentalFoundationApi::class)
     internal fun hideSelectionToolbar() {
-        if (textToolbar?.status == TextToolbarStatus.Shown) {
-            textToolbar?.hide()
+        if (ComposeFoundationFlags.isNewContextMenuEnabled) {
+            toolbarRequester.hide()
+        } else {
+            if (textToolbar?.status == TextToolbarStatus.Shown) {
+                textToolbar?.hide()
+            }
         }
     }
 
@@ -868,7 +964,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                         ?.localToRoot(
                             Offset(
                                 0f,
-                                it.layoutResult?.value?.getCursorRect(transformedStart)?.top ?: 0f
+                                it.layoutResult?.value?.getCursorRect(transformedStart)?.top ?: 0f,
                             )
                         )
                         ?.y ?: 0f
@@ -878,7 +974,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                         ?.localToRoot(
                             Offset(
                                 x = 0f,
-                                y = it.layoutResult?.value?.getCursorRect(transformedEnd)?.top ?: 0f
+                                y = it.layoutResult?.value?.getCursorRect(transformedEnd)?.top ?: 0f,
                             )
                         )
                         ?.y ?: 0f
@@ -919,13 +1015,13 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         val previousTransformedSelection =
             TextRange(
                 offsetMapping.originalToTransformed(value.selection.start),
-                offsetMapping.originalToTransformed(value.selection.end)
+                offsetMapping.originalToTransformed(value.selection.end),
             )
 
         val currentOffset =
             layoutResult.getOffsetForPosition(
                 position = currentPosition,
-                coerceInVisibleBounds = false
+                coerceInVisibleBounds = false,
             )
 
         val rawStartHandleOffset =
@@ -968,7 +1064,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         val newSelection =
             TextRange(
                 start = offsetMapping.transformedToOriginal(newTransformedSelection.start.offset),
-                end = offsetMapping.transformedToOriginal(newTransformedSelection.end.offset)
+                end = offsetMapping.transformedToOriginal(newTransformedSelection.end.offset),
             )
 
         if (newSelection == value.selection) return value.selection
@@ -1016,7 +1112,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
 
     private fun createTextFieldValue(
         annotatedString: AnnotatedString,
-        selection: TextRange
+        selection: TextRange,
     ): TextFieldValue {
         return TextFieldValue(annotatedString = annotatedString, selection = selection)
     }
@@ -1026,7 +1122,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
 internal fun TextFieldSelectionHandle(
     isStartHandle: Boolean,
     direction: ResolvedTextDirection,
-    manager: TextFieldSelectionManager
+    manager: TextFieldSelectionManager,
 ) {
     val observer = remember(isStartHandle, manager) { manager.handleDragObserver(isStartHandle) }
 
@@ -1065,7 +1161,7 @@ internal expect fun Modifier.textFieldMagnifier(manager: TextFieldSelectionManag
 /** @return the location of the magnifier relative to the inner text field coordinates */
 internal fun calculateSelectionMagnifierCenterAndroid(
     manager: TextFieldSelectionManager,
-    magnifierSize: IntSize
+    magnifierSize: IntSize,
 ): Offset {
     // state read of currentDragPosition so that we always recompose on drag position changes
     val localDragPosition = manager.currentDragPosition ?: return Offset.Unspecified
@@ -1120,3 +1216,8 @@ internal fun calculateSelectionMagnifierCenterAndroid(
 
     return Offset(centerX, centerY)
 }
+
+internal expect fun Modifier.addBasicTextFieldTextContextMenuComponents(
+    manager: TextFieldSelectionManager,
+    coroutineScope: CoroutineScope,
+): Modifier

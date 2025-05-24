@@ -17,6 +17,7 @@
 package androidx.compose.foundation.text.input.internal.selection
 
 import androidx.annotation.VisibleForTesting
+import androidx.compose.foundation.text.findCodePointOrEmojiStartBefore
 import androidx.compose.foundation.text.findFollowingBreak
 import androidx.compose.foundation.text.findParagraphEnd
 import androidx.compose.foundation.text.findParagraphStart
@@ -90,7 +91,7 @@ internal class TextFieldPreparedSelection(
     private val textLayoutResult: TextLayoutResult?,
     private val isFromSoftKeyboard: Boolean,
     private val visibleTextLayoutHeight: Float,
-    private val textPreparedSelectionState: TextFieldPreparedSelectionState
+    private val textPreparedSelectionState: TextFieldPreparedSelectionState,
 ) {
     /**
      * Read the value from state without read observation to not accidentally cause recompositions.
@@ -125,7 +126,7 @@ internal class TextFieldPreparedSelection(
      */
     private inline fun applyIfNotEmpty(
         resetCachedX: Boolean = true,
-        block: TextFieldPreparedSelection.() -> Unit
+        block: TextFieldPreparedSelection.() -> Unit,
     ): TextFieldPreparedSelection {
         if (resetCachedX) {
             textPreparedSelectionState.resetCachedX()
@@ -195,7 +196,7 @@ internal class TextFieldPreparedSelection(
      */
     private inline fun moveCursorTo(
         resetCachedX: Boolean = true,
-        proposedCursorMovement: () -> Int
+        proposedCursorMovement: () -> Int,
     ) =
         applyIfNotEmpty(resetCachedX) {
             val oldCursor = selection.end
@@ -203,7 +204,7 @@ internal class TextFieldPreparedSelection(
                 calculateNextCursorPositionAndWedgeAffinity(
                     proposedCursor = proposedCursorMovement(),
                     cursor = oldCursor,
-                    transformedTextFieldState = state
+                    transformedTextFieldState = state,
                 )
 
             if (newCursor != oldCursor || !selection.collapsed) {
@@ -213,6 +214,10 @@ internal class TextFieldPreparedSelection(
                 wedgeAffinity = newWedgeAffinity
             }
         }
+
+    fun moveCursorPrevByCodePointOrEmoji() = moveCursorTo {
+        text.findCodePointOrEmojiStartBefore(selection.end, ifNotFound = NoCharacterFound)
+    }
 
     fun moveCursorPrevByChar() = moveCursorTo { text.findPrecedingBreak(selection.end) }
 
@@ -308,7 +313,7 @@ internal class TextFieldPreparedSelection(
                 state.replaceText(
                     newText = "",
                     range = TextRange(initialValue.selection.start, selection.end),
-                    restartImeIfContentChanges = !isFromSoftKeyboard
+                    restartImeIfContentChanges = !isFromSoftKeyboard,
                 )
             }
             // Update the internal selection to where it was moved by the delete operation.
@@ -410,7 +415,7 @@ internal class TextFieldPreparedSelection(
         val newPos =
             currentPos.translate(
                 translateX = 0f,
-                translateY = visibleTextLayoutHeight * pagesAmount
+                translateY = visibleTextLayoutHeight * pagesAmount,
             )
         // which line does the new cursor position belong?
         val topLine = textLayoutResult.getLineForVerticalPosition(newPos.top)
@@ -450,7 +455,7 @@ internal class TextFieldPreparedSelection(
 internal fun calculateNextCursorPositionAndWedgeAffinity(
     proposedCursor: Int,
     cursor: Int,
-    transformedTextFieldState: TransformedTextFieldState
+    transformedTextFieldState: TransformedTextFieldState,
 ): CursorAndWedgeAffinity {
     if (proposedCursor == NoCharacterFound) {
         // At the start or end of the text, no change.
@@ -472,7 +477,7 @@ internal fun calculateNextCursorPositionAndWedgeAffinity(
                 Untransformed ->
                     CursorAndWedgeAffinity(
                         proposedCursor,
-                        if (forward) WedgeAffinity.Start else WedgeAffinity.End
+                        if (forward) WedgeAffinity.Start else WedgeAffinity.End,
                     )
 
                 // It doesn't matter which end of the deleted range we put the cursor, they'll both
@@ -517,7 +522,7 @@ internal fun calculateNextCursorPositionAndWedgeAffinity(
                     }
                 }
             }
-        }
+        },
     )
 }
 
@@ -528,7 +533,7 @@ internal value class CursorAndWedgeAffinity(private val value: Long) {
 
     constructor(
         cursor: Int,
-        wedgeAffinity: WedgeAffinity?
+        wedgeAffinity: WedgeAffinity?,
     ) : this(
         packInts(
             cursor,
@@ -536,7 +541,7 @@ internal value class CursorAndWedgeAffinity(private val value: Long) {
                 WedgeAffinity.Start -> 0
                 WedgeAffinity.End -> 1
                 null -> -1
-            }
+            },
         )
     )
 

@@ -16,9 +16,9 @@
 
 package androidx.xr.compose.subspace.layout
 
-import android.content.res.Resources
 import androidx.annotation.RestrictTo
 import androidx.compose.ui.unit.Density
+import androidx.xr.compose.subspace.node.SubspaceLayoutNode
 
 /**
  * The receiver scope of a layout's measure lambda. The return value of the measure lambda is
@@ -32,7 +32,8 @@ public interface MeasureScope : Density {
     /**
      * Sets the size and alignment lines of the measured layout, as well as the positioning block
      * that defines the children positioning logic. The [placementBlock] is a lambda used for
-     * positioning children. [Placeable.placeAt] should be called on children inside placementBlock.
+     * positioning children. [SubspacePlaceable.placeAt] should be called on children inside
+     * placementBlock.
      *
      * @param width the measured width of the layout, in pixels
      * @param height the measured height of the layout, in pixels
@@ -43,22 +44,24 @@ public interface MeasureScope : Density {
         width: Int,
         height: Int,
         depth: Int,
-        placementBlock: Placeable.PlacementScope.() -> Unit,
+        placementBlock: SubspacePlaceable.SubspacePlacementScope.() -> Unit,
     ): MeasureResult {
         return object : MeasureResult {
             override val width = width
             override val height = height
             override val depth = depth
 
-            override fun placeChildren(placementScope: Placeable.PlacementScope) {
+            override fun placeChildren(placementScope: SubspacePlaceable.SubspacePlacementScope) {
                 placementScope.placementBlock()
             }
         }
     }
+}
 
-    public override val density: Float
-        get() = Resources.getSystem().displayMetrics.density
+internal class LayoutMeasureScope(private val layoutNode: SubspaceLayoutNode) : MeasureScope {
+    override val density: Float
+        get() = layoutNode.density.density
 
     public override val fontScale: Float
-        get() = Resources.getSystem().configuration.fontScale
+        get() = layoutNode.density.fontScale
 }

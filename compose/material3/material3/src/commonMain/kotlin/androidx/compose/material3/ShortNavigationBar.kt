@@ -53,6 +53,12 @@ import kotlin.math.roundToInt
  * Short navigation bars offer a persistent and convenient way to switch between primary
  * destinations in an app.
  *
+ * ![Short navigation bar with vertical items
+ * image](https://developer.android.com/images/reference/androidx/compose/material3/short-navigation-bar-vertical-items.png)
+ *
+ * ![Short navigation bar with horizontal items
+ * image](https://developer.android.com/images/reference/androidx/compose/material3/short-navigation-bar-horizontal-items.png)
+ *
  * The recommended configuration of the [ShortNavigationBar] depends on the width size of the screen
  * it's being displayed at:
  * - In small screens, the [ShortNavigationBar] should contain three to five
@@ -91,12 +97,9 @@ fun ShortNavigationBar(
     contentColor: Color = ShortNavigationBarDefaults.contentColor,
     windowInsets: WindowInsets = ShortNavigationBarDefaults.windowInsets,
     arrangement: ShortNavigationBarArrangement = ShortNavigationBarDefaults.arrangement,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    Surface(
-        color = containerColor,
-        contentColor = contentColor,
-    ) {
+    Surface(color = containerColor, contentColor = contentColor) {
         Layout(
             modifier =
                 modifier
@@ -115,7 +118,7 @@ fun ShortNavigationBar(
                     else -> {
                         throw IllegalArgumentException("Invalid ItemsArrangement value.")
                     }
-                }
+                },
         )
     }
 }
@@ -323,7 +326,7 @@ object ShortNavigationBarItemDefaults {
 private class EqualWeightContentMeasurePolicy : MeasurePolicy {
     override fun MeasureScope.measure(
         measurables: List<Measurable>,
-        constraints: Constraints
+        constraints: Constraints,
     ): MeasureResult {
         val width = constraints.maxWidth
         var itemHeight = constraints.minHeight
@@ -375,7 +378,7 @@ private class EqualWeightContentMeasurePolicy : MeasurePolicy {
 private class CenteredContentMeasurePolicy : MeasurePolicy {
     override fun MeasureScope.measure(
         measurables: List<Measurable>,
-        constraints: Constraints
+        constraints: Constraints,
     ): MeasureResult {
         val width = constraints.maxWidth
         var itemHeight = constraints.minHeight

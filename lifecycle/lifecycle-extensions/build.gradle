@@ -26,7 +26,7 @@ import androidx.build.SoftwareType
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
 }
 
 dependencies {
@@ -67,4 +67,5 @@ androidx {
 
 android {
     namespace = "androidx.lifecycle.extensions"
+    testOptions.unitTests.returnDefaultValues = true
 }

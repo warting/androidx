@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -37,11 +38,13 @@ import androidx.compose.material3.ExpandedDockedSearchBar
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopSearchBar
 import androidx.compose.material3.rememberSearchBarState
@@ -70,19 +73,23 @@ fun SimpleSearchBarSample() {
                 textFieldState = textFieldState,
                 onSearch = { scope.launch { searchBarState.animateToCollapsed() } },
                 placeholder = { Text("Search...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = {
+                    if (searchBarState.currentValue == SearchBarValue.Expanded) {
+                        IconButton(
+                            onClick = { scope.launch { searchBarState.animateToCollapsed() } }
+                        ) {
+                            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    }
+                },
                 trailingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
             )
         }
 
-    SearchBar(
-        state = searchBarState,
-        inputField = inputField,
-    )
-    ExpandedFullScreenSearchBar(
-        state = searchBarState,
-        inputField = inputField,
-    ) {
+    SearchBar(state = searchBarState, inputField = inputField)
+    ExpandedFullScreenSearchBar(state = searchBarState, inputField = inputField) {
         SearchResults(
             onResultClick = { result ->
                 textFieldState.setTextAndPlaceCursorAtEnd(result)
@@ -109,7 +116,17 @@ fun FullScreenSearchBarScaffoldSample() {
                 textFieldState = textFieldState,
                 onSearch = { scope.launch { searchBarState.animateToCollapsed() } },
                 placeholder = { Text("Search...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = {
+                    if (searchBarState.currentValue == SearchBarValue.Expanded) {
+                        IconButton(
+                            onClick = { scope.launch { searchBarState.animateToCollapsed() } }
+                        ) {
+                            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    }
+                },
                 trailingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
             )
         }
@@ -122,10 +139,7 @@ fun FullScreenSearchBarScaffoldSample() {
                 state = searchBarState,
                 inputField = inputField,
             )
-            ExpandedFullScreenSearchBar(
-                state = searchBarState,
-                inputField = inputField,
-            ) {
+            ExpandedFullScreenSearchBar(state = searchBarState, inputField = inputField) {
                 SearchResults(
                     onResultClick = { result ->
                         textFieldState.setTextAndPlaceCursorAtEnd(result)
@@ -133,12 +147,9 @@ fun FullScreenSearchBarScaffoldSample() {
                     }
                 )
             }
-        }
+        },
     ) { padding ->
-        LazyColumn(
-            contentPadding = padding,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        LazyColumn(contentPadding = padding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val list = List(100) { "Text $it" }
             items(count = list.size) {
                 Text(
@@ -167,7 +178,17 @@ fun DockedSearchBarScaffoldSample() {
                 textFieldState = textFieldState,
                 onSearch = { scope.launch { searchBarState.animateToCollapsed() } },
                 placeholder = { Text("Search...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = {
+                    if (searchBarState.currentValue == SearchBarValue.Expanded) {
+                        IconButton(
+                            onClick = { scope.launch { searchBarState.animateToCollapsed() } }
+                        ) {
+                            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    }
+                },
                 trailingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
             )
         }
@@ -180,10 +201,7 @@ fun DockedSearchBarScaffoldSample() {
                 state = searchBarState,
                 inputField = inputField,
             )
-            ExpandedDockedSearchBar(
-                state = searchBarState,
-                inputField = inputField,
-            ) {
+            ExpandedDockedSearchBar(state = searchBarState, inputField = inputField) {
                 SearchResults(
                     onResultClick = { result ->
                         textFieldState.setTextAndPlaceCursorAtEnd(result)
@@ -191,12 +209,9 @@ fun DockedSearchBarScaffoldSample() {
                     }
                 )
             }
-        }
+        },
     ) { padding ->
-        LazyColumn(
-            contentPadding = padding,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        LazyColumn(contentPadding = padding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val list = List(100) { "Text $it" }
             items(count = list.size) {
                 Text(
@@ -209,10 +224,7 @@ fun DockedSearchBarScaffoldSample() {
 }
 
 @Composable
-private fun SearchResults(
-    onResultClick: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun SearchResults(onResultClick: (String) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.verticalScroll(rememberScrollState())) {
         repeat(10) { idx ->
             val resultText = "Suggestion $idx"
@@ -224,7 +236,7 @@ private fun SearchResults(
                 modifier =
                     Modifier.clickable { onResultClick(resultText) }
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
     }

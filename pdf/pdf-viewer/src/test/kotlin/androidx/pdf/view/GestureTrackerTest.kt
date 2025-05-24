@@ -21,14 +21,15 @@ import android.graphics.Point
 import android.graphics.PointF
 import android.view.MotionEvent
 import android.view.ViewConfiguration
+import android.view.ViewParent
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.filters.SmallTest
 import com.google.common.truth.Truth.assertThat
 import java.util.concurrent.TimeUnit
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
 import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.eq
@@ -41,7 +42,6 @@ import org.mockito.kotlin.whenever
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 
-@SmallTest
 @RunWith(RobolectricTestRunner::class)
 class GestureTrackerTest {
     private val gestureHandlerSpy =
@@ -147,7 +147,7 @@ class GestureTrackerTest {
         for (event in
             oneFingerDrag(
                 start = PointF(50f, 50f),
-                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0)
+                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0),
             )) {
             gestureTracker.feed(event)
         }
@@ -182,10 +182,7 @@ class GestureTrackerTest {
     fun testDrag() {
         val velocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity / 4
         for (event in
-            oneFingerDrag(
-                start = PointF(50f, 50f),
-                velocity = Point(velocity, velocity),
-            )) {
+            oneFingerDrag(start = PointF(50f, 50f), velocity = Point(velocity, velocity))) {
             gestureTracker.feed(event)
         }
 
@@ -201,10 +198,7 @@ class GestureTrackerTest {
     fun testFling() {
         val velocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity * 2
         for (event in
-            oneFingerDrag(
-                start = PointF(50f, 50f),
-                velocity = Point(velocity, velocity),
-            )) {
+            oneFingerDrag(start = PointF(50f, 50f), velocity = Point(velocity, velocity))) {
             gestureTracker.feed(event)
         }
 
@@ -314,7 +308,7 @@ class GestureTrackerTest {
         for (event in
             oneFingerDrag(
                 point,
-                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0)
+                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0),
             )) {
             gestureTracker.feed(event)
         }
@@ -340,7 +334,7 @@ class GestureTrackerTest {
         for (event in
             oneFingerDrag(
                 point,
-                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0)
+                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0),
             )) {
             gestureTracker.feed(event)
         }
@@ -376,7 +370,7 @@ class GestureTrackerTest {
         for (event in
             oneFingerDrag(
                 start = point,
-                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0)
+                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0),
             )) {
             gestureTracker.feed(event)
         }
@@ -393,7 +387,7 @@ class GestureTrackerTest {
         for (event in
             oneFingerDrag(
                 start = point,
-                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0)
+                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0),
             )) {
             gestureTracker.feed(event)
         }
@@ -405,6 +399,57 @@ class GestureTrackerTest {
         assertThat(gestureTracker.matches(GestureTracker.Gesture.DRAG_X)).isTrue()
         // And that we never detected a zoom / quick scale
         verify(gestureHandlerSpy, never()).onScale(any())
+
+        verifyNoMoreInteractions(gestureHandlerSpy)
+    }
+
+    @Test
+    fun testDragX_nonNullViewParent_contentAtEdge_onScrollInterceptDisallowed() {
+        val disallowInterceptCaptor = ArgumentCaptor.forClass(Boolean::class.java)
+        val viewParentSpy = mock<ViewParent>().apply { requestDisallowInterceptTouchEvent(true) }
+
+        for (event in
+            oneFingerDrag(
+                start = PointF(50f, 50f),
+                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0),
+            )) {
+            gestureTracker.feed(event, viewParentSpy, contentAtEdge = true)
+        }
+
+        verify(gestureHandlerSpy).onGestureStart()
+        verify(gestureHandlerSpy, atLeastOnce()).onScroll(any(), any(), any(), any())
+        verify(viewParentSpy, atLeastOnce())
+            .requestDisallowInterceptTouchEvent(disallowInterceptCaptor.capture())
+        assertThat(disallowInterceptCaptor.value).isFalse()
+
+        verify(gestureHandlerSpy).onGestureEnd(eq(GestureTracker.Gesture.DRAG_X))
+        assertThat(gestureTracker.matches(GestureTracker.Gesture.DRAG_X)).isTrue()
+        assertThat(disallowInterceptCaptor.value).isFalse()
+
+        verifyNoMoreInteractions(gestureHandlerSpy)
+    }
+
+    @Test
+    fun testDragX_nonNullViewParent_contentNotAtEdge_onScrollInterceptAllowed() {
+        val disallowInterceptCaptor = ArgumentCaptor.forClass(Boolean::class.java)
+        val viewParentSpy = mock<ViewParent>().apply { requestDisallowInterceptTouchEvent(true) }
+
+        for (event in
+            oneFingerDrag(
+                start = PointF(50f, 50f),
+                velocity = Point(ViewConfiguration.get(context).scaledMinimumFlingVelocity / 2, 0),
+            )) {
+            gestureTracker.feed(event, viewParentSpy, contentAtEdge = false)
+        }
+
+        verify(gestureHandlerSpy).onGestureStart()
+        verify(gestureHandlerSpy, atLeastOnce()).onScroll(any(), any(), any(), any())
+        verify(viewParentSpy, atLeastOnce())
+            .requestDisallowInterceptTouchEvent(disallowInterceptCaptor.capture())
+        assertThat(disallowInterceptCaptor.value).isTrue()
+
+        verify(gestureHandlerSpy).onGestureEnd(eq(GestureTracker.Gesture.DRAG_X))
+        assertThat(gestureTracker.matches(GestureTracker.Gesture.DRAG_X)).isTrue()
 
         verifyNoMoreInteractions(gestureHandlerSpy)
     }
@@ -455,7 +500,7 @@ private fun oneFingerDrag(
     start: PointF,
     velocity: Point,
     downTime: Long = Robolectric.getForegroundThreadScheduler().currentTime,
-    skipDown: Boolean = false
+    skipDown: Boolean = false,
 ): List<MotionEvent> {
     val sequence = mutableListOf<MotionEvent>()
     if (!skipDown) sequence.add(down(start, time = downTime))
@@ -481,7 +526,7 @@ private fun twoFingerDrag(
     start1: PointF,
     start2: PointF,
     velocity1: Point,
-    velocity2: Point
+    velocity2: Point,
 ): List<MotionEvent> {
     // Specify the touch properties for the finger events.
     val pp1 = MotionEvent.PointerProperties()
@@ -522,7 +567,7 @@ private fun twoFingerDrag(
             0,
             0,
             0,
-            0
+            0,
         )
     val secondFingerEvent =
         MotionEvent.obtain(
@@ -539,7 +584,7 @@ private fun twoFingerDrag(
             0,
             0,
             0,
-            0
+            0,
         )
     val sequence = mutableListOf(firstFingerEvent, secondFingerEvent)
     // Compute a series of ACTION_MOVE events with interpolated coordinates for each pointer
@@ -565,7 +610,7 @@ private fun twoFingerDrag(
                 0,
                 0,
                 0,
-                0
+                0,
             )
         sequence.add(twoPointerMove)
     }
@@ -585,7 +630,7 @@ private fun twoFingerDrag(
             0,
             0,
             0,
-            0
+            0,
         )
     val firstFingerUpEvent =
         MotionEvent.obtain(
@@ -602,7 +647,7 @@ private fun twoFingerDrag(
             0,
             0,
             0,
-            0
+            0,
         )
     sequence.add(secondFingerUpEvent)
     sequence.add(firstFingerUpEvent)

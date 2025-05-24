@@ -31,9 +31,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsProperties.Text
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.TouchInjectionScope
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
@@ -70,6 +75,44 @@ class PullToRefreshBoxTest {
     }
 
     @Test
+    fun boxNotVisible_notVisibleToSemantics() {
+        val state = PullToRefreshState()
+        rule.setContent {
+            PullToRefreshBox(
+                modifier = Modifier.testTag("PullToRefresh"),
+                isRefreshing = false,
+                state = state,
+                onRefresh = {},
+            ) {}
+        }
+
+        assertThat(state.distanceFraction).isEqualTo(0f)
+        rule
+            .onNodeWithTag("PullToRefresh")
+            .onChild()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
+    }
+
+    @Test
+    fun boxVisible_VisibleToSemantics() {
+        val state = PullToRefreshState()
+        rule.setContent {
+            PullToRefreshBox(
+                modifier = Modifier.testTag("PullToRefresh"),
+                isRefreshing = true,
+                state = state,
+                onRefresh = {},
+            ) {}
+        }
+
+        assertThat(state.distanceFraction).isEqualTo(1f)
+        rule
+            .onNodeWithTag("PullToRefresh")
+            .onChild()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+    }
+
+    @Test
     fun startRefreshing_pull_isNoop() {
         val state = PullToRefreshState()
         rule.setContent {
@@ -91,7 +134,7 @@ class PullToRefreshBoxTest {
             PullToRefreshBox(
                 isRefreshing = isRefreshing.value,
                 state = state,
-                onRefresh = { isRefreshing.value = true }
+                onRefresh = { isRefreshing.value = true },
             ) {
                 LazyColumn(Modifier.testTag("lazy")) { items(50) { Text("Item") } }
             }
@@ -114,7 +157,7 @@ class PullToRefreshBoxTest {
             PullToRefreshBox(
                 isRefreshing = isRefreshing.value,
                 state = state,
-                onRefresh = { isRefreshing.value = true }
+                onRefresh = { isRefreshing.value = true },
             ) {
                 Column(
                     Modifier.fillMaxWidth()
@@ -129,7 +172,7 @@ class PullToRefreshBoxTest {
                                         remainingVelocity = initialVelocity
                                         return initialVelocity
                                     }
-                                }
+                                },
                         )
                 ) {
                     repeat(50) { Text("Lorem ipsum") }

@@ -41,7 +41,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.privacysandbox.activity.client.createSdkActivityLauncher
+import androidx.privacysandbox.activity.client.createManagedSdkActivityLauncher
 import androidx.privacysandbox.activity.client.toLauncherInfo
 import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.BackNavigation
 import androidx.privacysandbox.ui.integration.sdkproviderutils.SdkApiConstants.Companion.ScreenOrientation
@@ -51,7 +51,7 @@ class FullscreenSetupComposeFragment : BaseFragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         return ComposeView(requireContext()).apply {
             // Dispose of the Composition when the view's LifecycleOwner
@@ -67,7 +67,7 @@ class FullscreenSetupComposeFragment : BaseFragment() {
                     ScreenOrientation(
                         screenOrientationOptions,
                         selectedScreenOrientationOption,
-                        onScreenOrientationOptionSelected
+                        onScreenOrientationOptionSelected,
                     )
 
                     val backNavOptions =
@@ -80,10 +80,10 @@ class FullscreenSetupComposeFragment : BaseFragment() {
                         onClick = {
                             launchFullScreenAd(
                                 selectedScreenOrientationOption,
-                                selectedBackNavOption
+                                selectedBackNavOption,
                             )
                         },
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
                     ) {
                         Text(stringResource(R.string.cta_launch_fullscreen_ad))
                     }
@@ -96,17 +96,17 @@ class FullscreenSetupComposeFragment : BaseFragment() {
     fun ScreenOrientation(
         screenOrientationOptions: List<String>,
         selectedScreenOrientationOption: String,
-        onScreenOrientationOptionSelected: (String) -> Unit
+        onScreenOrientationOptionSelected: (String) -> Unit,
     ) {
         Column(modifier = Modifier.padding(top = 16.dp)) {
             Text(
                 modifier = Modifier.padding(start = 16.dp),
-                text = stringResource(R.string.label_screen_orientation)
+                text = stringResource(R.string.label_screen_orientation),
             )
             RadioGroup(
                 screenOrientationOptions,
                 selectedScreenOrientationOption,
-                onScreenOrientationOptionSelected
+                onScreenOrientationOptionSelected,
             )
         }
     }
@@ -115,12 +115,12 @@ class FullscreenSetupComposeFragment : BaseFragment() {
     fun BackNavigation(
         backNavOptions: List<String>,
         selectedBackNavOption: String,
-        onBackNavOptionSelected: (String) -> Unit
+        onBackNavOptionSelected: (String) -> Unit,
     ) {
         Column(modifier = Modifier.padding(top = 16.dp)) {
             Text(
                 modifier = Modifier.padding(start = 16.dp),
-                text = stringResource(R.string.label_back_navigation)
+                text = stringResource(R.string.label_back_navigation),
             )
             RadioGroup(backNavOptions, selectedBackNavOption, onBackNavOptionSelected)
         }
@@ -130,7 +130,7 @@ class FullscreenSetupComposeFragment : BaseFragment() {
     fun RadioGroup(
         radioOptions: List<String>,
         selectedOption: String,
-        onOptionSelected: (String) -> Unit
+        onOptionSelected: (String) -> Unit,
     ) {
         Column(Modifier.selectableGroup()) {
             radioOptions.forEach { text ->
@@ -140,16 +140,16 @@ class FullscreenSetupComposeFragment : BaseFragment() {
                         .selectable(
                             selected = (text == selectedOption),
                             onClick = { onOptionSelected(text) },
-                            role = Role.RadioButton
+                            role = Role.RadioButton,
                         )
                         .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RadioButton(selected = (text == selectedOption), onClick = null)
                     Text(
                         text = text,
                         style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(start = 16.dp)
+                        modifier = Modifier.padding(start = 16.dp),
                     )
                 }
             }
@@ -158,7 +158,7 @@ class FullscreenSetupComposeFragment : BaseFragment() {
 
     private fun launchFullScreenAd(
         screenOrientationSelected: String,
-        backNavOptionSelected: String
+        backNavOptionSelected: String,
     ) {
         val screenOrientation =
             when (screenOrientationSelected) {
@@ -175,12 +175,12 @@ class FullscreenSetupComposeFragment : BaseFragment() {
                 else -> BackNavigation.ENABLED
             }
 
-        val activityLauncher = requireActivity().createSdkActivityLauncher({ true })
+        val activityLauncher = requireActivity().createManagedSdkActivityLauncher({ true })
         getSdkApi()
             .launchFullscreenAd(
                 activityLauncher.toLauncherInfo(),
                 screenOrientation,
-                backNavigation
+                backNavigation,
             )
     }
 

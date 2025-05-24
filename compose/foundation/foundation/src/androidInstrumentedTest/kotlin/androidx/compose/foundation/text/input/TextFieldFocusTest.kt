@@ -98,7 +98,7 @@ internal class TextFieldFocusTest {
                 modifier =
                     Modifier.focusRequester(data.focusRequester)
                         .onFocusChanged { data.focused = it.isFocused }
-                        .requiredWidth(10.dp)
+                        .requiredWidth(10.dp),
             )
         }
     }
@@ -114,7 +114,7 @@ internal class TextFieldFocusTest {
                 listOf(
                     FocusTestData(FocusRequester()),
                     FocusTestData(FocusRequester()),
-                    FocusTestData(FocusRequester())
+                    FocusTestData(FocusRequester()),
                 )
 
             TextFieldApp(testDataList)
@@ -156,7 +156,7 @@ internal class TextFieldFocusTest {
             BasicTextField(
                 state = rememberTextFieldState(),
                 modifier = Modifier.testTag(tag),
-                interactionSource = interactionSource
+                interactionSource = interactionSource,
             )
             Box(modifier = Modifier.size(10.dp).focusable())
         }
@@ -167,15 +167,131 @@ internal class TextFieldFocusTest {
 
         rule.onNodeWithTag(tag).requestFocus()
 
-        rule.runOnIdle {
-            assertThat(interactions.filterIsInstance<FocusInteraction.Focus>()).isNotEmpty()
+        rule.waitForIdle()
+        assertThat(interactions.filterIsInstance<FocusInteraction.Focus>()).isNotEmpty()
+        val focusEvent = interactions.filterIsInstance<FocusInteraction.Focus>().first()
+
+        rule.runOnUiThread { focusManager.moveFocus(FocusDirection.Next) }
+
+        rule.waitForIdle()
+        assertThat(interactions.filterIsInstance<FocusInteraction.Unfocus>()).hasSize(1)
+        assertThat(interactions.filterIsInstance<FocusInteraction.Unfocus>().first().focus)
+            .isSameInstanceAs(focusEvent)
+    }
+
+    @Test
+    fun interactionSource_emitsUnfocusEvent_whenDisabled() {
+        val interactionSource = MutableInteractionSource()
+        val tag = "TextField"
+        var enabled by mutableStateOf(true)
+        lateinit var scope: CoroutineScope
+
+        rule.setContent {
+            scope = rememberCoroutineScope()
+            BasicTextField(
+                state = rememberTextFieldState(),
+                modifier = Modifier.testTag(tag),
+                interactionSource = interactionSource,
+                enabled = enabled,
+            )
         }
 
-        focusManager.moveFocus(FocusDirection.Next)
+        val interactions = mutableListOf<Interaction>()
 
-        rule.runOnIdle {
-            assertThat(interactions.filterIsInstance<FocusInteraction.Unfocus>()).isNotEmpty()
+        scope.launch { interactionSource.interactions.collect { interactions.add(it) } }
+
+        rule.onNodeWithTag(tag).requestFocus()
+
+        rule.waitForIdle()
+        assertThat(interactions.filterIsInstance<FocusInteraction.Focus>()).isNotEmpty()
+        val focusEvent = interactions.filterIsInstance<FocusInteraction.Focus>().first()
+
+        enabled = false
+
+        rule.waitForIdle()
+        assertThat(interactions.filterIsInstance<FocusInteraction.Unfocus>()).hasSize(1)
+        assertThat(interactions.filterIsInstance<FocusInteraction.Unfocus>().first().focus)
+            .isSameInstanceAs(focusEvent)
+    }
+
+    @Test
+    fun interactionSource_focusEventsAreSentTo_newInteractionSource() {
+        val interactionSource1 = MutableInteractionSource()
+        val interactionSource2 = MutableInteractionSource()
+        val interactionSourceState = mutableStateOf(interactionSource1)
+        val tag = "TextField"
+        lateinit var scope: CoroutineScope
+        lateinit var focusManager: FocusManager
+
+        rule.setContent {
+            scope = rememberCoroutineScope()
+            focusManager = LocalFocusManager.current
+            BasicTextField(
+                state = rememberTextFieldState(),
+                modifier = Modifier.testTag(tag),
+                interactionSource = interactionSourceState.value,
+            )
         }
+
+        val interactions1 = mutableListOf<Interaction>()
+        val interactions2 = mutableListOf<Interaction>()
+
+        scope.launch { interactionSource1.interactions.collect { interactions1.add(it) } }
+        scope.launch { interactionSource2.interactions.collect { interactions2.add(it) } }
+
+        rule.onNodeWithTag(tag).requestFocus()
+
+        rule.waitForIdle()
+        assertThat(interactions1.filterIsInstance<FocusInteraction.Focus>()).isNotEmpty()
+        assertThat(interactions2.filterIsInstance<FocusInteraction.Focus>()).isEmpty()
+        val focusEvent = interactions1.filterIsInstance<FocusInteraction.Focus>().first()
+
+        interactionSourceState.value = interactionSource2
+
+        rule.runOnIdle { focusManager.clearFocus() }
+
+        rule.onNodeWithTag(tag).requestFocus()
+
+        assertThat(interactions1.filterIsInstance<FocusInteraction.Unfocus>()).hasSize(1)
+        assertThat(interactions1.filterIsInstance<FocusInteraction.Unfocus>().first().focus)
+            .isSameInstanceAs(focusEvent)
+
+        assertThat(interactions2.filterIsInstance<FocusInteraction.Focus>()).isNotEmpty()
+    }
+
+    @Test
+    fun interactionSourceChanges_whenFieldDisabled_eventsAreSentToNewInteractionSource() {
+        val interactionSource1 = MutableInteractionSource()
+        val interactionSource2 = MutableInteractionSource()
+        val interactionSourceState = mutableStateOf(interactionSource1)
+        val tag = "TextField"
+        lateinit var scope: CoroutineScope
+        var enabled by mutableStateOf(false)
+
+        rule.setContent {
+            scope = rememberCoroutineScope()
+            BasicTextField(
+                state = rememberTextFieldState(),
+                modifier = Modifier.testTag(tag),
+                enabled = enabled,
+                interactionSource = interactionSourceState.value,
+            )
+        }
+
+        val interactions1 = mutableListOf<Interaction>()
+        val interactions2 = mutableListOf<Interaction>()
+
+        scope.launch { interactionSource1.interactions.collect { interactions1.add(it) } }
+        scope.launch { interactionSource2.interactions.collect { interactions2.add(it) } }
+
+        rule.runOnIdle { interactionSourceState.value = interactionSource2 }
+
+        rule.runOnIdle { enabled = true }
+
+        rule.onNodeWithTag(tag).requestFocus()
+
+        assertThat(interactions1.filterIsInstance<FocusInteraction.Focus>()).isEmpty()
+        assertThat(interactions2.filterIsInstance<FocusInteraction.Focus>()).isNotEmpty()
     }
 
     @Test
@@ -191,7 +307,7 @@ internal class TextFieldFocusTest {
                 modifier =
                     Modifier.testTag(tag)
                         .onFocusChanged { focused = it.isFocused }
-                        .requiredWidth(10.dp)
+                        .requiredWidth(10.dp),
             )
         }
         // bring enabled text field into focus
@@ -240,7 +356,7 @@ internal class TextFieldFocusTest {
                     // Need to explicitly install the interceptor in the dialog as well.
                     inputMethodInterceptor.Content(it)
                 }
-            }
+            },
         )
     }
 
@@ -261,13 +377,13 @@ internal class TextFieldFocusTest {
                     // Need to explicitly install the interceptor in the dialog as well.
                     inputMethodInterceptor.Content(it)
                 }
-            }
+            },
         )
     }
 
     private fun textInputStarted_whenFocusRequestedImmediately_fromEffect(
         runEffect: @Composable (body: () -> Unit) -> Unit,
-        wrapContent: @Composable (@Composable () -> Unit) -> Unit = { it() }
+        wrapContent: @Composable (@Composable () -> Unit) -> Unit = { it() },
     ) {
         val focusRequester = FocusRequester()
         val state = TextFieldState()
@@ -484,7 +600,7 @@ internal class TextFieldFocusTest {
                 keyPressOnKeyboardInputDevice(
                     rule,
                     NativeKeyEvent.KEYCODE_TAB,
-                    metaState = KeyEvent.META_SHIFT_ON
+                    metaState = KeyEvent.META_SHIFT_ON,
                 )
             )
             .isTrue()
@@ -511,7 +627,7 @@ internal class TextFieldFocusTest {
                 0,
                 0,
                 invalidDeviceId,
-                0
+                0,
             )
         assertThat(keyEventDown.device).isNull()
         rule.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(keyEventDown))
@@ -525,15 +641,13 @@ internal class TextFieldFocusTest {
                 0,
                 0,
                 invalidDeviceId,
-                0
+                0,
             )
         rule.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(keyEventUp))
         rule.waitForIdle()
     }
 
-    private fun setupAndEnableBasicTextField(
-        singleLine: Boolean = false,
-    ) {
+    private fun setupAndEnableBasicTextField(singleLine: Boolean = false) {
         setupContent(singleLine)
 
         rule.onNodeWithTag("test-text-field-1").assertIsFocused()
@@ -555,9 +669,7 @@ internal class TextFieldFocusTest {
         keyPressOnVirtualKeyboard(NativeKeyEvent.KEYCODE_C)
     }
 
-    private fun setupContent(
-        singleLine: Boolean = false,
-    ) {
+    private fun setupContent(singleLine: Boolean = false) {
         rule.setContent {
             CompositionLocalProvider(
                 LocalSoftwareKeyboardController provides testKeyboardController
@@ -590,7 +702,7 @@ internal class TextFieldFocusTest {
                     .padding(10.dp)
                     .onFocusChanged { isFocused = it.hasFocus }
                     .focusable()
-                    .border(2.dp, if (isFocused) Color.Green else Color.Cyan)
+                    .border(2.dp, if (isFocused) Color.Green else Color.Cyan),
         )
     }
 
@@ -615,7 +727,7 @@ internal class TextFieldFocusTest {
                     .testTag("test-text-field-$id")
                     .padding(10.dp)
                     .onFocusChanged { isFocused = it.isFocused || it.hasFocus }
-                    .border(2.dp, if (isFocused) Color.Red else Color.Transparent)
+                    .border(2.dp, if (isFocused) Color.Red else Color.Transparent),
         )
 
         LaunchedEffect(requestFocus, focusRequester) {
@@ -627,7 +739,7 @@ internal class TextFieldFocusTest {
     private fun keyPressOnDpadInputDevice(
         rule: ComposeContentTestRule,
         keyCode: Int,
-        count: Int = 1
+        count: Int = 1,
     ) = keyPressOnPhysicalDevice(rule, keyCode, InputDevice.SOURCE_DPAD, count)
 
     /** Triggers a key press on the root node from a non-virtual keyboard device (if supported). */
@@ -661,7 +773,7 @@ internal class TextFieldFocusTest {
                 deviceId,
                 0,
                 0,
-                source
+                source,
             )
         val keyEventUp =
             KeyEvent(
@@ -674,7 +786,7 @@ internal class TextFieldFocusTest {
                 deviceId,
                 0,
                 0,
-                source
+                source,
             )
 
         repeat(count) {

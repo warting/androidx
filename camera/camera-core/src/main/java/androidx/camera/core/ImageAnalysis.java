@@ -438,6 +438,7 @@ public final class ImageAnalysis extends UseCase {
                 },
                 CameraXExecutors.mainThreadExecutor());
 
+        sessionConfigBuilder.setSessionType(streamSpec.getSessionType());
         // Applies the AE fps range to the session config builder according to the stream spec and
         // quirk values.
         applyExpectedFrameRateRange(sessionConfigBuilder, streamSpec);
@@ -867,6 +868,8 @@ public final class ImageAnalysis extends UseCase {
     protected @NonNull StreamSpec onSuggestedStreamSpecUpdated(
             @NonNull StreamSpec primaryStreamSpec,
             @Nullable StreamSpec secondaryStreamSpec) {
+        Logger.d(TAG, "onSuggestedStreamSpecUpdated: primaryStreamSpec = " + primaryStreamSpec
+                + ", secondaryStreamSpec " + secondaryStreamSpec);
         final ImageAnalysisConfig config = (ImageAnalysisConfig) getCurrentConfig();
 
         mSessionConfigBuilder = createPipeline(getCameraId(), config,

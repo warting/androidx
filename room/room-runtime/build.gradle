@@ -64,13 +64,14 @@ android {
             version = 1
         }
     }
+    testOptions.unitTests.returnDefaultValues = true
     namespace = "androidx.room"
     // TODO(b/345531033)
     experimentalProperties["android.lint.useK2Uast"] = false
 }
 
 androidXMultiplatform {
-    android()
+    androidTarget()
     ios() {
         // Link to sqlite3 available in iOS
         binaries.configureEach {
@@ -225,11 +226,6 @@ androidx {
     type = SoftwareType.PUBLISHED_LIBRARY
     inceptionYear = "2017"
     description = "Android Room-Runtime"
-    legacyDisableKotlinStrictApiMode = true
-    metalavaK2UastEnabled = false
-    kotlinTarget = KotlinTarget.KOTLIN_2_0
+    kotlinTarget = KotlinTarget.KOTLIN_2_1
 }
 
-ksp {
-    useKsp2 = true
-}

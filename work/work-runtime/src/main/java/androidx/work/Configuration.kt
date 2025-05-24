@@ -137,15 +137,20 @@ class Configuration internal constructor(builder: Builder) {
     /** @return `true` If the default task [Executor] is being used */
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) val isUsingDefaultTaskExecutor: Boolean
 
+    // Note: public experimental properties are not allowed because the accessors will not appear
+    // experimental to Java clients. There is a public accessor for this property below.
+    @property:ExperimentalConfigurationApi
+    private val isMarkingJobsAsImportantWhileForeground: Boolean
+
     /**
      * Specifies whether WorkManager automatically set
      * [android.app.job.JobInfo.Builder.setImportantWhileForeground] for workers that are eligible
      * to run immediately.
      */
-    @get:ExperimentalConfigurationApi
-    @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
-    @property:ExperimentalConfigurationApi
-    val isMarkingJobsAsImportantWhileForeground: Boolean
+    @ExperimentalConfigurationApi
+    fun isMarkingJobsAsImportantWhileForeground(): Boolean {
+        return isMarkingJobsAsImportantWhileForeground
+    }
 
     /**
      * @return The [Tracer] instance that can be used by [WorkManager] to record trace spans when
@@ -591,7 +596,7 @@ private fun createDefaultExecutor(isTaskExecutor: Boolean): Executor {
     return Executors.newFixedThreadPool(
         // This value is the same as the core pool size for AsyncTask#THREAD_POOL_EXECUTOR.
         max(2, min(Runtime.getRuntime().availableProcessors() - 1, 4)),
-        factory
+        factory,
     )
 }
 
