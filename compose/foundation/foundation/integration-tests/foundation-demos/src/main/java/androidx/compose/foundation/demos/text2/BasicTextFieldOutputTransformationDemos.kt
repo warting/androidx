@@ -16,6 +16,10 @@
 
 package androidx.compose.foundation.demos.text2
 
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.demos.text.TagLine
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,8 +28,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.AnnotatedOutputTransformation
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.OutputTransformationAnnotationScope
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.text.input.TextFieldState
@@ -51,9 +57,12 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -67,6 +76,12 @@ fun BasicTextFieldOutputTransformationDemos() {
 
         TagLine("Phone number full template")
         PhoneNumberFullTemplateDemo()
+
+        TagLine("Bold/Italic every character")
+        BoldItalicEveryOtherChar()
+
+        TagLine("Color animation")
+        ColorAnimationDemo()
     }
 }
 
@@ -87,7 +102,7 @@ private fun InsertReplaceDeleteDemo() {
         "To move the cursor around, use the GBoard menu to get at selection controls, plug in a " +
             "hardware keyboard, or use the Running Devices tool in Android Studio with a " +
             "physical device. On an emulator, your host's hardware arrow keys won't work.",
-        style = MaterialTheme.typography.caption
+        style = MaterialTheme.typography.caption,
     )
 
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -148,7 +163,7 @@ private fun InsertReplaceDeleteDemo() {
                             drawLine(
                                 Color.Blue,
                                 start = cursorRect.topCenter,
-                                end = cursorRect.bottomCenter
+                                end = cursorRect.bottomCenter,
                             )
                         } else {
                             val selectionPath =
@@ -157,7 +172,7 @@ private fun InsertReplaceDeleteDemo() {
                                 selectionPath,
                                 Color.Blue,
                                 alpha = 0.8f,
-                                style = Stroke(width = 1.dp.toPx())
+                                style = Stroke(width = 1.dp.toPx()),
                             )
                         }
                     },
@@ -165,7 +180,7 @@ private fun InsertReplaceDeleteDemo() {
         Icon(
             Icons.AutoMirrored.Default.KeyboardArrowRight,
             contentDescription = null,
-            modifier = Modifier.alignBy { (it.measuredHeight * 0.75f).toInt() }
+            modifier = Modifier.alignBy { (it.measuredHeight * 0.75f).toInt() },
         )
         BasicTextField(
             state = state,
@@ -219,6 +234,55 @@ private fun PhoneNumberFullTemplateDemo() {
         textStyle = TextStyle(fontFamily = FontFamily.Monospace),
         outputTransformation = PhoneNumberOutputTransformation(pad = true),
         inputTransformation = OnlyDigitsFilter,
+        decorator = demoDecorationBox,
+    )
+}
+
+@Composable
+private fun BoldItalicEveryOtherChar() {
+    BasicTextField(
+        state = rememberTextFieldState(),
+        modifier = demoTextFieldModifiers,
+        outputTransformation =
+            object : AnnotatedOutputTransformation {
+                override fun TextFieldBuffer.transformOutput() {
+                    var i = 1
+                    repeat(length - 1) {
+                        insert(i, "-")
+                        i += 2
+                    }
+                }
+
+                override fun OutputTransformationAnnotationScope.annotateOutput() {
+                    // now the text is like "H-E-L-L-O".
+                    // we are going to make the first character bold, the second italic, third bold
+                    // and
+                    // so on, skipping the decorations.
+                    var i = 0
+                    val bold = SpanStyle(fontWeight = FontWeight.Bold)
+                    val italic = SpanStyle(fontStyle = FontStyle.Italic)
+                    var toggle = true
+                    repeat(text.length / 2 + 1) {
+                        addStyle(if (toggle) bold else italic, i, i + 1)
+                        toggle = !toggle
+                        i += 2
+                    }
+                }
+            },
+        decorator = demoDecorationBox,
+    )
+}
+
+@Composable
+private fun ColorAnimationDemo() {
+    val infiniteTransition = rememberInfiniteTransition()
+    val color by
+        infiniteTransition.animateColor(Color.Red, Color.Blue, infiniteRepeatable(tween(1000)))
+    BasicTextField(
+        state = rememberTextFieldState(),
+        modifier = demoTextFieldModifiers,
+        outputTransformation =
+            AnnotatedOutputTransformation { addStyle(SpanStyle(color = color), 0, text.length) },
         decorator = demoDecorationBox,
     )
 }

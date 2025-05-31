@@ -15,7 +15,6 @@
  */
 package androidx.privacysandbox.sdkruntime.client
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.sdksandbox.LoadSdkException
 import android.app.sdksandbox.SandboxedSdk
@@ -34,7 +33,6 @@ import androidx.privacysandbox.sdkruntime.client.controller.impl.LocalAppOwnedSd
 import androidx.privacysandbox.sdkruntime.client.controller.impl.LocalSdkRegistry
 import androidx.privacysandbox.sdkruntime.client.controller.impl.PlatformAppOwnedSdkRegistry
 import androidx.privacysandbox.sdkruntime.client.loader.VersionHandshake
-import androidx.privacysandbox.sdkruntime.core.AdServicesInfo
 import androidx.privacysandbox.sdkruntime.core.AppOwnedSdkSandboxInterfaceCompat
 import androidx.privacysandbox.sdkruntime.core.LoadSdkCompatException
 import androidx.privacysandbox.sdkruntime.core.LoadSdkCompatException.Companion.LOAD_SDK_NOT_FOUND
@@ -82,7 +80,7 @@ class SdkSandboxManagerCompat
 private constructor(
     private val platformApi: PlatformApi,
     private val localSdkRegistry: LocalSdkRegistry,
-    private val appOwnedSdkRegistry: AppOwnedSdkRegistry
+    private val appOwnedSdkRegistry: AppOwnedSdkRegistry,
 ) {
     /**
      * Load SDK in a SDK sandbox java process or locally.
@@ -127,9 +125,10 @@ private constructor(
     internal fun loadLocalSdkWithVersionOverride(
         sdkName: String,
         params: Bundle,
-        apiVersion: Int
+        apiVersion: Int,
     ): SandboxedSdkCompat {
-        val customHandshake = VersionHandshake(overrideApiVersion = apiVersion)
+        val customHandshake =
+            VersionHandshake(overrideClientVersion = apiVersion, overrideSdkVersion = apiVersion)
         return localSdkRegistry.loadSdk(sdkName, params, customHandshake)
     }
 
@@ -163,7 +162,7 @@ private constructor(
      */
     fun addSdkSandboxProcessDeathCallback(
         callbackExecutor: Executor,
-        callback: SdkSandboxProcessDeathCallbackCompat
+        callback: SdkSandboxProcessDeathCallbackCompat,
     ) {
         platformApi.addSdkSandboxProcessDeathCallback(callbackExecutor, callback)
     }
@@ -251,7 +250,7 @@ private constructor(
         @DoNotInline
         fun addSdkSandboxProcessDeathCallback(
             callbackExecutor: Executor,
-            callback: SdkSandboxProcessDeathCallbackCompat
+            callback: SdkSandboxProcessDeathCallbackCompat,
         )
 
         @DoNotInline
@@ -263,8 +262,8 @@ private constructor(
     }
 
     @RequiresApi(34)
-    private open class Api34Impl(context: Context) : PlatformApi {
-        protected val sdkSandboxManager = context.getSystemService(SdkSandboxManager::class.java)
+    private class Api34Impl(context: Context) : PlatformApi {
+        private val sdkSandboxManager = context.getSystemService(SdkSandboxManager::class.java)
 
         private val sandboxDeathCallbackDelegates:
             MutableList<SdkSandboxProcessDeathCallbackDelegate> =
@@ -293,7 +292,7 @@ private constructor(
         @DoNotInline
         override fun addSdkSandboxProcessDeathCallback(
             callbackExecutor: Executor,
-            callback: SdkSandboxProcessDeathCallbackCompat
+            callback: SdkSandboxProcessDeathCallbackCompat,
         ) {
             synchronized(sandboxDeathCallbackDelegates) {
                 val delegate = SdkSandboxProcessDeathCallbackDelegate(callback)
@@ -327,7 +326,7 @@ private constructor(
                     sdkName,
                     params,
                     Runnable::run,
-                    continuation.asOutcomeReceiver()
+                    continuation.asOutcomeReceiver(),
                 )
             }
         }
@@ -335,7 +334,6 @@ private constructor(
         private class SdkSandboxProcessDeathCallbackDelegate(
             val callback: SdkSandboxProcessDeathCallbackCompat
         ) : SdkSandboxManager.SdkSandboxProcessDeathCallback {
-            @SuppressLint("Override") // b/273473397
             override fun onSdkSandboxDied() {
                 callback.onSdkSandboxDied()
             }
@@ -354,7 +352,7 @@ private constructor(
 
         override fun addSdkSandboxProcessDeathCallback(
             callbackExecutor: Executor,
-            callback: SdkSandboxProcessDeathCallbackCompat
+            callback: SdkSandboxProcessDeathCallbackCompat,
         ) {}
 
         override fun removeSdkSandboxProcessDeathCallback(
@@ -399,7 +397,7 @@ private constructor(
 
     private object PlatformApiFactory {
         fun create(context: Context): PlatformApi {
-            return if (Build.VERSION.SDK_INT >= 34 || AdServicesInfo.isDeveloperPreview()) {
+            return if (Build.VERSION.SDK_INT >= 34) {
                 Api34Impl(context)
             } else {
                 FailImpl()
@@ -408,11 +406,8 @@ private constructor(
     }
 
     private object AppOwnedSdkRegistryFactory {
-        @SuppressLint("NewApi") // For supporting DP Builds
         fun create(context: Context): AppOwnedSdkRegistry {
-            return if (
-                BuildCompat.AD_SERVICES_EXTENSION_INT >= 8 || AdServicesInfo.isDeveloperPreview()
-            ) {
+            return if (Build.VERSION.SDK_INT >= 34 && BuildCompat.AD_SERVICES_EXTENSION_INT >= 8) {
                 PlatformAppOwnedSdkRegistry(context)
             } else {
                 LocalAppOwnedSdkRegistry()

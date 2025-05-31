@@ -20,12 +20,11 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Build
 import android.util.Log
-import android.util.Printer
 import androidx.annotation.RequiresApi
 import androidx.annotation.RestrictTo
 import androidx.test.platform.app.InstrumentationRegistry
@@ -65,7 +64,7 @@ object DeviceInfo {
                     "/system/sd/xbin/su",
                     "/system/bin/failsafe/su",
                     "/data/local/su",
-                    "/su/bin/su"
+                    "/su/bin/su",
                 )
                 .any { File(it).exists() }
 
@@ -119,13 +118,13 @@ object DeviceInfo {
         !File("/sys/kernel/tracing/trace_marker").exists() &&
             !File("/sys/kernel/debug/tracing/trace_marker").exists()
 
-    private fun getMainlineAppInfo(packageName: String): ApplicationInfo? {
+    private fun getMainlinePackageInfo(packageName: String): PackageInfo? {
         return try {
             InstrumentationRegistry.getInstrumentation()
                 .context
                 .packageManager
-                .getApplicationInfo(packageName, PackageManager.MATCH_APEX)
-        } catch (notFoundException: PackageManager.NameNotFoundException) {
+                .getPackageInfo(packageName, PackageManager.MATCH_APEX)
+        } catch (_: PackageManager.NameNotFoundException) {
             null
         }
     }
@@ -133,14 +132,14 @@ object DeviceInfo {
     @RequiresApi(31)
     private fun queryArtMainlineVersion(): Long {
         val artMainlinePackage =
-            getMainlineAppInfo("com.google.android.art")
-                ?: getMainlineAppInfo("com.android.art")
-                ?: getMainlineAppInfo("com.google.android.go.art")
-                ?: getMainlineAppInfo("com.android.go.art")
+            getMainlinePackageInfo("com.google.android.art")
+                ?: getMainlinePackageInfo("com.android.art")
+                ?: getMainlinePackageInfo("com.google.android.go.art")
+                ?: getMainlinePackageInfo("com.android.go.art")
         if (artMainlinePackage == null) {
             Log.d(
                 BenchmarkState.TAG,
-                "No ART mainline module found on API ${Build.VERSION.SDK_INT}"
+                "No ART mainline module found on API ${Build.VERSION.SDK_INT}",
             )
             return if (Build.VERSION.SDK_INT >= 34) {
                 // defer error to avoid crashing during init
@@ -150,34 +149,7 @@ object DeviceInfo {
                 ART_MAINLINE_VERSION_UNDETECTED
             }
         }
-        // This is an EXTREMELY SILLY way to find out ART's versions, but I couldn't find a better
-        // one without reflecting into ApplicationInfo.longVersionCode (not allowed in jetpack)
-        // or shell commands (slower)
-        var versionCode = -1L
-        val printer =
-            object : Printer {
-                override fun println(x: String?) {
-                    if (x == null || versionCode != -1L) return
-                    // We're looking to a line like the following:
-                    // `enabled=true minSdkVersion=31 targetSdkVersion=34 versionCode=340818022
-                    // targetSandboxVersion=1`
-                    // See
-                    // https://cs.android.com/android/platform/superproject/main/+/main:frameworks/base/core/java/android/content/pm/ApplicationInfo.java;l=1680;drc=5f97e1c49d341d58d971abef4b30de2d58a706aa
-                    val prefix = " versionCode="
-                    val offset = x.indexOf(prefix)
-                    if (offset >= 0) {
-                        val versionString =
-                            x.substring(
-                                startIndex = offset + prefix.length,
-                                endIndex = x.indexOf(' ', offset + prefix.length)
-                            )
-                        versionCode = versionString.toLong()
-                    }
-                }
-            }
-        artMainlinePackage.dump(printer, "")
-        check(versionCode > 0) { "Unable to parse ART version code" }
-        return versionCode
+        return artMainlinePackage.longVersionCode
     }
 
     val isLowRamDevice: Boolean
@@ -221,7 +193,7 @@ object DeviceInfo {
                     changes quickly. For this reason they should not be used for
                     benchmarking. Use a '-user' or '-userdebug' system image.
                 """
-                            .trimIndent()
+                            .trimIndent(),
                 ),
                 conditionalError(
                     hasError = isEmulator,
@@ -234,7 +206,7 @@ object DeviceInfo {
                     benchmark improvements might not carry over to a real user's
                     experience (or even regress real device performance).
                 """
-                            .trimIndent()
+                            .trimIndent(),
                 ),
                 conditionalError(
                     hasError = initialBatteryPercent < MINIMUM_BATTERY_PERCENT,
@@ -247,8 +219,8 @@ object DeviceInfo {
                     Wait for your battery to charge to at least $MINIMUM_BATTERY_PERCENT%.
                     Currently at $initialBatteryPercent%.
                 """
-                            .trimIndent()
-                )
+                            .trimIndent(),
+                ),
             )
     }
 

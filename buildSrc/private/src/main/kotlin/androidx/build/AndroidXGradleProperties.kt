@@ -129,10 +129,17 @@ const val ALLOW_CUSTOM_COMPILE_SDK = "androidx.allowCustomCompileSdk"
 /** If true, yarn dependencies are fetched from an offline mirror */
 const val YARN_OFFLINE_MODE = "androidx.yarnOfflineMode"
 
-const val FORCE_KOTLIN_2_0_TARGET = "androidx.forceKotlin20Target"
-
 /** Defined by AndroidX Benchmark Plugin, may be used for local experiments with compilation */
 const val FORCE_BENCHMARK_AOT_COMPILATION = "androidx.benchmark.forceaotcompilation"
+
+/**
+ * This and [METALAVA_OPT_OUT_BYTECODE_API_PROJECTS] are temporary properties to control which
+ * projects will have bytecode-only APIs generated until the feature is enabled for all projects. If
+ * a project path starts with one of the opt-in prefixes and is not one of the opt-out paths, it
+ * will have bytecode-only APIs generated.
+ */
+const val METALAVA_OPT_IN_BYTECODE_API_PREFIXES = "androidx.metalava.optInBytecodeApiPrefixes"
+const val METALAVA_OPT_OUT_BYTECODE_API_PROJECTS = "androidx.metalava.optOutBytecodeApiProjects"
 
 val ALL_ANDROIDX_PROPERTIES =
     setOf(
@@ -166,18 +173,16 @@ val ALL_ANDROIDX_PROPERTIES =
         FilteredAnchorTask.PROP_TASK_NAME,
         FilteredAnchorTask.PROP_PATH_PREFIX,
         YARN_OFFLINE_MODE,
-        FORCE_KOTLIN_2_0_TARGET,
         FORCE_BENCHMARK_AOT_COMPILATION,
+        METALAVA_OPT_IN_BYTECODE_API_PREFIXES,
+        METALAVA_OPT_OUT_BYTECODE_API_PROJECTS,
     ) + AndroidConfigImpl.GRADLE_PROPERTIES
-
-fun Project.shouldForceKotlin20Target() =
-    project.providers.gradleProperty(FORCE_KOTLIN_2_0_TARGET).map { it.toBoolean() }.orElse(false)
 
 /**
  * Whether to enable constraints for projects in same-version groups See the property definition for
  * more details
  */
-fun Project.shouldAddGroupConstraints() =
+fun Project.shouldAddGroupConstraints(): Provider<Boolean> =
     project.providers.gradleProperty(ADD_GROUP_CONSTRAINTS).map { s -> s.toBoolean() }.orElse(true)
 
 /**
@@ -235,8 +240,8 @@ fun Project.isWriteVersionedApiFilesEnabled(): Boolean =
     findBooleanProperty(WRITE_VERSIONED_API_FILES) ?: true
 
 /** Returns whether the build is for checking forward compatibility across projects */
-fun Project.usingMaxDepVersions(): Boolean {
-    return project.providers.gradleProperty(USE_MAX_DEP_VERSIONS).isPresent()
+fun Project.usingMaxDepVersions(): Provider<Boolean> {
+    return project.providers.gradleProperty(USE_MAX_DEP_VERSIONS).map { true }.orElse(false)
 }
 
 /** Returns whether we export compose compiler metrics */
@@ -261,8 +266,15 @@ fun Project.allowMissingLintProject() =
 fun Project.isCustomCompileSdkAllowed(): Boolean =
     findBooleanProperty(ALLOW_CUSTOM_COMPILE_SDK) ?: true
 
-fun Project.findBooleanProperty(propName: String) = booleanPropertyProvider(propName).get()
+fun Project.findBooleanProperty(propName: String): Boolean? =
+    project.providers.gradleProperty(propName).map { it.toBoolean() }.getOrNull()
 
-fun Project.booleanPropertyProvider(propName: String): Provider<Boolean> {
-    return project.providers.gradleProperty(propName).map { s -> s.toBoolean() }.orElse(false)
-}
+private fun Project.optInBytecodeApiPrefixes() =
+    project.providers.gradleProperty(METALAVA_OPT_IN_BYTECODE_API_PREFIXES).get().split(",")
+
+private fun Project.optOutBytecodeApiProjects() =
+    project.providers.gradleProperty(METALAVA_OPT_OUT_BYTECODE_API_PROJECTS).get().split(",")
+
+fun Project.shouldGenerateBytecodeApis() =
+    optInBytecodeApiPrefixes().any { project.path.startsWith(it) } &&
+        optOutBytecodeApiProjects().none { project.path == it }

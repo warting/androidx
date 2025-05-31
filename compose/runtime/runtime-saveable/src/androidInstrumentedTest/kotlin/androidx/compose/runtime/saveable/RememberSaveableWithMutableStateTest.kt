@@ -17,7 +17,11 @@
 package androidx.compose.runtime.saveable
 
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateSetOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.SnapshotStateSet
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -54,10 +58,68 @@ class RememberSaveableWithMutableStateTest {
     }
 
     @Test
+    fun simpleRestoreList() {
+        var state: SnapshotStateList<Int>? = null
+        restorationTester.setContent { state = rememberSaveable { mutableStateListOf(0) } }
+
+        rule.runOnUiThread {
+            assertThat(state!![0]).isEqualTo(0)
+
+            state!![0] = 1
+            // we null it to ensure recomposition happened
+            state = null
+        }
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        rule.runOnUiThread { assertThat(state!![0]).isEqualTo(1) }
+    }
+
+    @Test
+    fun simpleRestoreSet() {
+        var state: SnapshotStateSet<Int>? = null
+        restorationTester.setContent { state = rememberSaveable { mutableStateSetOf(0) } }
+
+        rule.runOnUiThread {
+            assertThat(state!!.contains(0)).isTrue()
+
+            state!!.remove(0)
+            state!!.add(1)
+            // we null it to ensure recomposition happened
+            state = null
+        }
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        rule.runOnUiThread { assertThat(state!!.contains(1)).isTrue() }
+    }
+
+    @Test
     fun restoreWithSaver() {
         var state: MutableState<Holder>? = null
         restorationTester.setContent {
             state = rememberSaveable(stateSaver = HolderSaver) { mutableStateOf(Holder(0)) }
+        }
+
+        rule.runOnIdle {
+            assertThat(state!!.value).isEqualTo(Holder(0))
+
+            state!!.value.value = 1
+            // we null it to ensure recomposition happened
+            state = null
+        }
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        rule.runOnIdle { assertThat(state!!.value).isEqualTo(Holder(1)) }
+    }
+
+    @Test
+    fun restoreWithSerializer() {
+        var state: MutableState<Holder>? = null
+        restorationTester.setContent {
+            state =
+                rememberSaveable(stateSerializer = HolderSerializer) { mutableStateOf(Holder(0)) }
         }
 
         rule.runOnIdle {

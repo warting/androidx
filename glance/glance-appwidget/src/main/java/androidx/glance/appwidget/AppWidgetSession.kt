@@ -72,7 +72,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   ([AppWidgetId.isRealId]) in that case.
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-open class AppWidgetSession(
+public open class AppWidgetSession(
     private val widget: GlanceAppWidget,
     private val id: AppWidgetId,
     initialOptions: Bundle? = null,
@@ -107,7 +107,7 @@ open class AppWidgetSession(
 
     internal val lastRemoteViews = MutableStateFlow<RemoteViews?>(null)
 
-    override fun createRootEmittable() = RemoteViewsRoot(MaxComposeTreeDepth)
+    override fun createRootEmittable(): RemoteViewsRoot = RemoteViewsRoot(MaxComposeTreeDepth)
 
     override fun provideGlance(context: Context): @Composable @GlanceComposable () -> Unit = {
         CompositionLocalProvider(
@@ -137,7 +137,7 @@ open class AppWidgetSession(
                                 appWidgetMinSize(
                                     context.resources.displayMetrics,
                                     manager,
-                                    id.appWidgetId
+                                    id.appWidgetId,
                                 )
                             if (options == null) {
                                 options = manager.getAppWidgetOptions(id.appWidgetId)
@@ -163,7 +163,7 @@ open class AppWidgetSession(
 
     override suspend fun processEmittableTree(
         context: Context,
-        root: EmittableWithChildren
+        root: EmittableWithChildren,
     ): Boolean {
         if (root.shouldIgnoreResult()) return false
         root as RemoteViewsRoot
@@ -221,7 +221,7 @@ open class AppWidgetSession(
                     Log.i(
                         TAG,
                         "Received UpdateAppWidgetOptions(${event.newOptions}) event" +
-                            "for session($key)"
+                            "for session($key)",
                     )
                 }
                 Snapshot.withMutableSnapshot { options = event.newOptions }
@@ -252,15 +252,15 @@ open class AppWidgetSession(
         parentJob.cancel()
     }
 
-    suspend fun updateGlance() {
+    public suspend fun updateGlance() {
         sendEvent(UpdateGlanceState)
     }
 
-    suspend fun updateAppWidgetOptions(newOptions: Bundle) {
+    public suspend fun updateAppWidgetOptions(newOptions: Bundle) {
         sendEvent(UpdateAppWidgetOptions(newOptions))
     }
 
-    suspend fun runLambda(key: String) {
+    public suspend fun runLambda(key: String) {
         sendEvent(RunLambda(key))
     }
 
@@ -271,7 +271,7 @@ open class AppWidgetSession(
      * join will resume successfully (Job is completed). If the session is closed before it is
      * ready, we call [Job.cancel] and the call to join resumes with [CancellationException].
      */
-    suspend fun waitForReady(): Job {
+    public suspend fun waitForReady(): Job {
         val event = WaitForReady(Job(parentJob))
         sendEvent(event)
         return event.job
@@ -284,7 +284,7 @@ open class AppWidgetSession(
                 context,
                 glanceId = id,
                 appWidgetId = id.appWidgetId,
-                throwable = throwable
+                throwable = throwable,
             )
         } else {
             throw throwable // rethrow the error if we can't display it

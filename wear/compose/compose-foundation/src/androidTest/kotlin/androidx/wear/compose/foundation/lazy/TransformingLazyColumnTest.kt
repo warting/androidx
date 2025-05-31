@@ -20,6 +20,7 @@ import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -311,7 +312,7 @@ class TransformingLazyColumnTest {
                     .testTag(lazyListTag)
                     .graphicsLayer()
                     .background(Color.Blue),
-                state = state
+                state = state,
             ) {
                 items(2) {
                     val size = if (it == 0) 5.dp else 100.dp
@@ -406,11 +407,29 @@ class TransformingLazyColumnTest {
         rule.onNodeWithTag(lazyListTag).assertIsDisplayed()
     }
 
+    @Test
+    fun supportsInitialScrollPosition() {
+        lateinit var state: TransformingLazyColumnState
+
+        rule.setContent {
+            state = rememberTransformingLazyColumnState(initialAnchorItemIndex = 8)
+            TransformingLazyColumn(
+                state = state,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.testTag(lazyListTag).size(90.dp),
+            ) {
+                items(10) { Spacer(Modifier.size(30.dp).testTag("item $it")) }
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag("item 8").assertIsDisplayed()
+    }
+
     @OptIn(ExperimentalTestApi::class)
     private fun testTransformingLazyColumnRotary(
         userScrollEnabled: Boolean,
         scrollTarget: Int,
-        itemsToScroll: Int = 2
+        itemsToScroll: Int = 2,
     ) {
         lateinit var state: TransformingLazyColumnState
         val itemSizePx = 50
@@ -420,8 +439,8 @@ class TransformingLazyColumnTest {
             state = rememberTransformingLazyColumnState()
             TransformingLazyColumn(
                 state = state,
-                modifier = Modifier.testTag(lazyListTag),
-                userScrollEnabled = userScrollEnabled
+                modifier = Modifier.testTag(lazyListTag).size(itemSizeDp * 2),
+                userScrollEnabled = userScrollEnabled,
             ) {
                 items(100) {
                     BasicText(text = "item $it", modifier = Modifier.requiredSize(itemSizeDp))

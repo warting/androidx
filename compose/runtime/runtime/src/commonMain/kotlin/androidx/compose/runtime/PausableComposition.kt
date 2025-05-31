@@ -21,6 +21,7 @@ package androidx.compose.runtime
 import androidx.collection.emptyScatterSet
 import androidx.collection.mutableIntListOf
 import androidx.collection.mutableObjectListOf
+import androidx.compose.runtime.internal.AtomicReference
 import androidx.compose.runtime.internal.RememberEventDispatcher
 import androidx.compose.runtime.platform.SynchronizedObject
 import androidx.compose.runtime.platform.synchronized
@@ -64,7 +65,7 @@ sealed interface PausableComposition : ReusableComposition {
     fun setPausableContent(content: @Composable () -> Unit): PausedComposition
 
     /**
-     * Set the content of a resuable composition. A [PausedComposition] that is currently paused. No
+     * Set the content of a reusable composition. A [PausedComposition] that is currently paused. No
      * composition is performed until [PausedComposition.resume] is called.
      * [PausedComposition.resume] should be called until [PausedComposition.isComplete] is `true`.
      * The composition should not be used until [PausedComposition.isComplete] is `true` and
@@ -100,9 +101,27 @@ sealed interface PausedComposition {
     /**
      * Returns `true` when the [PausedComposition] is complete. [isComplete] matches the last value
      * returned from [resume]. Once a [PausedComposition] is [isComplete] the [apply] method should
-     * be called.
+     * be called. If the [apply] method is not called synchronously and immediately after [resume]
+     * returns `true` then this [isComplete] can return `false` as any state changes read by the
+     * paused composition while it is paused will cause the composition to require the paused
+     * composition to need to be resumed before it is used.
      */
     val isComplete: Boolean
+
+    /**
+     * Returns `true` when the [PausedComposition] is applied. [isApplied] becomes `true` after
+     * calling [apply]. Calling any method on the [PausedComposition] when [isApplied] is `true`
+     * will throw an exception.
+     */
+    val isApplied: Boolean
+
+    /**
+     * Returns `true` when the [PausedComposition] is cancelled. [isCancelled] becomes `true` after
+     * calling [cancel]. Calling any method on the [PausedComposition] when [isCancelled] is `true`
+     * will throw an exception. If [isCancelled] is `true` then the [Composition] that was used to
+     * create [PausedComposition] is in an uncertain state and must be discarded.
+     */
+    @get:Suppress("GetterSetterNames") val isCancelled: Boolean
 
     /**
      * Resume the composition that has been paused. This method should be called until [resume]
@@ -111,7 +130,7 @@ sealed interface PausedComposition {
      * composition should be paused. For example, in lazy lists this returns `false` until just
      * prior to the next frame starting in which it returns `true`
      *
-     * Calling [resume] after it returns `true` or when `isComplete` is true will throw an
+     * Calling [resume] after it returns `true` or when [isComplete] is `true` will throw an
      * exception.
      *
      * @param shouldPause A lambda that is used to determine if the composition should be paused.
@@ -127,6 +146,12 @@ sealed interface PausedComposition {
     /**
      * Apply the composition. This is the last step of a paused composition and is required to be
      * called prior to the composition is usable.
+     *
+     * Calling [apply] should always be proceeded with a check of [isComplete] before it is called
+     * and potentially calling [resume] in a loop until [isComplete] returns `true`. This can happen
+     * if [resume] returned `true` but [apply] was not synchronously called immediately afterwords.
+     * Any state that was read that changed between when [resume] being called and [apply] being
+     * called may require the paused composition to be resumed before applied.
      */
     fun apply()
 
@@ -155,6 +180,7 @@ internal enum class PausedCompositionState {
     Cancelled,
     InitialPending,
     RecomposePending,
+    Recomposing,
     ApplyPending,
     Applied,
 }
@@ -169,17 +195,26 @@ internal class PausedCompositionImpl(
     val applier: Applier<*>,
     val lock: SynchronizedObject,
 ) : PausedComposition {
-    private var state = PausedCompositionState.InitialPending
+    private var state = AtomicReference(PausedCompositionState.InitialPending)
     private var invalidScopes = emptyScatterSet<RecomposeScopeImpl>()
-    internal val rememberManager = RememberEventDispatcher(abandonSet)
+    internal val rememberManager =
+        RememberEventDispatcher().apply { prepare(abandonSet, composer.errorContext) }
     internal val pausableApplier = RecordingApplier(applier.current)
+    internal val isRecomposing
+        get() = state.get() == PausedCompositionState.Recomposing
 
     override val isComplete: Boolean
-        get() = state >= PausedCompositionState.ApplyPending
+        get() = state.get() >= PausedCompositionState.ApplyPending
+
+    override val isApplied: Boolean
+        get() = state.get() == PausedCompositionState.Applied
+
+    override val isCancelled: Boolean
+        get() = state.get() == PausedCompositionState.Cancelled
 
     override fun resume(shouldPause: ShouldPauseCallback): Boolean {
         try {
-            when (state) {
+            when (state.get()) {
                 PausedCompositionState.InitialPending -> {
                     if (reusable) composer.startReuseFromRoot()
                     try {
@@ -188,12 +223,30 @@ internal class PausedCompositionImpl(
                     } finally {
                         if (reusable) composer.endReuseFromRoot()
                     }
-                    state = PausedCompositionState.RecomposePending
+                    updateState(
+                        PausedCompositionState.InitialPending,
+                        PausedCompositionState.RecomposePending,
+                    )
                     if (invalidScopes.isEmpty()) markComplete()
                 }
                 PausedCompositionState.RecomposePending -> {
-                    invalidScopes = context.recomposePaused(composition, shouldPause, invalidScopes)
+                    updateState(
+                        PausedCompositionState.RecomposePending,
+                        PausedCompositionState.Recomposing,
+                    )
+                    try {
+                        invalidScopes =
+                            context.recomposePaused(composition, shouldPause, invalidScopes)
+                    } finally {
+                        updateState(
+                            PausedCompositionState.Recomposing,
+                            PausedCompositionState.RecomposePending,
+                        )
+                    }
                     if (invalidScopes.isEmpty()) markComplete()
+                }
+                PausedCompositionState.Recomposing -> {
+                    composeRuntimeError("Recursive call to resume()")
                 }
                 PausedCompositionState.ApplyPending ->
                     error("Pausable composition is complete and apply() should be applied")
@@ -204,7 +257,7 @@ internal class PausedCompositionImpl(
                     error("The paused composition is invalid because of a previous exception")
             }
         } catch (e: Exception) {
-            state = PausedCompositionState.Invalid
+            state.set(PausedCompositionState.Invalid)
             throw e
         }
         return isComplete
@@ -212,13 +265,14 @@ internal class PausedCompositionImpl(
 
     override fun apply() {
         try {
-            when (state) {
+            when (state.get()) {
                 PausedCompositionState.InitialPending,
-                PausedCompositionState.RecomposePending ->
+                PausedCompositionState.RecomposePending,
+                PausedCompositionState.Recomposing ->
                     error("The paused composition has not completed yet")
                 PausedCompositionState.ApplyPending -> {
                     applyChanges()
-                    state = PausedCompositionState.Applied
+                    updateState(PausedCompositionState.ApplyPending, PausedCompositionState.Applied)
                 }
                 PausedCompositionState.Applied ->
                     error("The paused composition has already been applied")
@@ -228,32 +282,46 @@ internal class PausedCompositionImpl(
                     error("The paused composition is invalid because of a previous exception")
             }
         } catch (e: Exception) {
-            state = PausedCompositionState.Invalid
+            state.set(PausedCompositionState.Invalid)
             throw e
         }
     }
 
     override fun cancel() {
-        state = PausedCompositionState.Cancelled
+        state.set(PausedCompositionState.Cancelled)
         rememberManager.dispatchAbandons()
         composition.pausedCompositionFinished()
     }
 
+    internal fun markIncomplete() {
+        if (state.get() == PausedCompositionState.RecomposePending) {
+            return
+        }
+        updateState(PausedCompositionState.ApplyPending, PausedCompositionState.RecomposePending)
+    }
+
     private fun markComplete() {
-        state = PausedCompositionState.ApplyPending
+        updateState(PausedCompositionState.RecomposePending, PausedCompositionState.ApplyPending)
     }
 
     private fun applyChanges() {
         synchronized(lock) {
             @Suppress("UNCHECKED_CAST")
             try {
-                pausableApplier.playTo(applier as Applier<Any?>)
+                pausableApplier.playTo(applier as Applier<Any?>, rememberManager)
                 rememberManager.dispatchRememberObservers()
                 rememberManager.dispatchSideEffects()
             } finally {
                 rememberManager.dispatchAbandons()
                 composition.pausedCompositionFinished()
             }
+        }
+    }
+
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun updateState(from: PausedCompositionState, to: PausedCompositionState) {
+        checkPrecondition(state.compareAndSet(from, to)) {
+            "Unexpected state change from: $from to: $to."
         }
     }
 }
@@ -312,7 +380,7 @@ internal class RecordingApplier<N>(root: N) : Applier<N> {
         operations.add(REUSE)
     }
 
-    fun playTo(applier: Applier<N>) {
+    fun playTo(applier: Applier<N>, rememberManager: RememberEventDispatcher) {
         var currentOperation = 0
         var currentInstance = 0
         val operations = operations
@@ -363,6 +431,10 @@ internal class RecordingApplier<N>(root: N) : Applier<N> {
                         applier.apply(block, value)
                     }
                     REUSE -> {
+                        val current = applier.current
+                        if (current is ComposeNodeLifecycleCallback) {
+                            rememberManager.dispatchOnDeactivateIfNecessary(current)
+                        }
                         applier.reuse()
                     }
                 }

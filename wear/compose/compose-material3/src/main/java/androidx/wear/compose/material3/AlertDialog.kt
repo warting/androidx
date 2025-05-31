@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package androidx.wear.compose.material3
 
 import androidx.compose.foundation.layout.Arrangement
@@ -38,9 +37,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.PaddingDefaults.horizontalContentPadding
@@ -68,7 +69,8 @@ import androidx.wear.compose.materialcore.screenWidthDp
  * @sample androidx.wear.compose.material3.samples.AlertDialogWithConfirmAndDismissSample
  * @param visible A boolean indicating whether the dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed by swiping
- *   right (typically also called by the [dismissButton]).
+ *   right (typically also called by the [dismissButton]). Implementation of this lambda must remove
+ *   the dialog from the composition hierarchy e.g. by setting [visible] to false.
  * @param confirmButton A slot for a [Button] indicating positive sentiment. Clicking the button
  *   must remove the dialog from the composition hierarchy e.g. by setting [visible] to false. It's
  *   recommended to use [AlertDialogDefaults.ConfirmButton] in this slot with onClick callback.
@@ -86,7 +88,8 @@ import androidx.wear.compose.materialcore.screenWidthDp
  * @param verticalArrangement The vertical arrangement of the dialog's children. There is a default
  *   padding between icon, title, and text, which will be added to the spacing specified in this
  *   [verticalArrangement] parameter.
- * @param contentPadding The padding to apply around the entire dialog's contents.
+ * @param contentPadding The padding to apply around the entire dialog's contents. It is recommended
+ *   to use the defaults, which adjust to reduce the top padding when an icon is present.
  * @param properties An optional [DialogProperties] object for configuring the dialog's behavior.
  * @param content A slot for additional content, displayed within a scrollable [ScalingLazyColumn].
  */
@@ -103,15 +106,16 @@ public fun AlertDialog(
     icon: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
     verticalArrangement: Arrangement.Vertical = AlertDialogDefaults.VerticalArrangement,
-    contentPadding: PaddingValues = AlertDialogDefaults.confirmDismissContentPadding(),
+    contentPadding: PaddingValues =
+        if (icon != null) {
+            AlertDialogDefaults.confirmDismissWithIconContentPadding()
+        } else {
+            AlertDialogDefaults.confirmDismissContentPadding()
+        },
     properties: DialogProperties = DialogProperties(),
-    content: (ScalingLazyListScope.() -> Unit)? = null
+    content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
-    Dialog(
-        visible = visible,
-        onDismissRequest = onDismissRequest,
-        properties = properties,
-    ) {
+    Dialog(visible = visible, onDismissRequest = onDismissRequest, properties = properties) {
         AlertDialogContent(
             confirmButton = confirmButton,
             title = title,
@@ -121,7 +125,7 @@ public fun AlertDialog(
             text = text,
             verticalArrangement = verticalArrangement,
             contentPadding = contentPadding,
-            content = content
+            content = content,
         )
     }
 }
@@ -140,7 +144,8 @@ public fun AlertDialog(
  *
  * @param visible A boolean indicating whether the dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed by swiping to
- *   the right or by other dismiss action.
+ *   the right or by other dismiss action. Implementation of this lambda must remove the dialog from
+ *   the composition hierarchy e.g. by setting [visible] to false.
  * @param title A slot for displaying the title of the dialog. Title should contain a summary of the
  *   dialog's purpose or content and should not exceed 3 lines of text. By default,
  *   [TextOverflow.Ellipsis] will be applied when text exceeds 3 lines.
@@ -152,9 +157,12 @@ public fun AlertDialog(
  * @param verticalArrangement The vertical arrangement of the dialog's children. There is a default
  *   padding between icon, title, and text, which will be added to the spacing specified in this
  *   [verticalArrangement] parameter.
- * @param contentPadding The padding to apply around the entire dialog's contents.
+ * @param contentPadding The padding to apply around the entire dialog's contents. It is recommended
+ *   to use the defaults, which adjust to reduce the top padding when an icon is present.
  * @param properties An optional [DialogProperties] object for configuring the dialog's behavior.
  * @param content A slot for additional content, displayed within a scrollable [ScalingLazyColumn].
+ *   Any buttons added in this slot that are intended to dismiss the dialog must remove the dialog
+ *   from the composition hierarchy e.g. by setting [visible] to false.
  */
 @Composable
 public fun AlertDialog(
@@ -165,15 +173,16 @@ public fun AlertDialog(
     icon: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
     verticalArrangement: Arrangement.Vertical = AlertDialogDefaults.VerticalArrangement,
-    contentPadding: PaddingValues = AlertDialogDefaults.contentPadding(),
+    contentPadding: PaddingValues =
+        if (icon != null) {
+            AlertDialogDefaults.contentWithIconPadding()
+        } else {
+            AlertDialogDefaults.contentPadding()
+        },
     properties: DialogProperties = DialogProperties(),
-    content: (ScalingLazyListScope.() -> Unit)? = null
+    content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
-    Dialog(
-        visible = visible,
-        onDismissRequest = onDismissRequest,
-        properties = properties,
-    ) {
+    Dialog(visible = visible, onDismissRequest = onDismissRequest, properties = properties) {
         AlertDialogContent(
             title = title,
             modifier = modifier,
@@ -181,7 +190,7 @@ public fun AlertDialog(
             text = text,
             verticalArrangement = verticalArrangement,
             contentPadding = contentPadding,
-            content = content
+            content = content,
         )
     }
 }
@@ -206,7 +215,8 @@ public fun AlertDialog(
  * @sample androidx.wear.compose.material3.samples.AlertDialogWithContentGroupsSample
  * @param visible A boolean indicating whether the dialog should be displayed.
  * @param onDismissRequest A lambda function to be called when the dialog is dismissed by swiping to
- *   the right or by other dismiss action.
+ *   the right or by other dismiss action. Implementation of this lambda must remove the dialog from
+ *   the composition hierarchy e.g. by setting [visible] to false.
  * @param edgeButton Slot for an [EdgeButton] indicating positive sentiment. Clicking the button
  *   must remove the dialog from the composition hierarchy e.g. by setting [visible] to false. It's
  *   recommended to use [AlertDialogDefaults.EdgeButton] in this slot with onClick callback. Note
@@ -224,9 +234,12 @@ public fun AlertDialog(
  *   padding between icon, title, and text, which will be added to the spacing specified in this
  *   [verticalArrangement] parameter.
  * @param contentPadding The padding to apply around the entire dialog's contents. Bottom padding
- *   will be ignored and default spacing for the [EdgeButton] will be used.
+ *   will be ignored and default spacing for the [EdgeButton] will be used. It is recommended to use
+ *   the defaults, which adjust to reduce the top padding when an icon is present.
  * @param properties An optional [DialogProperties] object for configuring the dialog's behavior.
  * @param content A slot for additional content, displayed within a scrollable [ScalingLazyColumn].
+ *   Any buttons added in this slot that are intended to dismiss the dialog must remove the dialog
+ *   from the composition hierarchy e.g. by setting [visible] to false.
  */
 @Composable
 public fun AlertDialog(
@@ -238,15 +251,16 @@ public fun AlertDialog(
     icon: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
     verticalArrangement: Arrangement.Vertical = AlertDialogDefaults.VerticalArrangement,
-    contentPadding: PaddingValues = AlertDialogDefaults.contentPadding(),
+    contentPadding: PaddingValues =
+        if (icon != null) {
+            AlertDialogDefaults.contentWithIconPadding()
+        } else {
+            AlertDialogDefaults.contentPadding()
+        },
     properties: DialogProperties = DialogProperties(),
-    content: (ScalingLazyListScope.() -> Unit)? = null
+    content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
-    Dialog(
-        visible = visible,
-        onDismissRequest = onDismissRequest,
-        properties = properties,
-    ) {
+    Dialog(visible = visible, onDismissRequest = onDismissRequest, properties = properties) {
         AlertDialogContent(
             edgeButton = edgeButton,
             title = title,
@@ -255,7 +269,7 @@ public fun AlertDialog(
             text = text,
             verticalArrangement = verticalArrangement,
             contentPadding = contentPadding,
-            content = content
+            content = content,
         )
     }
 }
@@ -283,7 +297,8 @@ public fun AlertDialog(
  * @param verticalArrangement The vertical arrangement of the dialog's children. There is a default
  *   padding between icon, title, and text, which will be added to the spacing specified in this
  *   [verticalArrangement] parameter.
- * @param contentPadding The padding to apply around the entire dialog's contents.
+ * @param contentPadding The padding to apply around the entire dialog's contents. It is recommended
+ *   to use the defaults, which adjust to reduce the top padding when an icon is present.
  * @param content A slot for additional content, displayed within a scrollable [ScalingLazyColumn].
  */
 @Composable
@@ -295,17 +310,18 @@ public fun AlertDialogContent(
     icon: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
     verticalArrangement: Arrangement.Vertical = AlertDialogDefaults.VerticalArrangement,
-    contentPadding: PaddingValues = AlertDialogDefaults.confirmDismissContentPadding(),
-    content: (ScalingLazyListScope.() -> Unit)? = null
+    contentPadding: PaddingValues =
+        if (icon != null) {
+            AlertDialogDefaults.confirmDismissWithIconContentPadding()
+        } else {
+            AlertDialogDefaults.confirmDismissContentPadding()
+        },
+    content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
     val state = rememberScalingLazyListState(initialCenterItemIndex = 0)
-
-    ScreenScaffold(
-        scrollState = state,
-        modifier = modifier,
-        contentPadding = contentPadding,
-    ) {
+    ScreenScaffold(scrollState = state, modifier = modifier, contentPadding = contentPadding) {
         ScalingLazyColumn(
+            scalingParams = AlertScalingParams,
             state = state,
             contentPadding = it,
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -314,7 +330,6 @@ public fun AlertDialogContent(
             modifier = Modifier.fillMaxSize(),
         ) {
             alertDialogCommonContent(icon = icon, title = title, text = text, content = content)
-
             item {
                 ConfirmDismissButtons(confirmButton = confirmButton, dismissButton = dismissButton)
             }
@@ -339,7 +354,8 @@ public fun AlertDialogContent(
  * @param verticalArrangement The vertical arrangement of the dialog's children. There is a default
  *   padding between icon, title, and text, which will be added to the spacing specified in this
  *   [verticalArrangement] parameter.
- * @param contentPadding The padding to apply around the entire dialog's contents.
+ * @param contentPadding The padding to apply around the entire dialog's contents. It is recommended
+ *   to use the defaults, which adjust to reduce the top padding when an icon is present.
  * @param content A slot for additional content, displayed within a scrollable [ScalingLazyColumn].
  */
 @Composable
@@ -349,17 +365,18 @@ public fun AlertDialogContent(
     icon: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
     verticalArrangement: Arrangement.Vertical = AlertDialogDefaults.VerticalArrangement,
-    contentPadding: PaddingValues = AlertDialogDefaults.contentPadding(),
-    content: (ScalingLazyListScope.() -> Unit)? = null
+    contentPadding: PaddingValues =
+        if (icon != null) {
+            AlertDialogDefaults.contentWithIconPadding()
+        } else {
+            AlertDialogDefaults.contentPadding()
+        },
+    content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
     val state = rememberScalingLazyListState(initialCenterItemIndex = 0)
-
-    ScreenScaffold(
-        scrollState = state,
-        modifier = modifier,
-        contentPadding = contentPadding,
-    ) {
+    ScreenScaffold(scrollState = state, modifier = modifier, contentPadding = contentPadding) {
         ScalingLazyColumn(
+            scalingParams = AlertScalingParams,
             state = state,
             contentPadding = it,
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -394,7 +411,8 @@ public fun AlertDialogContent(
  *   padding between icon, title, and text, which will be added to the spacing specified in this
  *   [verticalArrangement] parameter.
  * @param contentPadding The padding to apply around the entire dialog's contents. Bottom padding
- *   will be ignored and default spacing for the [EdgeButton] will be used.
+ *   will be ignored and default spacing for the [EdgeButton] will be used. It is recommended to use
+ *   the defaults, which adjust to reduce the top padding when an icon is present.
  * @param content A slot for additional content, displayed within a scrollable [ScalingLazyColumn].
  */
 @Composable
@@ -405,11 +423,15 @@ public fun AlertDialogContent(
     icon: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
     verticalArrangement: Arrangement.Vertical = AlertDialogDefaults.VerticalArrangement,
-    contentPadding: PaddingValues = AlertDialogDefaults.contentPadding(),
-    content: (ScalingLazyListScope.() -> Unit)? = null
+    contentPadding: PaddingValues =
+        if (icon != null) {
+            AlertDialogDefaults.contentWithIconPadding()
+        } else {
+            AlertDialogDefaults.contentPadding()
+        },
+    content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
     val state = rememberScalingLazyListState(initialCenterItemIndex = 0)
-
     val noTextAndContent = text == null && content == null
     ScreenScaffold(
         scrollState = state,
@@ -421,6 +443,7 @@ public fun AlertDialogContent(
             else AlertEdgeButtonSpacing,
     ) {
         ScalingLazyColumn(
+            scalingParams = AlertScalingParams,
             state = state,
             contentPadding = it,
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -450,14 +473,14 @@ public object AlertDialogDefaults {
         onClick: () -> Unit,
         modifier: Modifier = Modifier,
         colors: ButtonColors = ButtonDefaults.buttonColors(),
-        content: @Composable RowScope.() -> Unit = ConfirmIcon
+        content: @Composable RowScope.() -> Unit = ConfirmIcon,
     ) {
         EdgeButton(
             modifier = modifier,
             onClick = onClick,
             colors = colors,
             buttonSize = EdgeButtonSize.Medium,
-            content = content
+            content = content,
         )
     }
 
@@ -475,22 +498,20 @@ public object AlertDialogDefaults {
         onClick: () -> Unit,
         modifier: Modifier = Modifier,
         colors: IconButtonColors = IconButtonDefaults.filledIconButtonColors(),
-        content: @Composable RowScope.() -> Unit = ConfirmIcon
+        content: @Composable RowScope.() -> Unit = ConfirmIcon,
     ) {
         val confirmWidth = 63.dp
         val confirmHeight = 54.dp
-
         val confirmShape = CircleShape
-
         FilledIconButton(
             onClick = onClick,
             modifier = modifier.rotate(-45f).size(confirmWidth, confirmHeight),
             colors = colors,
-            shapes = IconButtonDefaults.shapes(confirmShape)
+            shapes = IconButtonDefaults.shapes(confirmShape),
         ) {
             Row(
                 modifier = Modifier.align(Alignment.Center).graphicsLayer { rotationZ = 45f },
-                content = content
+                content = content,
             )
         }
     }
@@ -509,17 +530,16 @@ public object AlertDialogDefaults {
         onClick: () -> Unit,
         modifier: Modifier = Modifier,
         colors: IconButtonColors = IconButtonDefaults.filledTonalIconButtonColors(),
-        content: @Composable RowScope.() -> Unit = DismissIcon
+        content: @Composable RowScope.() -> Unit = DismissIcon,
     ) {
         val dismissSize = 60.dp
         val dismissShape = MaterialTheme.shapes.medium
-
         Box(modifier = Modifier.size(dismissSize + cancelButtonPadding)) {
             FilledTonalIconButton(
                 onClick = onClick,
                 modifier = modifier.size(dismissSize).align(Alignment.BottomEnd),
                 colors = colors,
-                shapes = IconButtonDefaults.shapes(dismissShape)
+                shapes = IconButtonDefaults.shapes(dismissShape),
             ) {
                 Row(content = content)
             }
@@ -528,25 +548,60 @@ public object AlertDialogDefaults {
 
     /**
      * The padding to apply around the content for the [AlertDialog] variation with confirm dismiss
-     * buttons.
+     * buttons and no icon content.
      */
     @Composable
     public fun confirmDismissContentPadding(): PaddingValues {
         val verticalPadding = verticalContentPadding()
         val horizontalPadding = horizontalContentPadding()
-        return PaddingValues(horizontal = horizontalPadding, vertical = verticalPadding)
+        return PaddingValues(
+            top = calculateTopPadding(hasIcon = false),
+            bottom = verticalPadding,
+            start = horizontalPadding,
+            end = horizontalPadding,
+        )
     }
 
     /**
-     * The padding to apply around the content for the [AlertDialog] variation with a stack of
-     * options and no buttons at the end.
+     * The padding to apply around the content for the [AlertDialog] variation when an icon is
+     * provided and with confirm dismiss buttons.
+     */
+    @Composable
+    public fun confirmDismissWithIconContentPadding(): PaddingValues {
+        val verticalPadding = verticalContentPadding()
+        val horizontalPadding = horizontalContentPadding()
+        return PaddingValues(
+            top = calculateTopPadding(hasIcon = true),
+            bottom = verticalPadding,
+            start = horizontalPadding,
+            end = horizontalPadding,
+        )
+    }
+
+    /**
+     * The padding to apply around the content for the [AlertDialog] variation without an icon, that
+     * has a stack of buttons for options and no confirm or dismiss buttons at the end.
      */
     @Composable
     public fun contentPadding(): PaddingValues {
-        val topPadding = verticalContentPadding()
         val horizontalPadding = horizontalContentPadding()
         return PaddingValues(
-            top = topPadding,
+            top = calculateTopPadding(hasIcon = false),
+            bottom = screenHeightDp().dp * noEdgeButtonBottomPaddingFraction,
+            start = horizontalPadding,
+            end = horizontalPadding,
+        )
+    }
+
+    /**
+     * The padding to apply around the content for the [AlertDialog] variation with an icon, that
+     * has a stack of buttons for options and no confirm or dismiss buttons at the end.
+     */
+    @Composable
+    public fun contentWithIconPadding(): PaddingValues {
+        val horizontalPadding = horizontalContentPadding()
+        return PaddingValues(
+            top = calculateTopPadding(hasIcon = true),
             bottom = screenHeightDp().dp * noEdgeButtonBottomPaddingFraction,
             start = horizontalPadding,
             end = horizontalPadding,
@@ -565,27 +620,30 @@ public object AlertDialogDefaults {
     /** Default vertical arrangement for an [AlertDialog]. */
     public val VerticalArrangement: Arrangement.Vertical =
         Arrangement.spacedBy(space = 4.dp, alignment = Alignment.CenterVertically)
-
     /** Default icon for the confirm button. */
     public val ConfirmIcon: @Composable RowScope.() -> Unit = {
         Icon(
             imageVector = Icons.Check,
             contentDescription = getString(Strings.AlertDialogContentDescriptionConfirmButton),
-            modifier = Modifier.size(28.dp).align(Alignment.CenterVertically)
+            modifier = Modifier.size(28.dp).align(Alignment.CenterVertically),
         )
     }
-
     /** Default icon for the dismiss button. */
     public val DismissIcon: @Composable RowScope.() -> Unit = {
         Icon(
             imageVector = Icons.Close,
             contentDescription = getString(Strings.AlertDialogContentDescriptionDismissButton),
-            modifier = Modifier.size(28.dp).align(Alignment.CenterVertically)
+            modifier = Modifier.size(28.dp).align(Alignment.CenterVertically),
         )
     }
 
-    /** The extra top padding to apply to the edge button. */
-    internal val edgeButtonExtraTopPadding = 1.dp
+    @Composable
+    private fun calculateTopPadding(hasIcon: Boolean): Dp {
+        return if (hasIcon) screenHeightDp().dp * iconTopPaddingFraction
+        else verticalContentPadding()
+    }
+
+    internal val iconTopPaddingFraction = 0.012f
     internal val noEdgeButtonBottomPaddingFraction = 0.3646f
     internal val cancelButtonPadding = 1.dp
 }
@@ -594,7 +652,7 @@ private fun ScalingLazyListScope.alertDialogCommonContent(
     icon: @Composable (() -> Unit)? = null,
     title: @Composable () -> Unit,
     text: @Composable (() -> Unit)? = null,
-    content: (ScalingLazyListScope.() -> Unit)? = null
+    content: (ScalingLazyListScope.() -> Unit)? = null,
 ) {
     if (icon != null) {
         item { IconAlert(icon) }
@@ -628,9 +686,9 @@ private fun Title(content: @Composable () -> Unit) {
                 TextConfiguration(
                     textAlign = TextAlign.Center,
                     maxLines = AlertTitleMaxLines,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 ),
-            content = content
+            content = content,
         )
     }
 }
@@ -638,13 +696,13 @@ private fun Title(content: @Composable () -> Unit) {
 @Composable
 private fun ConfirmDismissButtons(
     confirmButton: @Composable RowScope.() -> Unit,
-    dismissButton: @Composable RowScope.() -> Unit
+    dismissButton: @Composable RowScope.() -> Unit,
 ) {
     Column {
         Spacer(modifier = Modifier.height(ConfirmDismissButtonsTopSpacing))
         Row(
             horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(modifier = Modifier.width(6.dp))
             dismissButton(this)
@@ -674,9 +732,9 @@ private fun TextMessage(content: @Composable () -> Unit) {
                 TextConfiguration(
                     textAlign = TextAlign.Center,
                     overflow = TextOverflow.Ellipsis,
-                    maxLines = TextConfigurationDefaults.MaxLines
+                    maxLines = TextConfigurationDefaults.MaxLines,
                 ),
-            content = content
+            content = content,
         )
     }
 }
@@ -689,7 +747,7 @@ internal val ConfirmDismissButtonsTopSpacing = 12.dp
 internal val AlertContentTopSpacing = 8.dp
 internal const val ConfirmDismissButtonsBottomSpacingFraction = 0.045f
 internal const val AlertTitleMaxLines = 3
-
 private const val TextPaddingFraction = 0.0416f
 private const val TitlePaddingFraction = 0.12f
 private const val ConfirmDismissBetweenButtonsPaddingFraction = 0.03f
+private val AlertScalingParams = ScalingLazyColumnDefaults.scalingParams(minTransitionArea = 0.2f)

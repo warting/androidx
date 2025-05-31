@@ -65,17 +65,17 @@ object Arguments {
     enum class RuleType {
         Microbenchmark,
         Macrobenchmark,
-        BaselineProfile
+        BaselineProfile,
     }
 
     val enableCompilation: Boolean
     val killProcessDelayMillis: Long
-    val enableStartupProfiles: Boolean
     val dryRunMode: Boolean
     val dropShadersEnable: Boolean
     val dropShadersThrowOnFailure: Boolean
     val skipBenchmarksOnEmulator: Boolean
     val saveProfileWaitMillis: Long
+    val killExistingPerfettoRecordings: Boolean
 
     // internal properties are microbenchmark only
     internal val outputEnable: Boolean
@@ -210,7 +210,7 @@ object Arguments {
             arguments
                 .getBenchmarkArgument(
                     key = "enabledRules",
-                    defaultValue = RuleType.values().joinToString(separator = ",") { it.toString() }
+                    defaultValue = RuleType.values().joinToString(separator = ",") { it.toString() },
                 )
                 .run {
                     if (this.lowercase() == "none") {
@@ -264,7 +264,7 @@ object Arguments {
             Log.d(
                 BenchmarkState.TAG,
                 "Profiler ${profiler.javaClass.simpleName}, freq " +
-                    "$profilerSampleFrequencyHz, duration $profilerSampleDurationSeconds"
+                    "$profilerSampleFrequencyHz, duration $profilerSampleDurationSeconds",
             )
         }
 
@@ -278,14 +278,14 @@ object Arguments {
                 dryRunMode -> {
                     Log.d(
                         BenchmarkState.TAG,
-                        "Ignoring request for cpuEventCounter due to dryRunMode=true"
+                        "Ignoring request for cpuEventCounter due to dryRunMode=true",
                     )
                     false
                 }
                 !DeviceInfo.supportsCpuEventCounters -> {
                     Log.d(
                         BenchmarkState.TAG,
-                        "Ignoring request for cpuEventCounter due to unrooted device"
+                        "Ignoring request for cpuEventCounter due to unrooted device",
                     )
                     false
                 }
@@ -296,7 +296,7 @@ object Arguments {
                 arguments
                     .getBenchmarkArgument(
                         "cpuEventCounter.events",
-                        "Instructions,CpuCycles,BranchMisses"
+                        "Instructions,CpuCycles,BranchMisses",
                     )
                     .split(",")
                     .map { eventName -> CpuEventCounter.Event.valueOf(eventName) }
@@ -325,9 +325,6 @@ object Arguments {
         saveProfileWaitMillis =
             arguments.getBenchmarkArgument("saveProfileWaitMillis")?.toLong() ?: 1_000L
 
-        enableStartupProfiles =
-            arguments.getBenchmarkArgument("startupProfiles.enable")?.toBoolean() ?: true
-
         dropShadersEnable =
             arguments.getBenchmarkArgument("dropShaders.enable")?.toBoolean() ?: true
         dropShadersThrowOnFailure =
@@ -344,6 +341,12 @@ object Arguments {
 
         throwOnMainThreadMeasureRepeated =
             arguments.getBenchmarkArgument("throwOnMainThreadMeasureRepeated")?.toBoolean() ?: false
+
+        killExistingPerfettoRecordings =
+            arguments.getBenchmarkArgument("killExistingPerfettoRecordings")?.toBoolean()
+                // below is a temporary workaround for compat, see b/399818365
+                ?: arguments.getString("killExistingPerfettoRecordings")?.toBoolean()
+                ?: true
 
         if (arguments.getString("orchestratorService") != null) {
             InstrumentationResults.scheduleIdeWarningOnNextReport(

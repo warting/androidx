@@ -45,13 +45,14 @@ import androidx.compose.ui.unit.dp
 import androidx.xr.compose.material3.ExperimentalMaterial3XrApi
 import androidx.xr.compose.platform.LocalSession
 import androidx.xr.compose.platform.LocalSpatialCapabilities
-import androidx.xr.compose.spatial.EdgeOffset
+import androidx.xr.compose.spatial.OrbiterOffsetType
+import androidx.xr.scenecore.scene
 
 @OptIn(ExperimentalMaterial3XrApi::class)
 @Composable
 internal fun XrSettingsPane(
     onNavSuiteTypeChanged: (NavigationSuiteType?) -> Unit,
-    onOrbiterEdgeOffsetChanged: (EdgeOffset?) -> Unit,
+    onOrbiterEdgeOffsetChanged: (OrbiterOffsetType?) -> Unit,
 ) {
     Scaffold { innerPadding ->
         Column(
@@ -78,9 +79,9 @@ private fun XrModeButton() {
         enabled = isDeviceXr,
         onClick = {
             if (isFullSpaceMode) {
-                session?.spatialEnvironment?.requestHomeSpaceMode()
+                session?.scene?.spatialEnvironment?.requestHomeSpaceMode()
             } else {
-                session?.spatialEnvironment?.requestFullSpaceMode()
+                session?.scene?.spatialEnvironment?.requestFullSpaceMode()
             }
         },
     ) {
@@ -105,7 +106,7 @@ private fun NavigationSuiteTypeButton(onNavSuiteTypeChanged: (NavigationSuiteTyp
     )
 }
 
-private enum class OrbiterEdgeOffsetChoices {
+private enum class OrbiterEdgeOffsetTypeChoices {
     /** The default Orbiter EdgeOffset, as defined in the implementation. */
     Default,
     /** An inner Orbiter EdgeOffset. */
@@ -116,24 +117,26 @@ private enum class OrbiterEdgeOffsetChoices {
 
 @OptIn(ExperimentalMaterial3XrApi::class)
 @Composable
-private fun XrNavigationOrbiterEdgeOffset(onOrbiterEdgeOffsetChanged: (EdgeOffset?) -> Unit) {
-    val selectedItem = remember { mutableStateOf(OrbiterEdgeOffsetChoices.Default) }
+private fun XrNavigationOrbiterEdgeOffset(
+    onOrbiterEdgeOffsetChanged: (OrbiterOffsetType?) -> Unit
+) {
+    val selectedItem = remember { mutableStateOf(OrbiterEdgeOffsetTypeChoices.Default) }
     val expanded = remember { mutableStateOf(false) }
 
-    val selectedEdgeOffset =
+    val selectedEdgeOffsetType =
         when (selectedItem.value) {
-            OrbiterEdgeOffsetChoices.Default -> EdgeOffset.outer(24.dp)
-            OrbiterEdgeOffsetChoices.Inner -> EdgeOffset.inner(24.dp)
-            OrbiterEdgeOffsetChoices.Overlap -> EdgeOffset.overlap(24.dp)
+            OrbiterEdgeOffsetTypeChoices.Default -> OrbiterOffsetType.OuterEdge
+            OrbiterEdgeOffsetTypeChoices.Inner -> OrbiterOffsetType.InnerEdge
+            OrbiterEdgeOffsetTypeChoices.Overlap -> OrbiterOffsetType.Overlap
         }
 
     SimpleDropdown(
         dropdownLabel = "NavigationRail Orbiter EdgeOffset",
-        items = OrbiterEdgeOffsetChoices.values().asList(),
+        items = OrbiterEdgeOffsetTypeChoices.values().asList(),
         selectedItem = selectedItem,
         expanded = expanded,
         itemLabel = { it.name },
-        onSelectedChange = { onOrbiterEdgeOffsetChanged(selectedEdgeOffset) },
+        onSelectedChange = { onOrbiterEdgeOffsetChanged(selectedEdgeOffsetType) },
     )
 }
 

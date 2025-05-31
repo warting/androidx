@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.list.scrollBy
 import androidx.compose.foundation.lazy.list.setContentWithTestViewConfiguration
 import androidx.compose.ui.Modifier
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Rule
@@ -92,7 +94,7 @@ class LazyGridHeadersTest {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 modifier = Modifier.height(300.dp).testTag(LazyGridTag),
-                state = rememberLazyGridState().also { state = it }
+                state = rememberLazyGridState().also { state = it },
             ) {
                 stickyHeader {
                     Spacer(Modifier.height(101.dp).fillMaxWidth().testTag(firstHeaderTag))
@@ -132,7 +134,7 @@ class LazyGridHeadersTest {
         rule.setContentWithTestViewConfiguration {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                modifier = Modifier.height(300.dp).testTag(LazyGridTag)
+                modifier = Modifier.height(300.dp).testTag(LazyGridTag),
             ) {
                 stickyHeader {
                     Spacer(Modifier.height(101.dp).fillMaxWidth().testTag(firstHeaderTag))
@@ -197,7 +199,7 @@ class LazyGridHeadersTest {
             LazyHorizontalGrid(
                 rows = GridCells.Fixed(3),
                 modifier = Modifier.width(300.dp).testTag(LazyGridTag),
-                state = rememberLazyGridState().also { state = it }
+                state = rememberLazyGridState().also { state = it },
             ) {
                 stickyHeader {
                     Spacer(Modifier.width(101.dp).fillMaxHeight().testTag(firstHeaderTag))
@@ -237,7 +239,7 @@ class LazyGridHeadersTest {
         rule.setContentWithTestViewConfiguration {
             LazyHorizontalGrid(
                 rows = GridCells.Fixed(3),
-                modifier = Modifier.width(300.dp).testTag(LazyGridTag)
+                modifier = Modifier.width(300.dp).testTag(LazyGridTag),
             ) {
                 stickyHeader {
                     Spacer(Modifier.width(101.dp).fillMaxHeight().testTag(firstHeaderTag))
@@ -274,7 +276,7 @@ class LazyGridHeadersTest {
                 columns = GridCells.Fixed(3),
                 modifier = Modifier.requiredSize(itemIndexDp * 4),
                 state = rememberLazyGridState().also { state = it },
-                contentPadding = PaddingValues(top = itemIndexDp * 2)
+                contentPadding = PaddingValues(top = itemIndexDp * 2),
             ) {
                 stickyHeader { Spacer(Modifier.requiredSize(itemIndexDp).testTag(headerTag)) }
 
@@ -292,7 +294,7 @@ class LazyGridHeadersTest {
             Assert.assertEquals(0, state.layoutInfo.visibleItemsInfo.first().index)
             Assert.assertEquals(
                 itemIndexPx / 2 - /* content padding size */ itemIndexPx * 2,
-                state.layoutInfo.visibleItemsInfo.first().offset.y
+                state.layoutInfo.visibleItemsInfo.first().offset.y,
             )
         }
 
@@ -312,7 +314,7 @@ class LazyGridHeadersTest {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 modifier = Modifier.height(itemSizeDp * 3.5f),
-                state = state
+                state = state,
             ) {
                 stickyHeader {
                     Spacer(Modifier.height(itemSizeDp).fillMaxWidth().testTag(firstHeaderTag))
@@ -334,5 +336,25 @@ class LazyGridHeadersTest {
             .onNodeWithTag(secondHeaderTag)
             .assertTopPositionInRootIsEqualTo(itemSizeDp - scrollDistanceDp)
         rule.onNodeWithTag("0").assertTopPositionInRootIsEqualTo(itemSizeDp * 2 - scrollDistanceDp)
+    }
+
+    @Test
+    fun lazyGrid_withEmptyHeader_shouldNotCrash() {
+        val items = (1..2).map { it.toString() }
+        val itemSizeDp = with(rule.density) { 100.toDp() }
+        val error = runCatching {
+            rule.setContent {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.height(itemSizeDp * 3.5f),
+                ) {
+                    stickyHeader {}
+
+                    items(items) { Spacer(Modifier.height(itemSizeDp).fillMaxWidth().testTag(it)) }
+                }
+            }
+        }
+
+        assertTrue { error.isSuccess }
     }
 }

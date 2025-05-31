@@ -34,6 +34,7 @@ import androidx.compose.runtime.snapshots.fastAny
 import androidx.compose.runtime.snapshots.fastForEach
 import androidx.compose.runtime.tooling.CompositionObserver
 import androidx.compose.runtime.tooling.CompositionObserverHandle
+import androidx.compose.runtime.tooling.ObservableComposition
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -306,7 +307,7 @@ sealed interface ControlledComposition : Composition {
 /** Utility function to set and restore a should pause callback. */
 internal inline fun <R> ControlledComposition.pausable(
     shouldPause: ShouldPauseCallback,
-    block: () -> R
+    block: () -> R,
 ): R {
     val previous = getAndSetShouldPauseCallback(shouldPause)
     return try {
@@ -327,8 +328,6 @@ internal inline fun <R> ControlledComposition.pausable(
 // ControlledComposition with a default implementation.
 @ExperimentalComposeApi
 val ControlledComposition.recomposeCoroutineContext: CoroutineContext
-    @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
-    @ExperimentalComposeApi
     get() = (this as? CompositionImpl)?.recomposeContext ?: EmptyCoroutineContext
 
 /**
@@ -399,7 +398,7 @@ fun ControlledComposition(applier: Applier<*>, parent: CompositionContext): Cont
 fun Composition(
     applier: Applier<*>,
     parent: CompositionContext,
-    recomposeCoroutineContext: CoroutineContext
+    recomposeCoroutineContext: CoroutineContext,
 ): Composition = CompositionImpl(parent, applier, recomposeContext = recomposeCoroutineContext)
 
 @TestOnly
@@ -407,13 +406,15 @@ fun Composition(
 fun ControlledComposition(
     applier: Applier<*>,
     parent: CompositionContext,
-    recomposeCoroutineContext: CoroutineContext
+    recomposeCoroutineContext: CoroutineContext,
 ): ControlledComposition =
     CompositionImpl(parent, applier, recomposeContext = recomposeCoroutineContext)
 
 private val PendingApplyNoModifications = Any()
 
-internal val CompositionImplServiceKey = object : CompositionServiceKey<CompositionImpl> {}
+@OptIn(ExperimentalComposeRuntimeApi::class)
+internal val ObservableCompositionServiceKey =
+    object : CompositionServiceKey<ObservableComposition> {}
 
 /**
  * The implementation of the [Composition] interface.
@@ -433,13 +434,15 @@ internal class CompositionImpl(
 
     /** The applier to use to update the tree managed by the composition. */
     private val applier: Applier<*>,
-    recomposeContext: CoroutineContext? = null
+    recomposeContext: CoroutineContext? = null,
 ) :
     ControlledComposition,
     ReusableComposition,
     RecomposeScopeOwner,
     CompositionServices,
-    PausableComposition {
+    PausableComposition,
+    ObservableComposition {
+
     /**
      * `null` if a composition isn't pending to apply. `Set<Any>` or `Array<Set<Any>>` if there are
      * modifications to record [PendingApplyNoModifications] if a composition is pending to apply,
@@ -562,7 +565,9 @@ internal class CompositionImpl(
 
     private var invalidationDelegateGroup: Int = 0
 
-    internal val observerHolder = CompositionObserverHolder()
+    internal val observerHolder = CompositionObserverHolder(parent = parent)
+
+    private val rememberManager = RememberEventDispatcher()
 
     /** The [Composer] to use to create and update the tree managed by this composition. */
     internal val composer: ComposerImpl =
@@ -573,7 +578,8 @@ internal class CompositionImpl(
                 abandonSet = abandonSet,
                 changes = changes,
                 lateChanges = lateChanges,
-                composition = this
+                composition = this,
+                observerHolder = observerHolder,
             )
             .also { parent.registerComposer(it) }
 
@@ -678,7 +684,7 @@ internal class CompositionImpl(
     }
 
     @OptIn(ExperimentalComposeRuntimeApi::class)
-    internal fun observe(observer: CompositionObserver): CompositionObserverHandle {
+    override fun setObserver(observer: CompositionObserver): CompositionObserverHandle {
         synchronized(lock) {
             observerHolder.observer = observer
             observerHolder.root = true
@@ -781,16 +787,7 @@ internal class CompositionImpl(
             synchronized(lock) {
                 drainPendingModificationsForCompositionLocked()
                 guardInvalidationsLocked { invalidations ->
-                    val observer = observer()
-                    if (observer != null) {
-                        @Suppress("UNCHECKED_CAST")
-                        observer.onBeginComposition(
-                            this,
-                            invalidations.asMap() as Map<RecomposeScope, Set<Any>>
-                        )
-                    }
                     composer.composeContent(invalidations, content, shouldPause)
-                    observer?.onEndComposition(this)
                 }
             }
         }
@@ -834,15 +831,16 @@ internal class CompositionImpl(
                 // will be moved to a new location.
                 val nonEmptySlotTable = slotTable.groupsSize > 0
                 if (nonEmptySlotTable || abandonSet.isNotEmpty()) {
-                    val manager = RememberEventDispatcher(abandonSet)
-                    if (nonEmptySlotTable) {
-                        applier.onBeginChanges()
-                        slotTable.write { writer -> writer.removeCurrentGroup(manager) }
-                        applier.clear()
-                        applier.onEndChanges()
-                        manager.dispatchRememberObservers()
+                    rememberManager.use(abandonSet, composer.errorContext) {
+                        if (nonEmptySlotTable) {
+                            applier.onBeginChanges()
+                            slotTable.write { writer -> writer.removeCurrentGroup(rememberManager) }
+                            applier.clear()
+                            applier.onEndChanges()
+                            dispatchRememberObservers()
+                        }
+                        dispatchAbandons()
                     }
-                    manager.dispatchAbandons()
                 }
                 composer.dispose()
             }
@@ -942,15 +940,19 @@ internal class CompositionImpl(
     override fun recordReadOf(value: Any) {
         // Not acquiring lock since this happens during composition with it already held
         if (!areChildrenComposing) {
-            composer.currentRecomposeScope?.let {
-                it.used = true
-                val alreadyRead = it.recordRead(value)
+            composer.currentRecomposeScope?.let { scope ->
+                scope.used = true
+
+                val alreadyRead = scope.recordRead(value)
+
+                observer()?.onReadInScope(scope, value)
+
                 if (!alreadyRead) {
                     if (value is StateObjectImpl) {
                         value.recordReadIn(ReaderKind.Composition)
                     }
 
-                    observations.add(value, it)
+                    observations.add(value, scope)
 
                     // Record derived state dependency mapping
                     if (value is DerivedState<*>) {
@@ -962,7 +964,7 @@ internal class CompositionImpl(
                             }
                             derivedStates.add(dependency, value)
                         }
-                        it.recordDerivedStateValue(value, record.currentValue)
+                        scope.recordDerivedStateValue(value, record.currentValue)
                     }
                 }
             }
@@ -990,19 +992,22 @@ internal class CompositionImpl(
 
     override fun recompose(): Boolean =
         synchronized(lock) {
+            val pendingPausedComposition = pendingPausedComposition
+            if (pendingPausedComposition != null && !pendingPausedComposition.isRecomposing) {
+                // If the composition is pending do not recompose it now as the recomposition
+                // is in the control of the pausable composition and is supposed to happen when
+                // the resume is called. However, this may cause the pausable composition to go
+                // revert to an incomplete state. If isRecomposing is true then this is being
+                // called in resume()
+                pendingPausedComposition.markIncomplete()
+                return false
+            }
             drainPendingModificationsForCompositionLocked()
             guardChanges {
                 guardInvalidationsLocked { invalidations ->
-                    val observer = observer()
-                    @Suppress("UNCHECKED_CAST")
-                    observer?.onBeginComposition(
-                        this,
-                        invalidations.asMap() as Map<RecomposeScope, Set<Any>>
-                    )
                     composer.recompose(invalidations, shouldPause).also { shouldDrain ->
                         // Apply would normally do this for us; do it now if apply shouldn't happen.
                         if (!shouldDrain) drainPendingModificationsLocked()
-                        observer?.onEndComposition(this)
                     }
                 }
             }
@@ -1016,24 +1021,30 @@ internal class CompositionImpl(
     }
 
     override fun disposeUnusedMovableContent(state: MovableContentState) {
-        val manager = RememberEventDispatcher(abandonSet)
-        val slotTable = state.slotTable
-        slotTable.write { writer -> writer.removeCurrentGroup(manager) }
-        manager.dispatchRememberObservers()
+        rememberManager.use(abandonSet, composer.errorContext) {
+            val slotTable = state.slotTable
+            slotTable.write { writer -> writer.removeCurrentGroup(rememberManager) }
+            dispatchRememberObservers()
+        }
     }
 
     private fun applyChangesInLocked(changes: ChangeList) {
-        val manager = RememberEventDispatcher(abandonSet)
+        rememberManager.prepare(abandonSet, composer.errorContext)
         try {
             if (changes.isEmpty()) return
             trace("Compose:applyChanges") {
                 val applier = pendingPausedComposition?.pausableApplier ?: applier
-                val rememberManager = pendingPausedComposition?.rememberManager ?: manager
+                val rememberManager = pendingPausedComposition?.rememberManager ?: rememberManager
                 applier.onBeginChanges()
 
                 // Apply all changes
                 slotTable.write { slots ->
-                    changes.executeAndFlushAllPendingChanges(applier, slots, rememberManager)
+                    changes.executeAndFlushAllPendingChanges(
+                        applier,
+                        slots,
+                        rememberManager,
+                        composer.errorContext,
+                    )
                 }
                 applier.onEndChanges()
             }
@@ -1041,8 +1052,8 @@ internal class CompositionImpl(
             // Side effects run after lifecycle observers so that any remembered objects
             // that implement RememberObserver receive onRemembered before a side effect
             // that captured it and operates on it can run.
-            manager.dispatchRememberObservers()
-            manager.dispatchSideEffects()
+            rememberManager.dispatchRememberObservers()
+            rememberManager.dispatchSideEffects()
 
             if (pendingInvalidScopes) {
                 trace("Compose:unobserve") {
@@ -1055,8 +1066,12 @@ internal class CompositionImpl(
             // Only dispatch abandons if we do not have any late changes or pending paused
             // compositions. The instances in the abandon set can be remembered in the late changes
             // or when the paused composition is applied.
-            if (this.lateChanges.isEmpty() && pendingPausedComposition == null) {
-                manager.dispatchAbandons()
+            try {
+                if (this.lateChanges.isEmpty() && pendingPausedComposition == null) {
+                    rememberManager.dispatchAbandons()
+                }
+            } finally {
+                rememberManager.clear()
             }
         }
     }
@@ -1088,7 +1103,9 @@ internal class CompositionImpl(
                 // By this time all abandon objects should be notified that they have been
                 // abandoned.
                 if (this.abandonSet.isNotEmpty()) {
-                    RememberEventDispatcher(abandonSet).dispatchAbandons()
+                    rememberManager.use(abandonSet, traceContext = composer.errorContext) {
+                        dispatchAbandons()
+                    }
                 }
             }
         }
@@ -1100,7 +1117,7 @@ internal class CompositionImpl(
         val invalidations = takeInvalidations()
         return try {
             block(invalidations)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             this.invalidations = invalidations
             throw e
         }
@@ -1109,7 +1126,7 @@ internal class CompositionImpl(
     private inline fun <T> guardChanges(block: () -> T): T =
         try {
             trackAbandonedValues(block)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             abandonChanges()
             throw e
         }
@@ -1120,7 +1137,7 @@ internal class CompositionImpl(
         lateChanges.clear()
 
         if (abandonSet.isNotEmpty()) {
-            RememberEventDispatcher(abandonSet).dispatchAbandons()
+            rememberManager.use(abandonSet, composer.errorContext) { dispatchAbandons() }
         }
     }
 
@@ -1141,7 +1158,7 @@ internal class CompositionImpl(
     override fun <R> delegateInvalidations(
         to: ControlledComposition?,
         groupIndex: Int,
-        block: () -> R
+        block: () -> R,
     ): R {
         return if (to != null && to != this && groupIndex >= 0) {
             invalidationDelegate = to as CompositionImpl
@@ -1180,16 +1197,22 @@ internal class CompositionImpl(
         }
         if (!scope.canRecompose)
             return InvalidationResult.IGNORED // The scope isn't able to be recomposed/invalidated
-        return invalidateChecked(scope, anchor, instance)
+        return invalidateChecked(scope, anchor, instance).also {
+            if (it != InvalidationResult.IGNORED) {
+                observer()?.onScopeInvalidated(scope, instance)
+            }
+        }
     }
 
     override fun recomposeScopeReleased(scope: RecomposeScopeImpl) {
         pendingInvalidScopes = true
+
+        observer()?.onScopeDisposed(scope)
     }
 
     @Suppress("UNCHECKED_CAST")
     override fun <T> getCompositionService(key: CompositionServiceKey<T>): T? =
-        if (key == CompositionImplServiceKey) this as T else null
+        if (key == ObservableCompositionServiceKey) this as T else null
 
     private fun tryImminentInvalidation(scope: RecomposeScopeImpl, instance: Any?): Boolean =
         isComposing && composer.tryImminentInvalidation(scope, instance)
@@ -1197,7 +1220,7 @@ internal class CompositionImpl(
     private fun invalidateChecked(
         scope: RecomposeScopeImpl,
         anchor: Anchor,
-        instance: Any?
+        instance: Any?,
     ): InvalidationResult {
         val delegate =
             synchronized(lock) {
@@ -1225,12 +1248,11 @@ internal class CompositionImpl(
 
                     // Observer requires a map of scope -> states, so we have to fill it if observer
                     // is set.
-                    val observer = observer()
                     if (instance == null) {
                         // invalidations[scope] containing ScopeInvalidated means it was invalidated
                         // unconditionally.
                         invalidations.set(scope, ScopeInvalidated)
-                    } else if (observer == null && instance !is DerivedState<*>) {
+                    } else if (instance !is DerivedState<*>) {
                         // If observer is not set, we only need to add derived states to
                         // invalidation,
                         // as regular states are always going to invalidate.
@@ -1296,39 +1318,29 @@ internal class CompositionImpl(
             block().also { success = true }
         } finally {
             if (!success && abandonSet.isNotEmpty()) {
-                RememberEventDispatcher(abandonSet).dispatchAbandons()
+                rememberManager.use(abandonSet, composer.errorContext) { dispatchAbandons() }
             }
         }
     }
 
-    private fun observer(): CompositionObserver? {
-        val holder = observerHolder
-
-        return if (holder.root) {
-            holder.observer
-        } else {
-            val parentHolder = parent.observerHolder
-            val parentObserver = parentHolder?.observer
-            if (parentObserver != holder.observer) {
-                holder.observer = parentObserver
-            }
-            parentObserver
-        }
-    }
+    private fun observer(): CompositionObserver? = observerHolder.current()
 
     override fun deactivate() {
         synchronized(lock) {
             val nonEmptySlotTable = slotTable.groupsSize > 0
             if (nonEmptySlotTable || abandonSet.isNotEmpty()) {
                 trace("Compose:deactivate") {
-                    val manager = RememberEventDispatcher(abandonSet)
-                    if (nonEmptySlotTable) {
-                        applier.onBeginChanges()
-                        slotTable.write { writer -> writer.deactivateCurrentGroup(manager) }
-                        applier.onEndChanges()
-                        manager.dispatchRememberObservers()
+                    rememberManager.use(abandonSet, composer.errorContext) {
+                        if (nonEmptySlotTable) {
+                            applier.onBeginChanges()
+                            slotTable.write { writer ->
+                                writer.deactivateCurrentGroup(rememberManager)
+                            }
+                            applier.onEndChanges()
+                            dispatchRememberObservers()
+                        }
+                        dispatchAbandons()
                     }
-                    manager.dispatchAbandons()
                 }
             }
             observations.clear()
@@ -1346,8 +1358,22 @@ internal class CompositionImpl(
 
 internal object ScopeInvalidated
 
-@ExperimentalComposeRuntimeApi
+@OptIn(ExperimentalComposeRuntimeApi::class)
 internal class CompositionObserverHolder(
     var observer: CompositionObserver? = null,
     var root: Boolean = false,
-)
+    private val parent: CompositionContext,
+) {
+    fun current(): CompositionObserver? {
+        return if (root) {
+            observer
+        } else {
+            val parentHolder = parent.observerHolder
+            val parentObserver = parentHolder?.observer
+            if (parentObserver != observer) {
+                observer = parentObserver
+            }
+            parentObserver
+        }
+    }
+}

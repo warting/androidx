@@ -47,7 +47,7 @@ import java.lang.reflect.Method
  *
  * For information see [Overview of system tracing]({@docRoot}studio/profile/systrace/).
  */
-object Trace {
+actual object Trace {
     private const val TAG: String = "Trace"
     internal const val MAX_TRACE_LABEL_LENGTH: Int = 127
 
@@ -99,10 +99,7 @@ object Trace {
                     val setAppTracingAllowed =
                         Trace::class
                             .java
-                            .getMethod(
-                                "setAppTracingAllowed",
-                                Boolean::class.javaPrimitiveType,
-                            )
+                            .getMethod("setAppTracingAllowed", Boolean::class.javaPrimitiveType)
                     setAppTracingAllowed.invoke(null, true)
                 }
             } catch (exception: Exception) {
@@ -123,7 +120,7 @@ object Trace {
      * @param label The name of the code section to appear in the trace.
      */
     @JvmStatic
-    fun beginSection(label: String) {
+    actual fun beginSection(label: String) {
         Trace.beginSection(label.truncatedTraceSectionLabel())
     }
 
@@ -135,7 +132,7 @@ object Trace {
      * that beginSection / endSection pairs are properly nested and called from the same thread.
      */
     @JvmStatic
-    fun endSection() {
+    actual fun endSection() {
         Trace.endSection()
     }
 
@@ -358,7 +355,7 @@ public inline fun <T> trace(lazyLabel: () -> String, block: () -> T): T {
 public suspend inline fun <T> traceAsync(
     methodName: String,
     cookie: Int,
-    crossinline block: suspend () -> T
+    crossinline block: suspend () -> T,
 ): T {
     androidx.tracing.Trace.beginAsyncSection(methodName, cookie)
     try {
@@ -382,7 +379,7 @@ public suspend inline fun <T> traceAsync(
 public inline fun <T> traceAsync(
     lazyMethodName: () -> String,
     lazyCookie: () -> Int,
-    block: () -> T
+    block: () -> T,
 ): T {
     var methodName: String? = null
     var cookie = 0

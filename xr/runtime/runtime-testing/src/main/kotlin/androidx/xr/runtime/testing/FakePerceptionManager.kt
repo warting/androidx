@@ -18,6 +18,8 @@ package androidx.xr.runtime.testing
 
 import androidx.annotation.RestrictTo
 import androidx.xr.runtime.internal.Anchor
+import androidx.xr.runtime.internal.AnchorInvalidUuidException
+import androidx.xr.runtime.internal.Earth
 import androidx.xr.runtime.internal.Hand
 import androidx.xr.runtime.internal.HitResult
 import androidx.xr.runtime.internal.PerceptionManager
@@ -27,21 +29,32 @@ import androidx.xr.runtime.math.Ray
 import java.util.UUID
 
 /** Test-only implementation of [PerceptionManager] used to validate state transitions. */
-@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
 public class FakePerceptionManager : PerceptionManager, AnchorHolder {
 
+    /** List of anchors created by this [FakePerceptionManager]. */
     public val anchors: MutableList<Anchor> = mutableListOf<Anchor>()
     override val trackables: MutableList<Trackable> = mutableListOf<Trackable>()
 
     override val leftHand: Hand? = FakeRuntimeHand()
     override val rightHand: Hand? = FakeRuntimeHand()
 
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    override val arDevice: FakeRuntimeArDevice = FakeRuntimeArDevice()
+
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    override val viewCameras: List<FakeRuntimeViewCamera> = listOf(FakeRuntimeViewCamera())
+
+    override val earth: Earth = FakeRuntimeEarth()
+
     private val hitResults = mutableListOf<HitResult>()
     private val anchorUuids = mutableListOf<UUID>()
 
+    /** Flag to represent available tracking state of the camera. */
+    public var isTrackingAvailable: Boolean = true
+
     override fun createAnchor(pose: Pose): Anchor {
         // TODO: b/349862231 - Modify it once detach is implemented.
-        val anchor = FakeRuntimeAnchor(pose, this)
+        val anchor = FakeRuntimeAnchor(pose, this, isTrackingAvailable)
         anchors.add(anchor)
         return anchor
     }
@@ -51,11 +64,16 @@ public class FakePerceptionManager : PerceptionManager, AnchorHolder {
     override fun getPersistedAnchorUuids(): List<UUID> = anchorUuids
 
     override fun loadAnchor(uuid: UUID): Anchor {
-        check(anchorUuids.contains(uuid)) { "Anchor is not persisted." }
+        if (!anchorUuids.contains(uuid)) {
+            throw AnchorInvalidUuidException()
+        }
         return FakeRuntimeAnchor(Pose(), this)
     }
 
     override fun unpersistAnchor(uuid: UUID) {
+        if (!anchorUuids.contains(uuid)) {
+            throw AnchorInvalidUuidException()
+        }
         anchorUuids.remove(uuid)
     }
 

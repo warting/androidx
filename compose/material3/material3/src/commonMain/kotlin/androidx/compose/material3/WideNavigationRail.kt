@@ -84,6 +84,7 @@ import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
@@ -106,6 +107,12 @@ import kotlinx.coroutines.launch
  *
  * Wide navigation rails provide access to primary destinations in apps when using tablet and
  * desktop screens.
+ *
+ * ![Wide navigation rail collapsed
+ * image](https://developer.android.com/images/reference/androidx/compose/material3/wide-navigation-rail-collapsed.png)
+ *
+ * ![Wide navigation rail expanded
+ * image](https://developer.android.com/images/reference/androidx/compose/material3/wide-navigation-rail-expanded.png)
  *
  * The wide navigation rail should be used to display multiple [WideNavigationRailItem]s, each
  * representing a singular app destination, and, optionally, a header containing a menu button, a
@@ -158,7 +165,7 @@ fun WideNavigationRail(
     header: @Composable (() -> Unit)? = null,
     windowInsets: WindowInsets = WideNavigationRailDefaults.windowInsets,
     arrangement: Arrangement.Vertical = WideNavigationRailDefaults.arrangement,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     WideNavigationRailLayout(
         modifier = modifier,
@@ -169,7 +176,7 @@ fun WideNavigationRail(
         header = header,
         windowInsets = windowInsets,
         arrangement = arrangement,
-        content = content
+        content = content,
     )
 }
 
@@ -183,7 +190,7 @@ private fun WideNavigationRailLayout(
     header: @Composable (() -> Unit)?,
     windowInsets: WindowInsets,
     arrangement: Arrangement.Vertical,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     var currentWidth by remember { mutableIntStateOf(0) }
     var actualMaxExpandedWidth by remember { mutableIntStateOf(0) }
@@ -200,22 +207,22 @@ private fun WideNavigationRailLayout(
     val minWidth by
         animateDpAsState(
             targetValue = if (!expanded) CollapsedRailWidth else ExpandedRailMinWidth,
-            animationSpec = if (!isModal) animationSpec else modalAnimationSpec
+            animationSpec = if (!isModal) animationSpec else modalAnimationSpec,
         )
     val widthFullRange by
         animateDpAsState(
             targetValue = if (!expanded) CollapsedRailWidth else ExpandedRailMaxWidth,
-            animationSpec = if (!isModal) animationSpec else modalAnimationSpec
+            animationSpec = if (!isModal) animationSpec else modalAnimationSpec,
         )
     val itemVerticalSpacedBy by
         animateDpAsState(
             targetValue = if (!expanded) NavigationRailCollapsedTokens.ItemVerticalSpace else 0.dp,
-            animationSpec = animationSpec
+            animationSpec = animationSpec,
         )
     val itemMinHeight by
         animateDpAsState(
             targetValue = if (!expanded) TopIconItemMinHeight else minimumA11ySize,
-            animationSpec = animationSpec
+            animationSpec = animationSpec,
         )
 
     Surface(
@@ -230,7 +237,8 @@ private fun WideNavigationRailLayout(
                     .windowInsetsPadding(windowInsets)
                     .widthIn(max = ExpandedRailMaxWidth)
                     .padding(top = WNRVerticalPadding)
-                    .selectableGroup(),
+                    .selectableGroup()
+                    .semantics { isTraversalGroup = true },
             content = {
                 if (header != null) {
                     Box(Modifier.layoutId(HeaderLayoutIdTag)) { header() }
@@ -241,7 +249,7 @@ private fun WideNavigationRailLayout(
                 object : MeasurePolicy {
                     override fun MeasureScope.measure(
                         measurables: List<Measurable>,
-                        constraints: Constraints
+                        constraints: Constraints,
                     ): MeasureResult {
                         val height = constraints.maxHeight
                         var itemsCount = measurables.size
@@ -336,7 +344,7 @@ private fun WideNavigationRailLayout(
                                         .coerceIn(
                                             minimumValue = actualMinWidth,
                                             maximumValue =
-                                                currentWidth.coerceAtLeast(actualMinWidth)
+                                                currentWidth.coerceAtLeast(actualMinWidth),
                                         )
                             }
                         }
@@ -379,7 +387,7 @@ private fun WideNavigationRailLayout(
                             }
                         }
                     }
-                }
+                },
         )
     }
 }
@@ -442,7 +450,7 @@ fun ModalWideNavigationRail(
     arrangement: Arrangement.Vertical = WideNavigationRailDefaults.arrangement,
     expandedProperties: ModalWideNavigationRailProperties =
         ModalWideNavigationRailDefaults.Properties,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val rememberContent =
         if (hideOnCollapse) {
@@ -464,7 +472,7 @@ fun ModalWideNavigationRail(
         animateFloatAsState(
             targetValue = if (!state.targetValue.isExpanded) 0f else 1f,
             // TODO: Load the motionScheme tokens from the component tokens file.
-            animationSpec = MotionSchemeKeyTokens.DefaultEffects.value()
+            animationSpec = MotionSchemeKeyTokens.DefaultEffects.value(),
         )
     val isCollapsed: Boolean by remember { derivedStateOf { positionProgress.value == 0f } }
     val modalExpanded: Boolean by remember { derivedStateOf { positionProgress.value >= 0.3f } }
@@ -493,7 +501,7 @@ fun ModalWideNavigationRail(
             header = header,
             windowInsets = windowInsets,
             arrangement = arrangement,
-            content = rememberContent
+            content = rememberContent,
         )
     }
 
@@ -535,7 +543,7 @@ fun ModalWideNavigationRail(
                 scope.launch { predictiveBackProgress.snapTo(backEvent) }
             },
             onPredictiveBackCancelled = { scope.launch { predictiveBackProgress.animateTo(0f) } },
-            predictiveBackState = predictiveBackState
+            predictiveBackState = predictiveBackState,
         ) {
             Box(modifier = Modifier.fillMaxSize().imePadding()) {
                 val isScrimVisible =
@@ -548,7 +556,7 @@ fun ModalWideNavigationRail(
                 Scrim(
                     color = colors.modalScrimColor,
                     onDismissRequest = animateToDismiss,
-                    visible = isScrimVisible
+                    visible = isScrimVisible,
                 )
 
                 ModalWideNavigationRailContent(
@@ -563,16 +571,14 @@ fun ModalWideNavigationRail(
                     shape = expandedShape,
                     openModalRailMaxWidth = ExpandedRailMaxWidth,
                     header = {
-                        Box(
-                            modifier = Modifier.padding(top = expandedHeaderTopPadding),
-                        ) {
+                        Box(modifier = Modifier.padding(top = expandedHeaderTopPadding)) {
                             header?.invoke()
                         }
                     },
                     windowInsets = windowInsets,
                     gesturesEnabled = hideOnCollapse,
                     arrangement = arrangement,
-                    content = rememberContent
+                    content = rememberContent,
                 )
             }
         }
@@ -762,13 +768,13 @@ object WideNavigationRailDefaults {
         containerColor: Color = WideNavigationRailDefaults.containerColor,
         contentColor: Color = contentColorFor(containerColor),
         modalContainerColor: Color = NavigationRailExpandedTokens.ModalContainerColor.value,
-        modalScrimColor: Color = ScrimTokens.ContainerColor.value.copy(ScrimTokens.ContainerOpacity)
+        modalScrimColor: Color = ScrimTokens.ContainerColor.value.copy(ScrimTokens.ContainerOpacity),
     ): WideNavigationRailColors =
         MaterialTheme.colorScheme.defaultWideWideNavigationRailColors.copy(
             containerColor = containerColor,
             contentColor = contentColor,
             modalContainerColor = modalContainerColor,
-            modalScrimColor = modalScrimColor
+            modalScrimColor = modalScrimColor,
         )
 
     private val containerColor: Color
@@ -784,7 +790,7 @@ object WideNavigationRailDefaults {
                         modalContainerColor =
                             fromToken(NavigationRailExpandedTokens.ModalContainerColor),
                         modalScrimColor =
-                            ScrimTokens.ContainerColor.value.copy(ScrimTokens.ContainerOpacity)
+                            ScrimTokens.ContainerColor.value.copy(ScrimTokens.ContainerOpacity),
                     )
                     .also { defaultWideWideNavigationRailColorsCached = it }
         }
@@ -878,9 +884,7 @@ internal expect fun createDefaultModalWideNavigationRailProperties():
 
 @Immutable
 @ExperimentalMaterial3ExpressiveApi
-expect class ModalWideNavigationRailProperties(
-    shouldDismissOnBackPress: Boolean = true,
-) {
+expect class ModalWideNavigationRailProperties(shouldDismissOnBackPress: Boolean = true) {
     val shouldDismissOnBackPress: Boolean
 }
 
@@ -892,7 +896,7 @@ internal expect fun ModalWideNavigationRailDialog(
     onPredictiveBack: (Float) -> Unit,
     onPredictiveBackCancelled: () -> Unit,
     predictiveBackState: RailPredictiveBackState,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -912,7 +916,7 @@ private fun ModalWideNavigationRailContent(
     windowInsets: WindowInsets,
     gesturesEnabled: Boolean,
     arrangement: Arrangement.Vertical,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val railPaneTitle = getString(string = Strings.WideNavigationRailPaneTitle)
@@ -937,7 +941,7 @@ private fun ModalWideNavigationRailContent(
                         scaleX =
                             calculatePredictiveBackScaleX(
                                 progress,
-                                predictiveBackState.swipeEdgeMatchesRail
+                                predictiveBackState.swipeEdgeMatchesRail,
                             )
                         scaleY = calculatePredictiveBackScaleY(progress)
                         transformOrigin =
@@ -966,7 +970,7 @@ private fun ModalWideNavigationRailContent(
                     enabled = gesturesEnabled,
                     startDragImmediately = railState.anchoredDraggableState.isAnimationRunning,
                     onDragStopped = { settleToDismiss(it) },
-                )
+                ),
     ) {
         WideNavigationRailLayout(
             modifier =
@@ -980,7 +984,7 @@ private fun ModalWideNavigationRailContent(
                     val predictiveBackScaleX =
                         calculatePredictiveBackScaleX(
                             progress,
-                            predictiveBackState.swipeEdgeMatchesRail
+                            predictiveBackState.swipeEdgeMatchesRail,
                         )
                     val predictiveBackScaleY = calculatePredictiveBackScaleY(progress)
                     scaleX =
@@ -996,7 +1000,7 @@ private fun ModalWideNavigationRailContent(
             windowInsets = windowInsets,
             arrangement = arrangement,
             isModal = true,
-            content = content
+            content = content,
         )
     }
 }
@@ -1016,9 +1020,7 @@ private fun GraphicsLayerScope.calculatePredictiveBackScaleX(
     }
 }
 
-private fun GraphicsLayerScope.calculatePredictiveBackScaleY(
-    progress: Float,
-): Float {
+private fun GraphicsLayerScope.calculatePredictiveBackScaleY(progress: Float): Float {
     val height = size.height
     return if (height.isNaN() || height == 0f) {
         1f
@@ -1034,7 +1036,7 @@ private fun Scrim(color: Color, onDismissRequest: suspend () -> Unit, visible: B
             animateFloatAsState(
                 targetValue = if (visible) 1f else 0f,
                 // TODO: Load the motionScheme tokens from the component tokens file.
-                animationSpec = MotionSchemeKeyTokens.DefaultEffects.value()
+                animationSpec = MotionSchemeKeyTokens.DefaultEffects.value(),
             )
         var dismiss by remember { mutableStateOf(false) }
         val closeModalRail = getString(Strings.CloseRail)

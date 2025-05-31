@@ -22,6 +22,7 @@ import androidx.build.dackka.DokkaAnalysisPlatform
 import androidx.build.dackka.docsPlatform
 import androidx.build.hasAndroidMultiplatformPlugin
 import androidx.build.multiplatformExtension
+import androidx.build.registerAsComponentForKmpPublishing
 import androidx.build.registerAsComponentForPublishing
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.api.variant.LibraryAndroidComponentsExtension
@@ -53,8 +54,9 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 /** Sets up a source jar task for an Android library project. */
 fun Project.configureSourceJarForAndroid(
     libraryVariant: LibraryVariant,
-    samplesProjects: MutableCollection<Project>
+    samplesProjects: MutableCollection<Project>,
 ) {
+    @Suppress("UnstableApiUsage") // Call to .kotlin
     val allSources =
         project.files(libraryVariant.sources.java?.all) +
             project.files(libraryVariant.sources.kotlin?.all)
@@ -76,23 +78,20 @@ fun Project.configureSourceJarForAndroid(
             it.artifacts.whenObjectAdded { _ ->
                 it.attributes.attribute(
                     DocsType.DOCS_TYPE_ATTRIBUTE,
-                    project.objects.named(DocsType::class.java, "fake-sources")
+                    project.objects.named(DocsType::class.java, "fake-sources"),
                 )
             }
         }
     }
 
-    val disableNames =
-        setOf(
-            "releaseSourcesJar",
-        )
+    val disableNames = setOf("releaseSourcesJar")
     disableUnusedSourceJarTasks(disableNames)
 }
 
 fun Project.configureMultiplatformSourcesForAndroid(
     variantName: String,
     target: KotlinMultiplatformAndroidLibraryTarget,
-    samplesProjects: MutableCollection<Project>
+    samplesProjects: MutableCollection<Project>,
 ) {
     val sourceJar =
         tasks.register("sourceJar${variantName.capitalize()}", Jar::class.java) { task ->
@@ -137,10 +136,7 @@ fun Project.configureSourceJarForJava(samplesProjects: MutableCollection<Project
     registerSourcesVariant(sourceJar)
     registerSamplesLibraries(samplesProjects)
 
-    val disableNames =
-        setOf(
-            "kotlinSourcesJar",
-        )
+    val disableNames = setOf("kotlinSourcesJar")
     disableUnusedSourceJarTasks(disableNames)
 }
 
@@ -169,6 +165,8 @@ fun Project.configureSourceJarForMultiplatform() {
                 .filterNot { it.name in setOfStubTargets }
                 .flatMap { it.mainCompilation().allKotlinSourceSets }
                 .toSet()
+                // Sort sourceSets to ensure child sourceSets come after their parents, b/404784813
+                .sortedWith(compareBy({ it.dependsOn.size }, { it.name }))
                 .forEach { sourceSet ->
                     task.from(sourceSet.kotlin.srcDirs) { copySpec ->
                         copySpec.into(sourceSet.name)
@@ -178,10 +176,7 @@ fun Project.configureSourceJarForMultiplatform() {
         }
     registerMultiplatformSourcesVariant(sourceJar)
 
-    val disableNames =
-        setOf(
-            "kotlinSourcesJar",
-        )
+    val disableNames = setOf("kotlinSourcesJar")
     disableUnusedSourceJarTasks(disableNames)
 }
 
@@ -197,7 +192,9 @@ internal val Project.multiplatformUsage
     get() = objects.named<Usage>("androidx-multiplatform-docs")
 
 private fun Project.registerMultiplatformSourcesVariant(sourceJar: TaskProvider<Jar>) =
-    registerSourcesVariant(kmpSourcesConfigurationName, sourceJar, multiplatformUsage)
+    registerSourcesVariant(kmpSourcesConfigurationName, sourceJar, multiplatformUsage).also {
+        registerAsComponentForKmpPublishing(it)
+    }
 
 private fun Project.registerSourcesVariant(sourceJar: TaskProvider<Jar>) =
     registerSourcesVariant(sourcesConfigurationName, sourceJar, objects.named(Usage.JAVA_RUNTIME))
@@ -213,15 +210,15 @@ private fun Project.registerSourcesVariant(
         gradleVariant.attributes.attribute(Usage.USAGE_ATTRIBUTE, usage)
         gradleVariant.attributes.attribute(
             Category.CATEGORY_ATTRIBUTE,
-            objects.named<Category>(Category.DOCUMENTATION)
+            objects.named<Category>(Category.DOCUMENTATION),
         )
         gradleVariant.attributes.attribute(
             Bundling.BUNDLING_ATTRIBUTE,
-            objects.named<Bundling>(Bundling.EXTERNAL)
+            objects.named<Bundling>(Bundling.EXTERNAL),
         )
         gradleVariant.attributes.attribute(
             DocsType.DOCS_TYPE_ATTRIBUTE,
-            objects.named<DocsType>(DocsType.SOURCES)
+            objects.named<DocsType>(DocsType.SOURCES),
         )
         gradleVariant.outgoing.artifact(sourceJar)
         registerAsComponentForPublishing(gradleVariant)
@@ -264,7 +261,7 @@ fun createSourceSetMetadata(kmpExtension: KotlinMultiplatformExtension): Map<Str
                 mapOf(
                     "name" to commonMain.name,
                     "dependencies" to commonMain.dependsOn.map { it.name }.sorted(),
-                    "analysisPlatform" to DokkaAnalysisPlatform.COMMON.jsonName
+                    "analysisPlatform" to DokkaAnalysisPlatform.COMMON.jsonName,
                 )
         )
     kmpExtension.targets.forEach { target ->
@@ -275,7 +272,7 @@ fun createSourceSetMetadata(kmpExtension: KotlinMultiplatformExtension): Map<Str
                 mapOf(
                     "name" to it.name,
                     "dependencies" to it.dependsOn.map { it.name }.sorted(),
-                    "analysisPlatform" to target.docsPlatform().jsonName
+                    "analysisPlatform" to target.docsPlatform().jsonName,
                 )
             }
         }

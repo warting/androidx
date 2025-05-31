@@ -23,7 +23,6 @@
  */
 
 import androidx.build.AndroidXConfig
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 
 plugins {
@@ -46,19 +45,21 @@ dependencies {
     androidTestImplementation(libs.truth)
     androidTestImplementation("androidx.appcompat:appcompat:1.2.0")
     androidTestImplementation(project(":kruth:kruth"))
+    androidTestImplementation(project(":xr:runtime:runtime-testing"))
 }
 
 android {
     namespace = "androidx.xr.runtime.openxr"
     sourceSets.main {
         resources.srcDirs += "src/main/resources"
-        jniLibs.srcDirs += new File(AndroidXConfig.getPrebuiltsRoot(project), "androidx/xr/android")
+        jniLibs.srcDirs += new File(AndroidXConfig.getPrebuiltsRoot(project), "androidx/xr/native/android")
     }
     defaultConfig {
         consumerProguardFiles 'proguard-rules.pro'
+        minSdkVersion 23
     }
     sourceSets.androidTest {
-        jniLibs.srcDirs += new File(AndroidXConfig.getPrebuiltsRoot(project), "androidx/xr/androidTest")
+        jniLibs.srcDirs += new File(AndroidXConfig.getPrebuiltsRoot(project), "androidx/xr/native/androidTest")
     }
 }
 
@@ -67,7 +68,6 @@ androidx {
     type = SoftwareType.PUBLISHED_LIBRARY
     inceptionYear = "2024"
     description = "An implementation of the XR runtime using OpenXR."
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
     // TODO: b/326456246
     optOutJSpecify = true
 }

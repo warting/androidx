@@ -133,7 +133,7 @@ class SnapshotStateMapTests {
     }
 
     @Test
-    @IgnoreJsTarget
+    @IgnoreJsTarget // b/409729875
     fun validateEntriesIterator() {
         validateRead { map, normalMap ->
             for (entries in map.entries.zip(normalMap.entries)) {
@@ -181,11 +181,11 @@ class SnapshotStateMapTests {
             val two = map.entries.drop(1).first()
             assertEquals(
                 normalMap.entries.containsAll(listOf(normalOne, normalTwo)),
-                map.entries.containsAll(listOf(one, two))
+                map.entries.containsAll(listOf(one, two)),
             )
             assertEquals(
                 normalMap.entries.containsAll(listOf(one, two)),
-                map.entries.containsAll(listOf(normalOne, normalTwo))
+                map.entries.containsAll(listOf(normalOne, normalTwo)),
             )
             val independentOne =
                 object : MutableMap.MutableEntry<Int, Float> {
@@ -203,7 +203,7 @@ class SnapshotStateMapTests {
                 }
             assertEquals(
                 normalMap.entries.containsAll(listOf(independentOne, independentTwo)),
-                map.entries.containsAll(listOf(independentOne, independentTwo))
+                map.entries.containsAll(listOf(independentOne, independentTwo)),
             )
         }
     }
@@ -214,11 +214,13 @@ class SnapshotStateMapTests {
     }
 
     @Test
+    @IgnoreJsTarget // b/409727470
     fun validateEntriesRemoveAll() {
         validateWrite { map -> map.entries.removeAll(map.entries.filter { it.key % 2 == 0 }) }
     }
 
     @Test
+    @IgnoreJsTarget // b/409727470
     fun validateEntriesRetainAll() {
         validateWrite { map -> map.entries.retainAll(map.entries.filter { it.key % 2 == 0 }) }
     }
@@ -380,6 +382,7 @@ class SnapshotStateMapTests {
     }
 
     @Test
+    @IgnoreJsTarget
     fun validateValuesRemove() {
         validateWrite { map ->
             map.values.remove(1f)
@@ -584,14 +587,14 @@ class SnapshotStateMapTests {
 
     private fun validateRead(
         initialMap: MutableMap<Int, Float> = defaultMap(),
-        block: (Map<Int, Float>, Map<Int, Float>) -> Unit
+        block: (Map<Int, Float>, Map<Int, Float>) -> Unit,
     ) {
         validateMaps(initialMap) { map, normalMap -> block(map, normalMap) }
     }
 
     private fun validateWrite(
         initialMap: MutableMap<Int, Float> = defaultMap(),
-        block: (MutableMap<Int, Float>) -> Unit
+        block: (MutableMap<Int, Float>) -> Unit,
     ) {
         validateMaps(initialMap) { map, normalMap ->
             block(normalMap)
@@ -602,7 +605,7 @@ class SnapshotStateMapTests {
 
     private fun validateMaps(
         map: MutableMap<Int, Float> = defaultMap(),
-        block: (MutableMap<Int, Float>, MutableMap<Int, Float>) -> Unit
+        block: (MutableMap<Int, Float>, MutableMap<Int, Float>) -> Unit,
     ) {
         val normalMap = map.toMutableMap()
         block(map, normalMap)

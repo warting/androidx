@@ -6,18 +6,24 @@
  * modifying its settings.
  */
 
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
 
 plugins {
     id("AndroidXPlugin")
-    id("com.android.library")
     alias(libs.plugins.kotlinSerialization)
 }
 
 androidXMultiplatform {
-    android()
+    androidLibrary {
+        namespace = "androidx.savedstate.compose"
+        optimization {
+            it.consumerKeepRules.publish = true
+            it.consumerKeepRules.files.add(new File("proguard-rules.pro"))
+        }
+        // TODO(b/345531033)
+        experimentalProperties["android.lint.useK2Uast"] = false
+    }
     jvmStubs()
     linuxX64Stubs()
 
@@ -44,7 +50,7 @@ androidXMultiplatform {
          androidMain {
             dependsOn(commonMain)
             dependencies {
-                api("androidx.annotation:annotation:1.8.1")
+                api("androidx.annotation:annotation:1.9.1")
                 implementation("androidx.core:core-ktx:1.13.1")
             }
         }
@@ -52,7 +58,6 @@ androidXMultiplatform {
         androidUnitTest {
             dependsOn(commonTest)
             dependencies {
-                implementation(libs.robolectric)
             }
         }
 
@@ -80,20 +85,11 @@ androidXMultiplatform {
     }
 }
 
-android {
-    buildTypes.configureEach {
-        consumerProguardFiles("proguard-rules.pro")
-    }
-    namespace = "androidx.savedstate.compose"
-    experimentalProperties["android.lint.useK2Uast"] = false // TODO(b/345531033)
-}
-
 androidx {
     name = "Saved State Compose"
     type = SoftwareType.PUBLISHED_LIBRARY
     samples(project(":savedstate:savedstate-compose"))
-    inceptionYear = "2018"
+    inceptionYear = "2024"
     description = "Compose integration with Saved State"
-    metalavaK2UastEnabled = false
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
+    enableRobolectric()
 }

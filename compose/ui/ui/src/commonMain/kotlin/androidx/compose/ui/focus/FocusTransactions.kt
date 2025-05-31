@@ -31,6 +31,7 @@ import androidx.compose.ui.focus.FocusStateImpl.Active
 import androidx.compose.ui.focus.FocusStateImpl.ActiveParent
 import androidx.compose.ui.focus.FocusStateImpl.Captured
 import androidx.compose.ui.focus.FocusStateImpl.Inactive
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.node.Nodes
 import androidx.compose.ui.node.nearestAncestor
 import androidx.compose.ui.node.observeReads
@@ -63,15 +64,10 @@ private fun FocusTargetNode.performRequestFocusOptimized(): Boolean {
         return true
     }
 
-    if (previousActiveNode?.clearFocus(refreshFocusEvents = true) == false) {
-        return false // Don't grant focus if clearing focus from the previous node was rejected
-    }
-
     // Request owner focus if it doesn't already have focus
-    if (previousActiveNode == null && !requestFocusForOwner()) {
+    if (previousActiveNode == null && !requestOwnerFocus()) {
         return false // Don't grant focus if requesting owner focus failed
     }
-    grantFocus()
 
     // Find ancestor target and event nodes of the previous active target node
     var previousAncestorTargetNodes: MutableVector<FocusTargetNode>? = null
@@ -80,14 +76,26 @@ private fun FocusTargetNode.performRequestFocusOptimized(): Boolean {
         previousActiveNode.visitAncestors(Nodes.FocusTarget) { previousAncestorTargetNodes.add(it) }
     }
 
-    // Diff the previous ancestor nodes with the ancestors of the new active target node
+    // Diff the previous ancestor nodes with the ancestors of the new active target node.
+    // We also check if the previous active node is an ancestor of the new active node, in which
+    // case we don't need to clear focus from it.
+    var shouldClearFocusFromPreviousActiveNode = true
     val ancestorTargetNodes = mutableVectorOf<FocusTargetNode>()
     visitAncestors(Nodes.FocusTarget) {
         val removed = previousAncestorTargetNodes?.remove(it)
         if (removed == null || !removed) {
             ancestorTargetNodes.add(it)
         }
+        if (it === previousActiveNode) shouldClearFocusFromPreviousActiveNode = false
     }
+
+    if (shouldClearFocusFromPreviousActiveNode) {
+        if (previousActiveNode?.clearFocus(refreshFocusEvents = true) == false) {
+            return false // Don't grant focus if clearing focus from the previous node was rejected
+        }
+    }
+
+    grantFocus()
 
     // Notify ancestor target nodes of the previous active node that are no longer ActiveParent
     // The ancestors are traversed in the reversed order to dispatch events top->down
@@ -108,7 +116,10 @@ private fun FocusTargetNode.performRequestFocusOptimized(): Boolean {
             // The focus request was redirected or cancelled in a previous focus change callback
             return false
         }
-        it.dispatchFocusCallbacks(Inactive, ActiveParent)
+        it.dispatchFocusCallbacks(
+            previousState = if (it === previousActiveNode) Active else Inactive,
+            newState = ActiveParent,
+        )
     }
 
     // Check if focus was cleared or redirected in a previous focus change callback
@@ -129,7 +140,7 @@ private fun FocusTargetNode.performRequestFocusOptimized(): Boolean {
     @OptIn(ExperimentalComposeUiApi::class, InternalComposeUiApi::class)
     if (ComposeUiFlags.isViewFocusFixEnabled && requireLayoutNode().getInteropView() == null) {
         // This isn't an AndroidView, so we should be focused on this ComposeView
-        requireOwner().focusOwner.requestFocusForOwner(FocusDirection.Next, null)
+        requestOwnerFocus(FocusDirection.Next, null)
     }
 
     return true
@@ -151,7 +162,7 @@ private fun FocusTargetNode.performRequestFocusLegacy(): Boolean {
                     }
                     success
                 } else {
-                    requestFocusForOwner() && grantFocus()
+                    requestOwnerFocus() && grantFocus()
                 }
             }
         }
@@ -159,7 +170,7 @@ private fun FocusTargetNode.performRequestFocusLegacy(): Boolean {
         @OptIn(ExperimentalComposeUiApi::class, InternalComposeUiApi::class)
         if (ComposeUiFlags.isViewFocusFixEnabled && requireLayoutNode().getInteropView() == null) {
             // This isn't an AndroidView, so we should be focused on this ComposeView
-            requireOwner().focusOwner.requestFocusForOwner(FocusDirection.Next, null)
+            requestOwnerFocus(FocusDirection.Next, null)
         }
         dispatchFocusCallbacks()
     }
@@ -244,7 +255,7 @@ internal fun FocusTargetNode.freeFocus() =
  */
 internal fun FocusTargetNode.clearFocus(
     forced: Boolean = false,
-    refreshFocusEvents: Boolean
+    refreshFocusEvents: Boolean,
 ): Boolean =
     when (focusState) {
         Active -> {
@@ -321,7 +332,7 @@ private fun FocusTargetNode.grantFocus(): Boolean {
 /** This function clears any focus from the focused child. */
 private fun FocusTargetNode.clearChildFocus(
     forced: Boolean = false,
-    refreshFocusEvents: Boolean = true
+    refreshFocusEvents: Boolean = true,
 ): Boolean = activeChild?.clearFocus(forced, refreshFocusEvents) ?: true
 
 /**
@@ -352,7 +363,7 @@ private fun FocusTargetNode.requestFocusForChild(childNode: FocusTargetNode): Bo
             val focusParent = nearestAncestor(Nodes.FocusTarget)
             when {
                 // If this node is the root, request focus from the compose owner.
-                focusParent == null && requestFocusForOwner() -> {
+                focusParent == null && requestOwnerFocus() -> {
                     childNode.grantFocus().also { success ->
                         if (success) focusState = ActiveParent
                     }
@@ -379,9 +390,10 @@ private fun FocusTargetNode.requestFocusForChild(childNode: FocusTargetNode): Bo
     }
 }
 
-private fun FocusTargetNode.requestFocusForOwner(): Boolean {
-    return requireOwner().focusOwner.requestFocusForOwner(null, null)
-}
+private fun FocusTargetNode.requestOwnerFocus(
+    focusDirection: FocusDirection? = null,
+    previouslyFocusedRect: Rect? = null,
+): Boolean = requireOwner().focusOwner.requestOwnerFocus(focusDirection, previouslyFocusedRect)
 
 private fun FocusTargetNode.requireActiveChild(): FocusTargetNode {
     return requireNotNull(activeChild) { "ActiveParent with no focused child" }
@@ -391,7 +403,7 @@ internal enum class CustomDestinationResult {
     None,
     Cancelled,
     Redirected,
-    RedirectCancelled
+    RedirectCancelled,
 }
 
 internal fun FocusTargetNode.performCustomRequestFocus(

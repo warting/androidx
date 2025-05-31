@@ -20,6 +20,8 @@ import android.graphics.Matrix
 import android.graphics.RenderNode
 import android.os.Build
 import androidx.ink.brush.Brush
+import androidx.ink.brush.BrushFamily
+import androidx.ink.brush.BrushPaint
 import androidx.ink.brush.ExperimentalInkCustomBrushApi
 import androidx.ink.brush.InputToolType
 import androidx.ink.brush.StockBrushes
@@ -42,6 +44,7 @@ import org.junit.runner.RunWith
  * TODO(b/293163827) Move this to [CanvasMeshRendererRobolectricTest] once a shadow exists for
  *   [android.graphics.MeshSpecification].
  */
+@OptIn(ExperimentalInkCustomBrushApi::class)
 @RunWith(AndroidJUnit4::class)
 @MediumTest
 @SdkSuppress(minSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
@@ -66,9 +69,7 @@ class CanvasMeshRendererTest {
 
     private val clock = FakeClock()
 
-    private val meshRenderer =
-        @OptIn(ExperimentalInkCustomBrushApi::class)
-        CanvasMeshRenderer(getDurationTimeMillis = clock::currentTimeMillis)
+    private val meshRenderer = CanvasMeshRenderer(getDurationTimeMillis = clock::currentTimeMillis)
 
     @Test
     fun obtainShaderMetadata_whenCalledTwiceWithSamePackedInstance_returnsCachedValue() {
@@ -90,7 +91,7 @@ class CanvasMeshRendererTest {
                             InputToolType.UNKNOWN,
                             x = 99F,
                             y = 99F,
-                            elapsedTimeMillis = 100
+                            elapsedTimeMillis = 100,
                         )
                         .asImmutable(),
             )
@@ -111,18 +112,14 @@ class CanvasMeshRendererTest {
                 start(
                     Brush.createWithColorIntArgb(StockBrushes.markerLatest, 0x44112233, 10f, 0.25f)
                 )
-                assertThat(
-                        enqueueInputs(
-                                buildStrokeInputBatchFromPoints(
-                                    floatArrayOf(10f, 20f, 100f, 120f),
-                                    startTime = 0L
-                                ),
-                                MutableStrokeInputBatch(),
-                            )
-                            .isSuccess
-                    )
-                    .isTrue()
-                assertThat(updateShape(3L).isSuccess).isTrue()
+                enqueueInputsOrThrow(
+                    buildStrokeInputBatchFromPoints(
+                        floatArrayOf(10f, 20f, 100f, 120f),
+                        startTime = 0L,
+                    ),
+                    MutableStrokeInputBatch(),
+                )
+                updateShapeOrThrow(3L)
             }
         assertThat(meshRenderer.createAndroidMesh(inProgressStroke, coatIndex = 0, meshIndex = 0))
             .isNotNull()
@@ -155,7 +152,7 @@ class CanvasMeshRendererTest {
         assertThat(
                 meshRenderer.obtainShaderMetadata(
                     inProgressStroke.getMeshFormat(0, 0),
-                    isPacked = false
+                    isPacked = false,
                 )
             )
             .isSameInstanceAs(
@@ -169,7 +166,7 @@ class CanvasMeshRendererTest {
     @Test
     @SdkSuppress(
         minSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
-        maxSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+        maxSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
     )
     fun drawStroke_whenAndroidU_shouldSaveRecentlyDrawnMesh() {
         val renderNode = RenderNode("test")
@@ -254,6 +251,115 @@ class CanvasMeshRendererTest {
         clock.currentTimeMillis += 3000
         meshRenderer.draw(canvas, strokeNewColor, Matrix().apply { setScale(3F, 4F) })
         assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(0)
+    }
+
+    @Test
+    @SdkSuppress(
+        minSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        maxSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+    )
+    fun drawStroke_whenAndroidU_withTextureAnimation_shouldSaveRecentlyDrawnMesh() {
+        // Create a stroke with a texture animation.
+        val texture =
+            BrushPaint.TextureLayer(
+                clientTextureId = "test",
+                sizeX = 10f,
+                sizeY = 10f,
+                animationFrames = 8,
+            )
+        val family = BrushFamily(paint = BrushPaint(listOf(texture)))
+        val brush = Brush(family = family, size = 10f, epsilon = 0.1f)
+        val stroke =
+            Stroke(
+                brush = brush,
+                inputs =
+                    MutableStrokeInputBatch()
+                        .addOrThrow(
+                            InputToolType.UNKNOWN,
+                            x = 10F,
+                            y = 10F,
+                            elapsedTimeMillis = 100,
+                        )
+                        .asImmutable(),
+            )
+
+        val renderNode = RenderNode("test")
+        val canvas = renderNode.beginRecording()
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(0)
+
+        // Draw the stroke at texture progress = 10%.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.1f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(1)
+
+        // Draw again, this time at 20% progress. Should use a new mesh.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.2f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(2)
+
+        // Draw at 20% progress again. The mesh should be reused.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.2f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(2)
+
+        // Draw at 30% progress. Should use a new mesh.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.3f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(3)
+    }
+
+    /**
+     * Same set of steps as
+     * [drawStroke_whenAndroidU_withTextureAnimation_shouldSaveRecentlyDrawnMesh], but without a
+     * texture animation, so changing animation progress should not cause a new mesh to be created.
+     */
+    @Test
+    @SdkSuppress(
+        minSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+        maxSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
+    )
+    fun drawStroke_whenAndroidU_withoutTextureAnimation_shouldIgnoreTextureProgressForMeshReuse() {
+        // Create a stroke without a texture animation.
+        val texture =
+            BrushPaint.TextureLayer(
+                clientTextureId = "test",
+                sizeX = 10f,
+                sizeY = 10f,
+                animationFrames = 1,
+            )
+        val family = BrushFamily(paint = BrushPaint(listOf(texture)))
+        val brush = Brush(family = family, size = 10f, epsilon = 0.1f)
+        val stroke =
+            Stroke(
+                brush = brush,
+                inputs =
+                    MutableStrokeInputBatch()
+                        .addOrThrow(
+                            InputToolType.UNKNOWN,
+                            x = 10F,
+                            y = 10F,
+                            elapsedTimeMillis = 100,
+                        )
+                        .asImmutable(),
+            )
+
+        val renderNode = RenderNode("test")
+        val canvas = renderNode.beginRecording()
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(0)
+
+        // Draw the stroke at texture progress = 10%.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.1f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(1)
+
+        // Draw again, this time at 20% progress. Since the stroke has no texture animation, the
+        // mesh
+        // should be reused.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.2f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(1)
+
+        // Draw at 20% progress again. Should still reuse the same mesh.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.2f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(1)
+
+        // Draw at 30% progress. Should still reuse the same mesh.
+        meshRenderer.draw(canvas, stroke, Matrix(), 0.3f)
+        assertThat(meshRenderer.getRecentlyDrawnAndroidMeshesCount()).isEqualTo(1)
     }
 
     private class FakeClock(var currentTimeMillis: Long = 1000L)

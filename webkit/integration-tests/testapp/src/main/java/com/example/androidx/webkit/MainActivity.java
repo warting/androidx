@@ -109,6 +109,12 @@ public class MainActivity extends AppCompatActivity {
                 new MenuListView.MenuItem(
                         getResources().getString(R.string.web_storage_activity_title),
                         new Intent(activityContext, WebStorageCompatActivity.class)),
+                new MenuListView.MenuItem(
+                        getResources().getString(R.string.payment_request_activity_title),
+                        new Intent(activityContext, PaymentRequestActivity.class)),
+                new MenuListView.MenuItem(
+                        getResources().getString(R.string.webview_builder_title),
+                        new Intent(activityContext, WebViewBuilderActivity.class)),
         };
         listView.setItems(menuItems);
     }

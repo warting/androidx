@@ -20,6 +20,7 @@ import android.os.Build
 import android.util.Range
 import android.util.Size
 import androidx.camera.core.DynamicRange
+import androidx.camera.core.impl.StreamSpec.FRAME_RATE_RANGE_UNSPECIFIED
 import androidx.camera.core.impl.UseCaseConfigFactory.CaptureType
 import androidx.camera.testing.impl.fakes.FakeUseCaseConfig
 import com.google.common.truth.Truth
@@ -42,7 +43,7 @@ class AttachedSurfaceInfoTest {
     private val dynamicRange = DynamicRange.SDR
     private val captureTypes = listOf(CaptureType.PREVIEW)
     private val inputFormat = ImageFormat.PRIVATE
-    private val targetFramerate = Range(10, 20)
+    private val targetFrameRate = Range(10, 20)
     private val config =
         FakeUseCaseConfig.Builder(CaptureType.PREVIEW, inputFormat).useCaseConfig.config
 
@@ -56,7 +57,8 @@ class AttachedSurfaceInfoTest {
                 dynamicRange,
                 captureTypes,
                 config,
-                targetFramerate
+                targetFrameRate,
+                FRAME_RATE_RANGE_UNSPECIFIED,
             )
     }
 
@@ -66,7 +68,7 @@ class AttachedSurfaceInfoTest {
             .isEqualTo(
                 SurfaceConfig.create(
                     SurfaceConfig.ConfigType.JPEG,
-                    SurfaceConfig.ConfigSize.PREVIEW
+                    SurfaceConfig.ConfigSize.PREVIEW,
                 )
             )
     }
@@ -112,11 +114,11 @@ class AttachedSurfaceInfoTest {
 
     @Test
     fun canGetTargetFrameRate() {
-        Truth.assertThat(attachedSurfaceInfo!!.targetFrameRate).isEqualTo(targetFramerate)
+        Truth.assertThat(attachedSurfaceInfo!!.targetFrameRate).isEqualTo(targetFrameRate)
     }
 
     @Test
-    fun nullGetTargetFrameRateReturnsNull() {
+    fun defaultFrameRates() {
         val attachedSurfaceInfo2 =
             AttachedSurfaceInfo.create(
                 surfaceConfig,
@@ -125,8 +127,12 @@ class AttachedSurfaceInfoTest {
                 dynamicRange,
                 listOf(CaptureType.PREVIEW),
                 config,
-                null
+                FRAME_RATE_RANGE_UNSPECIFIED,
+                FRAME_RATE_RANGE_UNSPECIFIED,
             )
-        Truth.assertThat(attachedSurfaceInfo2.targetFrameRate).isNull()
+        Truth.assertThat(attachedSurfaceInfo2.targetFrameRate)
+            .isEqualTo(FRAME_RATE_RANGE_UNSPECIFIED)
+        Truth.assertThat(attachedSurfaceInfo2.targetHighSpeedFrameRate)
+            .isEqualTo(FRAME_RATE_RANGE_UNSPECIFIED)
     }
 }

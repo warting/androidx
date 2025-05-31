@@ -43,7 +43,9 @@ import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.interaction.Interaction
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -113,6 +115,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -131,6 +134,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.Layout
@@ -143,6 +150,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -182,11 +190,11 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /**
- * <a href="https://m3.material.io/components/search/overview" class="external"
- * target="_blank">Material Design search</a>.
+ * [Material Design search](https://m3.material.io/components/search/overview)
  *
  * A search bar represents a field that allows users to enter a keyword or phrase and get relevant
  * information. It can be used as a way to navigate through an app via search queries.
@@ -240,8 +248,7 @@ fun SearchBar(
 }
 
 /**
- * <a href="https://m3.material.io/components/search/overview" class="external"
- * target="_blank">Material Design search</a>.
+ * [Material Design search](https://m3.material.io/components/search/overview)
  *
  * A search bar represents a field that allows users to enter a keyword or phrase and get relevant
  * information. It can be used as a way to navigate through an app via search queries.
@@ -441,7 +448,7 @@ fun ExpandedDockedSearchBar(
                     anchorBounds: IntRect,
                     windowSize: IntSize,
                     layoutDirection: LayoutDirection,
-                    popupContentSize: IntSize
+                    popupContentSize: IntSize,
                 ): IntOffset = state.collapsedBounds.topLeft
             }
         }
@@ -489,8 +496,7 @@ fun ExpandedDockedSearchBar(
 }
 
 /**
- * <a href="https://m3.material.io/components/search/overview" class="external"
- * target="_blank">Material Design search</a>.
+ * [Material Design search](https://m3.material.io/components/search/overview)
  *
  * A search bar represents a floating search field that allows users to enter a keyword or phrase
  * and get relevant information. It can be used as a way to navigate through an app via search
@@ -583,7 +589,7 @@ fun SearchBar(
                 coroutineScope.launch {
                     animationProgress.animateTo(
                         targetValue = 1f,
-                        animationSpec = AnimationPredictiveBackExitFloatSpec
+                        animationSpec = AnimationPredictiveBackExitFloatSpec,
                     )
                     finalBackProgress.floatValue = Float.NaN
                     firstBackEvent.value = null
@@ -610,8 +616,7 @@ fun SearchBar(
 }
 
 /**
- * <a href="https://m3.material.io/components/search/overview" class="external"
- * target="_blank">Material Design search</a>.
+ * [Material Design search](https://m3.material.io/components/search/overview)
  *
  * A search bar represents a floating search field that allows users to enter a keyword or phrase
  * and get relevant information. It can be used as a way to navigate through an app via search
@@ -662,7 +667,7 @@ fun DockedSearchBar(
         contentColor = contentColorFor(colors.containerColor),
         tonalElevation = tonalElevation,
         shadowElevation = shadowElevation,
-        modifier = modifier.zIndex(1f).width(SearchBarMinWidth)
+        modifier = modifier.zIndex(1f).width(SearchBarMinWidth),
     ) {
         Column {
             inputField()
@@ -826,7 +831,7 @@ fun rememberSearchBarState(
             SearchBarState.Saver(
                 animationSpecForExpand = animationSpecForExpand,
                 animationSpecForCollapse = animationSpecForCollapse,
-            )
+            ),
     ) {
         SearchBarState(
             initialValue = initialValue,
@@ -936,7 +941,7 @@ private class EnterAlwaysSearchBarScrollBehavior(
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
-                source: NestedScrollSource
+                source: NestedScrollSource,
             ): Offset {
                 if (!canScroll()) return Offset.Zero
                 if (reverseLayout && available.y > 0f) {
@@ -969,20 +974,18 @@ private class EnterAlwaysSearchBarScrollBehavior(
         // to continue the motion to scroll the search bar.
         if (abs(velocity) > 1f) {
             var lastValue = 0f
-            AnimationState(
-                    initialValue = 0f,
-                    initialVelocity = velocity,
-                )
-                .animateDecay(flingAnimationSpec) {
-                    val delta = value - lastValue
-                    val initialScrollOffset = scrollOffset
-                    scrollOffset = initialScrollOffset + delta
-                    val consumed = abs(initialScrollOffset - scrollOffset)
-                    lastValue = value
-                    remainingVelocity = this.velocity
-                    // avoid rounding errors and stop if anything is unconsumed
-                    if (abs(delta - consumed) > 0.5f) this.cancelAnimation()
-                }
+            AnimationState(initialValue = 0f, initialVelocity = velocity).animateDecay(
+                flingAnimationSpec
+            ) {
+                val delta = value - lastValue
+                val initialScrollOffset = scrollOffset
+                scrollOffset = initialScrollOffset + delta
+                val consumed = abs(initialScrollOffset - scrollOffset)
+                lastValue = value
+                remainingVelocity = this.velocity
+                // avoid rounding errors and stop if anything is unconsumed
+                if (abs(delta - consumed) > 0.5f) this.cancelAnimation()
+            }
         }
         if (scrollOffsetLimit < scrollOffset && scrollOffset < 0) {
             AnimationState(initialValue = scrollOffset).animateTo(
@@ -1013,7 +1016,7 @@ private class EnterAlwaysSearchBarScrollBehavior(
                         snapAnimationSpec = snapAnimationSpec,
                         flingAnimationSpec = flingAnimationSpec,
                     )
-                }
+                },
             )
     }
 }
@@ -1104,7 +1107,7 @@ object SearchBarDefaults {
                     canScroll = canScroll,
                     snapAnimationSpec = snapAnimationSpec,
                     flingAnimationSpec = flingAnimationSpec,
-                )
+                ),
         ) {
             EnterAlwaysSearchBarScrollBehavior(
                 initialOffset = initialOffset,
@@ -1314,9 +1317,18 @@ object SearchBarDefaults {
         @Suppress("NAME_SHADOWING")
         val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
 
-        val focused = interactionSource.collectIsFocusedAsState().value
+        /*
+        Relationship between focus and expansion state:
+            * In touch mode, the two are coupled:
+                * Text field gains focus => search bar expands
+                * Search bar collapses => text field loses focus
+            * In non-touch/keyboard mode, they are independent. Instead, expansion triggers when:
+                * the user starts typing
+                * the user presses the down direction key
+         */
+        val focused by interactionSource.collectIsFocusedAsState()
         val focusManager = LocalFocusManager.current
-        val focusRequester = remember { FocusRequester() }
+        val isInTouchMode = LocalInputModeManager.current.inputMode == InputMode.Touch
 
         val searchSemantics = getString(Strings.SearchBarSearch)
         val suggestionsAvailableSemantics = getString(Strings.SuggestionsAvailable)
@@ -1333,14 +1345,21 @@ object SearchBarDefaults {
             state = textFieldState,
             modifier =
                 modifier
+                    .onPreviewKeyEvent {
+                        val expandOnDownKey = !isInTouchMode && !searchBarState.isExpanded
+                        if (expandOnDownKey && it.key == Key.DirectionDown) {
+                            coroutineScope.launch { searchBarState.animateToExpanded() }
+                            return@onPreviewKeyEvent true
+                        }
+                        false
+                    }
                     .sizeIn(
                         minWidth = SearchBarMinWidth,
                         maxWidth = SearchBarMaxWidth,
                         minHeight = InputFieldHeight,
                     )
-                    .focusRequester(focusRequester)
                     .onFocusChanged {
-                        if (it.isFocused) {
+                        if (it.isFocused && isInTouchMode) {
                             coroutineScope.launch { searchBarState.animateToExpanded() }
                         }
                     }
@@ -1388,18 +1407,45 @@ object SearchBarDefaults {
                                     colors.containerColor(
                                         enabled = enabled,
                                         isError = false,
-                                        focused = focused
+                                        focused = focused,
                                     ),
                                 animationSpec = MotionSchemeKeyTokens.FastEffects.value(),
                             )
                         Box(Modifier.textFieldBackground(containerColor::value, shape))
                     },
-                )
+                ),
         )
 
-        val shouldClearFocus = !searchBarState.isExpanded && focused
+        // Most expansions from touch happen via `onFocusChanged` above, but in a mixed
+        // keyboard-touch flow, the user can focus via keyboard (with no expansion),
+        // and subsequent touches won't change focus state. So this effect is needed as well.
+        DetectClickFromInteractionSource(interactionSource) {
+            if (!searchBarState.isExpanded) {
+                coroutineScope.launch { searchBarState.animateToExpanded() }
+            }
+        }
+
+        // Expand search bar if the user starts typing
+        LaunchedEffect(searchBarState, textFieldState) {
+            if (!searchBarState.isExpanded) {
+                var prevLength = textFieldState.text.length
+                snapshotFlow { textFieldState.text }
+                    .onEach {
+                        val currLength = it.length
+                        if (currLength > prevLength && focused && !searchBarState.isExpanded) {
+                            // Don't use LaunchedEffect's coroutine because
+                            // cancelling the animation shouldn't cancel the Flow
+                            coroutineScope.launch { searchBarState.animateToExpanded() }
+                        }
+                        prevLength = currLength
+                    }
+                    .collect {}
+            }
+        }
+
+        val shouldClearFocusOnCollapse = !searchBarState.isExpanded && focused && isInTouchMode
         LaunchedEffect(searchBarState.isExpanded) {
-            if (shouldClearFocus) {
+            if (shouldClearFocusOnCollapse) {
                 focusManager.clearFocus()
             }
         }
@@ -1544,13 +1590,13 @@ object SearchBarDefaults {
                                     colors.containerColor(
                                         enabled = enabled,
                                         isError = false,
-                                        focused = focused
+                                        focused = focused,
                                     ),
                                 animationSpec = MotionSchemeKeyTokens.FastEffects.value(),
                             )
                         Box(Modifier.textFieldBackground(containerColor::value, shape))
                     },
-                )
+                ),
         )
 
         val shouldClearFocus = !expanded && focused
@@ -1676,7 +1722,7 @@ object SearchBarDefaults {
                                         colors.containerColor(
                                             enabled = enabled,
                                             isError = false,
-                                            focused = focused
+                                            focused = focused,
                                         ),
                                     animationSpec = MotionSchemeKeyTokens.FastEffects.value(),
                                 )
@@ -1685,7 +1731,7 @@ object SearchBarDefaults {
                             )
                         },
                     )
-                }
+                },
         )
 
         val shouldClearFocus = !expanded && focused
@@ -1839,7 +1885,7 @@ class SearchBarColors(
 ) {
     @Deprecated(
         message = "Use overload that takes `inputFieldColors",
-        replaceWith = ReplaceWith("SearchBarColors(containerColor, dividerColor, inputFieldColors)")
+        replaceWith = ReplaceWith("SearchBarColors(containerColor, dividerColor, inputFieldColors)"),
     )
     constructor(
         containerColor: Color,
@@ -2170,7 +2216,7 @@ private fun SearchBarLayout(
             calculatePredictiveBackMultiplier(
                 currentBackEvent.value,
                 animationProgress,
-                finalBackProgress.floatValue
+                finalBackProgress.floatValue,
             )
 
         val startWidth = lerp(defaultStartWidth, predictiveBackStartWidth, predictiveBackMultiplier)
@@ -2178,7 +2224,7 @@ private fun SearchBarLayout(
             lerp(
                 topPadding + defaultStartHeight,
                 predictiveBackStartHeight,
-                predictiveBackMultiplier
+                predictiveBackMultiplier,
             )
 
         val maxWidth = constraints.maxWidth
@@ -2219,7 +2265,7 @@ private fun SearchBarLayout(
                                 .coerceAtLeast(0)
                         } else {
                             constraints.maxHeight
-                        }
+                        },
                 )
             )
 
@@ -2327,11 +2373,7 @@ private fun DockedSearchBarLayout(
             val contentPlaceables = contentMeasurables.fastMap { it.measure(contentConstraints) }
 
             val height = inputFieldHeight + (contentPlaceables.fastMaxOfOrNull { it.height } ?: 0)
-            val width =
-                max(
-                    inputFieldWidth,
-                    contentPlaceables.fastMaxOfOrNull { it.width } ?: 0,
-                )
+            val width = max(inputFieldWidth, contentPlaceables.fastMaxOfOrNull { it.width } ?: 0)
 
             layout(constraints.constrainWidth(width), constraints.constrainHeight(height)) {
                 inputFieldPlaceables.fastForEach { it.place(0, 0) }
@@ -2507,27 +2549,16 @@ private fun FullScreenSearchBarLayout(
                             SearchBarPredictiveBackMinMargin.roundToPx())
                         .coerceAtLeast(0)
                 val totalOffsetY =
-                    min(
-                        availableVerticalSpace,
-                        SearchBarPredictiveBackMaxOffsetY.roundToPx(),
-                    )
+                    min(availableVerticalSpace, SearchBarPredictiveBackMaxOffsetY.roundToPx())
                 val interpolatedOffsetY = lerp(0, totalOffsetY, relativeDeltaY)
                 return (interpolatedOffsetY * sign(absoluteDeltaY).toInt() + topPadding)
                     .coerceAtMost(state.collapsedBounds.top)
             }
 
             val endOffsetX =
-                lerp(
-                    0,
-                    lastInProgressValue.value?.endOffsetX() ?: 0,
-                    predictiveBackProgress,
-                )
+                lerp(0, lastInProgressValue.value?.endOffsetX() ?: 0, predictiveBackProgress)
             val endOffsetY =
-                lerp(
-                    0,
-                    lastInProgressValue.value?.endOffsetY() ?: 0,
-                    predictiveBackProgress,
-                )
+                lerp(0, lastInProgressValue.value?.endOffsetY() ?: 0, predictiveBackProgress)
             val offsetX = lerp(state.collapsedBounds.left, endOffsetX, state.progress)
             val offsetY = lerp(state.collapsedBounds.top, endOffsetY, state.progress)
 
@@ -2552,10 +2583,7 @@ private fun BackEventProgress.InProgress?.transform(): Float =
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun DisableSoftKeyboard(content: @Composable () -> Unit) {
-    InterceptPlatformTextInput(
-        interceptor = { _, _ -> awaitCancellation() },
-        content = content,
-    )
+    InterceptPlatformTextInput(interceptor = { _, _ -> awaitCancellation() }, content = content)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2564,10 +2592,22 @@ private val SearchBarState.collapsedBounds: IntRect
         collapsedCoords?.let { IntRect(offset = it.positionInWindow().round(), size = it.size) }
             ?: IntRect.Zero
 
+@Composable
+private fun DetectClickFromInteractionSource(
+    interactionSource: InteractionSource,
+    onClick: () -> Unit,
+) {
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release) onClick()
+        }
+    }
+}
+
 private fun calculatePredictiveBackMultiplier(
     currentBackEvent: BackEventCompat?,
     progress: Float,
-    finalBackProgress: Float
+    finalBackProgress: Float,
 ) =
     when {
         currentBackEvent == null -> 0f // Not in predictive back at all.
@@ -2582,7 +2622,7 @@ private fun calculatePredictiveBackOffsetX(
     currentBackEvent: BackEventCompat?,
     layoutDirection: LayoutDirection,
     progress: Float,
-    predictiveBackMultiplier: Float
+    predictiveBackMultiplier: Float,
 ): Int {
     if (currentBackEvent == null || predictiveBackMultiplier == 0f) {
         return 0
@@ -2602,7 +2642,7 @@ private fun calculatePredictiveBackOffsetY(
     firstBackEvent: BackEventCompat?,
     height: Int,
     maxOffsetY: Int,
-    predictiveBackMultiplier: Float
+    predictiveBackMultiplier: Float,
 ): Int {
     if (firstBackEvent == null || currentBackEvent == null || predictiveBackMultiplier == 0f) {
         return 0
@@ -2704,10 +2744,7 @@ private val AnimationExitFloatSpec: FiniteAnimationSpec<Float> =
         easing = AnimationExitEasing,
     )
 private val AnimationPredictiveBackExitFloatSpec: FiniteAnimationSpec<Float> =
-    tween(
-        durationMillis = AnimationExitDurationMillis,
-        easing = AnimationExitEasing,
-    )
+    tween(durationMillis = AnimationExitDurationMillis, easing = AnimationExitEasing)
 private val AnimationEnterSizeSpec: FiniteAnimationSpec<IntSize> =
     tween(
         durationMillis = AnimationEnterDurationMillis,

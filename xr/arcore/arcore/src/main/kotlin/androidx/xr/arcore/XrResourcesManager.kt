@@ -17,17 +17,29 @@
 package androidx.xr.arcore
 
 import android.annotation.SuppressLint
+import androidx.xr.runtime.internal.ArDevice as RuntimeArDevice
+import androidx.xr.runtime.internal.Earth as RuntimeEarth
 import androidx.xr.runtime.internal.Hand as RuntimeHand
+import androidx.xr.runtime.internal.LifecycleManager
 import androidx.xr.runtime.internal.Plane as RuntimePlane
 import androidx.xr.runtime.internal.Trackable as RuntimeTrackable
+import androidx.xr.runtime.internal.ViewCamera as RuntimeViewCamera
+import java.util.Queue
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** Manages all XR resources that are used by the ARCore for XR API. */
 internal class XrResourcesManager {
 
+    internal lateinit var lifecycleManager: LifecycleManager
+
     /** List of [Updatable]s that are updated every frame. */
     private val _updatables = CopyOnWriteArrayList<Updatable>()
     val updatables: List<Updatable> = _updatables
+
+    /** Queue of [Anchor]s that will be detached on the next frame update. */
+    private val _anchorsToDetachQueue = ConcurrentLinkedQueue<Anchor>()
+    val anchorsToDetachQueue: Queue<Anchor> = _anchorsToDetachQueue
 
     /** Map of runtime trackable pointer to [Trackable]. */
     @SuppressLint("BanConcurrentHashMap")
@@ -41,9 +53,34 @@ internal class XrResourcesManager {
     val leftHand: Hand? by lazy { _leftRuntimeHand?.let { Hand(it) } }
     val rightHand: Hand? by lazy { _rightRuntimeHand?.let { Hand(it) } }
 
+    /** The ar device tracking data */
+    lateinit var arDevice: ArDevice
+        private set
+
+    /** The view camera data */
+    lateinit var viewCameras: List<ViewCamera>
+        private set
+
+    /** Geospatial data */
+    private var _earth: Earth? = null
+    val earth: Earth
+        get() = checkNotNull(_earth)
+
+    internal fun initiateEarth(runtimeEarth: RuntimeEarth) {
+        _earth = Earth(runtimeEarth, this)
+    }
+
     internal fun initiateHands(leftRuntimeHand: RuntimeHand?, rightRuntimeHand: RuntimeHand?) {
         _leftRuntimeHand = leftRuntimeHand
         _rightRuntimeHand = rightRuntimeHand
+    }
+
+    internal fun initiateArDevice(runtimeArDevice: RuntimeArDevice) {
+        arDevice = ArDevice(runtimeArDevice)
+    }
+
+    internal fun initiateViewCameras(runtimeViewCameras: List<RuntimeViewCamera>) {
+        viewCameras = runtimeViewCameras.map { ViewCamera(it) }
     }
 
     internal fun addUpdatable(updatable: Updatable) {
@@ -54,9 +91,24 @@ internal class XrResourcesManager {
         _updatables.remove(updatable)
     }
 
+    internal fun queueAnchorToDetach(anchor: Anchor) {
+        _anchorsToDetachQueue.add(anchor)
+    }
+
     internal suspend fun update() {
+        while (!_anchorsToDetachQueue.isEmpty()) {
+            _anchorsToDetachQueue.poll()?.runtimeAnchor?.detach()
+        }
+
         for (updatable in updatables) {
             updatable.update()
+        }
+
+        // Earth should always be initialized if a runtime is present. This check should only fail
+        // in
+        // unit tests.
+        if (_earth != null) {
+            earth.update()
         }
     }
 

@@ -16,6 +16,7 @@
 
 package androidx.ink.strokes
 
+import androidx.ink.brush.ExperimentalInkCustomBrushApi
 import androidx.ink.brush.InputToolType
 import com.google.common.truth.Truth.assertThat
 import java.lang.IllegalArgumentException
@@ -434,6 +435,29 @@ internal class StrokeInputBatchTest {
     }
 
     @Test
+    @OptIn(ExperimentalInkCustomBrushApi::class)
+    fun getNoiseSeed_returnsZeroIfUnset() {
+        assertThat(builder.getNoiseSeed()).isEqualTo(0)
+        assertThat(builder.asImmutable().getNoiseSeed()).isEqualTo(0)
+
+        builder.addOrThrow(InputToolType.MOUSE, 1f, 2f, 3L)
+        assertThat(builder.getNoiseSeed()).isEqualTo(0)
+        assertThat(builder.asImmutable().getNoiseSeed()).isEqualTo(0)
+    }
+
+    @Test
+    @OptIn(ExperimentalInkCustomBrushApi::class)
+    fun getNoiseSeed_returnsValueIfSet() {
+        builder.setNoiseSeed(12345)
+        assertThat(builder.getNoiseSeed()).isEqualTo(12345)
+        assertThat(builder.asImmutable().getNoiseSeed()).isEqualTo(12345)
+
+        builder.addOrThrow(InputToolType.MOUSE, 1f, 2f, 3L)
+        assertThat(builder.getNoiseSeed()).isEqualTo(12345)
+        assertThat(builder.asImmutable().getNoiseSeed()).isEqualTo(12345)
+    }
+
+    @Test
     fun clear_removesAllInput() {
         assertThat(
                 builder
@@ -526,7 +550,7 @@ internal class StrokeInputBatchTest {
                 1L,
                 InputToolType.STYLUS,
                 pressure = 0.5f,
-                tiltRadians = 0.5f
+                tiltRadians = 0.5f,
             )
         assertThat(builder.addOrThrow(noOrientationInput)).isEqualTo(builder)
 

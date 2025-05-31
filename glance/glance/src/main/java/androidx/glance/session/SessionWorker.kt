@@ -55,7 +55,7 @@ import kotlinx.coroutines.withContext
  * @property timeSource The time source for measuring progress towards timeouts.
  */
 @RestrictTo(LIBRARY_GROUP)
-data class TimeoutOptions(
+public data class TimeoutOptions(
     val initialTimeout: Duration = 45.seconds,
     val additionalTime: Duration = 5.seconds,
     val idleTimeout: Duration = 5.seconds,
@@ -71,25 +71,21 @@ data class TimeoutOptions(
  * composition, the worker blocks on [Session.receiveEvents] until [Session.close] is called.
  */
 @RestrictTo(LIBRARY_GROUP)
-class SessionWorker(
+public class SessionWorker(
     appContext: Context,
     private val params: WorkerParameters,
     private val sessionManager: SessionManager = GlanceSessionManager,
     private val timeouts: TimeoutOptions = TimeoutOptions(),
     @Deprecated("Deprecated by super class, replacement in progress, see b/245353737")
-    override val coroutineContext: CoroutineDispatcher = Dispatchers.Main
+    override val coroutineContext: CoroutineDispatcher = Dispatchers.Main,
 ) : CoroutineWorker(appContext, params) {
     // This constructor is required by WorkManager's default WorkerFactory.
-    constructor(
+    public constructor(
         appContext: Context,
-        params: WorkerParameters
-    ) : this(
-        appContext,
-        params,
-        GlanceSessionManager,
-    )
+        params: WorkerParameters,
+    ) : this(appContext, params, GlanceSessionManager)
 
-    companion object {
+    public companion object {
         internal const val TAG = "GlanceSessionWorker"
         internal const val DEBUG = false
         internal const val TimeoutExitReason = "TIMEOUT_EXIT_REASON"
@@ -101,14 +97,14 @@ class SessionWorker(
 
     @VisibleForTesting internal var effectJob: Job? = null
 
-    override suspend fun doWork() =
+    override suspend fun doWork(): Result =
         withTimerOrNull(timeouts.timeSource) {
             observeIdleEvents(
                 applicationContext,
                 onIdle = {
                     startTimer(timeouts.idleTimeout)
                     if (DEBUG) Log.d(TAG, "Received idle event, session timeout $timeLeft")
-                }
+                },
             ) {
                 val session =
                     sessionManager.runWithLock { getSession(key) }
@@ -121,7 +117,7 @@ class SessionWorker(
                             // persistable.
                             Log.w(
                                 TAG,
-                                "SessionWorker attempted restart but Session is not available for $key"
+                                "SessionWorker attempted restart but Session is not available for $key",
                             )
                             return@observeIdleEvents Result.success()
                         }
@@ -131,7 +127,7 @@ class SessionWorker(
                         applicationContext,
                         session,
                         timeouts,
-                        effectJobFactory = { Job().also { effectJob = it } }
+                        effectJobFactory = { Job().also { effectJob = it } },
                     )
                 } finally {
                     // Get session manager lock to close session to prevent a race where an observer
@@ -215,7 +211,7 @@ private suspend fun TimerScope.runSession(
                             val processed =
                                 session.processEmittableTree(
                                     context,
-                                    root.copy() as EmittableWithChildren
+                                    root.copy() as EmittableWithChildren,
                                 )
                             // If the UI has been processed for the first time, set uiReady to true
                             // and start the timeout.
@@ -258,6 +254,6 @@ private suspend fun TimerScope.runSession(
  * [GlanceSessionManager], i.e. without starting a worker.
  */
 @RestrictTo(LIBRARY_GROUP)
-suspend fun Session.runSession(context: Context) {
+public suspend fun Session.runSession(context: Context) {
     noopTimer { runSession(context, this@runSession, TimeoutOptions()) }
 }

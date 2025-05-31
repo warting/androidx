@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE") // b/407927787
 
 package androidx.compose.foundation.lazy.list
 
@@ -49,6 +49,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -132,7 +133,7 @@ class LazyListHeadersTest {
         rule.setContentWithTestViewConfiguration {
             LazyColumn(
                 Modifier.height(300.dp).testTag(LazyListTag),
-                rememberLazyListState().also { state = it }
+                rememberLazyListState().also { state = it },
             ) {
                 stickyHeader {
                     Spacer(Modifier.height(101.dp).fillParentMaxWidth().testTag(firstHeaderTag))
@@ -262,7 +263,7 @@ class LazyListHeadersTest {
         rule.setContentWithTestViewConfiguration {
             LazyRow(
                 Modifier.width(300.dp).testTag(LazyListTag),
-                rememberLazyListState().also { state = it }
+                rememberLazyListState().also { state = it },
             ) {
                 stickyHeader {
                     Spacer(Modifier.width(101.dp).fillParentMaxHeight().testTag(firstHeaderTag))
@@ -335,7 +336,7 @@ class LazyListHeadersTest {
             LazyColumn(
                 Modifier.requiredSize(itemIndexDp * 4),
                 state = rememberLazyListState().also { state = it },
-                contentPadding = PaddingValues(top = itemIndexDp * 2)
+                contentPadding = PaddingValues(top = itemIndexDp * 2),
             ) {
                 stickyHeader { Spacer(Modifier.requiredSize(itemIndexDp).testTag(headerTag)) }
 
@@ -351,7 +352,7 @@ class LazyListHeadersTest {
             assertEquals(0, state.layoutInfo.visibleItemsInfo.first().index)
             assertEquals(
                 itemIndexPx / 2 - /* content padding size */ itemIndexPx * 2,
-                state.layoutInfo.visibleItemsInfo.first().offset
+                state.layoutInfo.visibleItemsInfo.first().offset,
             )
         }
 
@@ -392,6 +393,24 @@ class LazyListHeadersTest {
             .assertTopPositionInRootIsEqualTo(itemSizeDp - scrollDistanceDp)
         rule.onNodeWithTag("0").assertTopPositionInRootIsEqualTo(itemSizeDp * 2 - scrollDistanceDp)
     }
+
+    @Test
+    fun lazyColumn_withEmptyHeader_shouldNotCrash() {
+        val items = (1..2).map { it.toString() }
+        val error = runCatching {
+            rule.setContent {
+                LazyColumn(Modifier.height(300.dp)) {
+                    stickyHeader {}
+
+                    items(items) {
+                        Spacer(Modifier.height(101.dp).fillParentMaxWidth().testTag(it))
+                    }
+                }
+            }
+        }
+
+        assertTrue { error.isSuccess }
+    }
 }
 
 @Composable
@@ -406,7 +425,7 @@ private fun LazyColumn(
     flingBehavior: FlingBehavior = ScrollableDefaults.flingBehavior(),
     userScrollEnabled: Boolean = true,
     beyondBoundsItemCount: Int,
-    content: LazyListScope.() -> Unit
+    content: LazyListScope.() -> Unit,
 ) {
     LazyList(
         modifier = modifier,
@@ -420,7 +439,7 @@ private fun LazyColumn(
         userScrollEnabled = userScrollEnabled,
         overscrollEffect = rememberOverscrollEffect(),
         beyondBoundsItemCount = beyondBoundsItemCount,
-        content = content
+        content = content,
     )
 }
 
@@ -436,7 +455,7 @@ private fun LazyRow(
     flingBehavior: FlingBehavior = ScrollableDefaults.flingBehavior(),
     userScrollEnabled: Boolean = true,
     beyondBoundsItemCount: Int,
-    content: LazyListScope.() -> Unit
+    content: LazyListScope.() -> Unit,
 ) {
     LazyList(
         modifier = modifier,
@@ -450,6 +469,6 @@ private fun LazyRow(
         userScrollEnabled = userScrollEnabled,
         overscrollEffect = rememberOverscrollEffect(),
         beyondBoundsItemCount = beyondBoundsItemCount,
-        content = content
+        content = content,
     )
 }

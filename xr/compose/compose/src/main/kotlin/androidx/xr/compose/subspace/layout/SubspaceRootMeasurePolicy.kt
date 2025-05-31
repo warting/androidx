@@ -30,9 +30,9 @@ import androidx.xr.runtime.math.Vector3
  */
 internal class SubspaceRootMeasurePolicy() : MeasurePolicy {
     override fun MeasureScope.measure(
-        measurables: List<Measurable>,
+        measurables: List<SubspaceMeasurable>,
         constraints: VolumeConstraints,
-    ): MeasureResult {
+    ): SubspaceMeasureResult {
         return when {
             measurables.isEmpty() -> {
                 layout(constraints.minWidth, constraints.minHeight, constraints.minDepth) {}

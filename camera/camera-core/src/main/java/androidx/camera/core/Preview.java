@@ -264,6 +264,7 @@ public final class Preview extends UseCase {
         // Send the camera Surface to the camera2.
         SessionConfig.Builder sessionConfigBuilder = SessionConfig.Builder.createFrom(config,
                 streamSpec.getResolution());
+        sessionConfigBuilder.setSessionType(streamSpec.getSessionType());
         // Applies the AE fps range to the session config builder according to the stream spec and
         // quirk values.
         applyExpectedFrameRateRange(sessionConfigBuilder, streamSpec);
@@ -315,6 +316,12 @@ public final class Preview extends UseCase {
         if (cameraEdge != null) {
             cameraEdge.close();
             mCameraEdge = null;
+        }
+        if (mCurrentSurfaceRequest != null) {
+            // clear the transformationInfoListener to avoid memory leak
+            // SurfaceRequest reference might be held in the Camera2 framework on some devices.
+            // Its TransformationInfo listener could hold the context or activity reference forever.
+            mCurrentSurfaceRequest.clearTransformationInfoListener();
         }
         mCurrentSurfaceRequest = null;
     }
@@ -599,6 +606,8 @@ public final class Preview extends UseCase {
     protected @NonNull StreamSpec onSuggestedStreamSpecUpdated(
             @NonNull StreamSpec primaryStreamSpec,
             @Nullable StreamSpec secondaryStreamSpec) {
+        Logger.d(TAG, "onSuggestedStreamSpecUpdated: primaryStreamSpec = " + primaryStreamSpec
+                + ", secondaryStreamSpec " + secondaryStreamSpec);
         updateConfigAndOutput((PreviewConfig) getCurrentConfig(), primaryStreamSpec);
         return primaryStreamSpec;
     }

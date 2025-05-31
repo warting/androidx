@@ -67,7 +67,7 @@ internal abstract class TextFieldKeyEventHandler {
         textFieldState: TransformedTextFieldState,
         textFieldSelectionState: TextFieldSelectionState,
         focusManager: FocusManager,
-        keyboardController: SoftwareKeyboardController
+        keyboardController: SoftwareKeyboardController,
     ): Boolean {
         val selection = textFieldState.visualText.selection
         return if (!selection.collapsed && event.cancelsTextSelection()) {
@@ -86,7 +86,7 @@ internal abstract class TextFieldKeyEventHandler {
         clipboardKeyCommandsHandler: ClipboardKeyCommandsHandler,
         editable: Boolean,
         singleLine: Boolean,
-        onSubmit: () -> Unit,
+        onSubmit: () -> Boolean,
     ): Boolean {
         val keyCode = event.key.keyCode
 
@@ -132,7 +132,7 @@ internal abstract class TextFieldKeyEventHandler {
         clipboardKeyCommandsHandler: ClipboardKeyCommandsHandler,
         editable: Boolean,
         singleLine: Boolean,
-        onSubmit: () -> Unit,
+        onSubmit: () -> Boolean,
     ): Boolean {
         if (event.isTypedEvent) {
             val codePoint = deadKeyCombiner.consume(event)
@@ -142,7 +142,7 @@ internal abstract class TextFieldKeyEventHandler {
                     textFieldState.replaceSelectedText(
                         newText = text,
                         clearComposition = true,
-                        restartImeIfContentChanges = !event.isFromSoftKeyboard
+                        restartImeIfContentChanges = !event.isFromSoftKeyboard,
                     )
                     preparedSelectionState.resetCachedX()
                     true
@@ -178,7 +178,7 @@ internal abstract class TextFieldKeyEventHandler {
                 KeyCommand.LINE_RIGHT -> moveCursorToLineRightSide()
                 KeyCommand.HOME -> moveCursorToHome()
                 KeyCommand.END -> moveCursorToEnd()
-                KeyCommand.DELETE_PREV_CHAR -> moveCursorPrevByChar().deleteMovement()
+                KeyCommand.DELETE_PREV_CHAR -> moveCursorPrevByCodePointOrEmoji().deleteMovement()
                 KeyCommand.DELETE_NEXT_CHAR -> moveCursorNextByChar().deleteMovement()
                 KeyCommand.DELETE_PREV_WORD -> moveCursorPrevByWord().deleteMovement()
                 KeyCommand.DELETE_NEXT_WORD -> moveCursorNextByWord().deleteMovement()
@@ -189,10 +189,10 @@ internal abstract class TextFieldKeyEventHandler {
                         textFieldState.replaceSelectedText(
                             newText = "\n",
                             clearComposition = true,
-                            restartImeIfContentChanges = !event.isFromSoftKeyboard
+                            restartImeIfContentChanges = !event.isFromSoftKeyboard,
                         )
                     } else {
-                        onSubmit()
+                        consumed = onSubmit()
                     }
                 }
                 KeyCommand.TAB -> {
@@ -200,7 +200,7 @@ internal abstract class TextFieldKeyEventHandler {
                         textFieldState.replaceSelectedText(
                             newText = "\t",
                             clearComposition = true,
-                            restartImeIfContentChanges = !event.isFromSoftKeyboard
+                            restartImeIfContentChanges = !event.isFromSoftKeyboard,
                         )
                     } else {
                         consumed = false // let propagate to focus system
@@ -242,7 +242,7 @@ internal abstract class TextFieldKeyEventHandler {
         state: TransformedTextFieldState,
         textLayoutState: TextLayoutState,
         isFromSoftKeyboard: Boolean,
-        block: TextFieldPreparedSelection.() -> Unit
+        block: TextFieldPreparedSelection.() -> Unit,
     ) {
         val layoutResult = textLayoutState.layoutResult
         val visibleTextLayoutHeight = textLayoutState.getVisibleTextLayoutHeight()
@@ -252,7 +252,7 @@ internal abstract class TextFieldKeyEventHandler {
                 textLayoutResult = layoutResult,
                 isFromSoftKeyboard = isFromSoftKeyboard,
                 visibleTextLayoutHeight = visibleTextLayoutHeight,
-                textPreparedSelectionState = preparedSelectionState
+                textPreparedSelectionState = preparedSelectionState,
             )
         preparedSelection.block()
         if (preparedSelection.selection != preparedSelection.initialValue.selection) {

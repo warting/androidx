@@ -49,7 +49,7 @@ import androidx.compose.ui.util.trace
 internal class FocusTargetNode(
     focusability: Focusability = Focusability.Always,
     private val onFocusChange: ((previous: FocusState, current: FocusState) -> Unit)? = null,
-    private val onDispatchEventsCompleted: ((FocusTargetNode) -> Unit)? = null
+    private val onDispatchEventsCompleted: ((FocusTargetNode) -> Unit)? = null,
 ) :
     CompositionLocalConsumerModifierNode,
     FocusTargetModifierNode,
@@ -97,7 +97,7 @@ internal class FocusTargetNode(
     @Deprecated(
         message = "Use the version accepting FocusDirection",
         replaceWith = ReplaceWith("this.requestFocus()"),
-        level = DeprecationLevel.HIDDEN
+        level = DeprecationLevel.HIDDEN,
     )
     override fun requestFocus(): Boolean {
         return requestFocus(FocusDirection.Enter)
@@ -171,10 +171,25 @@ internal class FocusTargetNode(
         invalidateFocusTarget()
     }
 
+    override fun onReset() {
+        // The focused item is being removed from a lazy list, so we need to clear focus.
+        // This is called after onEndApplyChanges, so we can safely clear focus from the owner,
+        // which could trigger an initial focus scenario.
+        @OptIn(ExperimentalComposeUiApi::class)
+        if (ComposeUiFlags.isClearFocusOnResetEnabled && focusState.isFocused) {
+            requireOwner()
+                .focusOwner
+                .clearFocus(
+                    force = true,
+                    refreshFocusEvents = true,
+                    clearOwnerFocus = true,
+                    focusDirection = Exit,
+                )
+        }
+    }
+
     /** Clears focus if this focus target has it. */
     override fun onDetach() {
-        //  Note: this is called after onEndApplyChanges, so we can't schedule any nodes for
-        //  invalidation here. If we do, they will be run on the next onEndApplyChanges.
         when (focusState) {
             // Clear focus from the current FocusTarget.
             // This currently clears focus from the entire hierarchy, but we can change the
@@ -186,7 +201,7 @@ internal class FocusTargetNode(
                     force = true,
                     refreshFocusEvents = true,
                     clearOwnerFocus = false,
-                    focusDirection = Exit
+                    focusDirection = Exit,
                 )
                 // We don't clear the owner's focus yet, because this could trigger an initial
                 // focus scenario after the focus is cleared. Instead, we schedule invalidation
@@ -227,7 +242,7 @@ internal class FocusTargetNode(
     private inline fun fetchCustomEnterOrExit(
         focusDirection: FocusDirection,
         block: (FocusRequester) -> Unit,
-        enterOrExit: FocusProperties.(FocusEnterExitScope) -> Unit
+        enterOrExit: FocusProperties.(FocusEnterExitScope) -> Unit,
     ) {
         val focusProperties = fetchFocusProperties()
         val scope = CancelIndicatingFocusBoundaryScope(focusDirection)
@@ -261,7 +276,7 @@ internal class FocusTargetNode(
      */
     internal inline fun fetchCustomEnter(
         focusDirection: FocusDirection,
-        block: (FocusRequester) -> Unit
+        block: (FocusRequester) -> Unit,
     ) {
         if (!isProcessingCustomEnter) {
             isProcessingCustomEnter = true
@@ -285,7 +300,7 @@ internal class FocusTargetNode(
      */
     internal inline fun fetchCustomExit(
         focusDirection: FocusDirection,
-        block: (FocusRequester) -> Unit
+        block: (FocusRequester) -> Unit,
     ) {
         if (!isProcessingCustomExit) {
             isProcessingCustomExit = true

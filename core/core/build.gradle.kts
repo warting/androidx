@@ -11,12 +11,11 @@ import androidx.stableaidl.StableAidlBuildTypeDslExtension
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
     id("androidx.stableaidl")
 }
 
 dependencies {
-    api(libs.jspecify)
     // Atomically versioned.
     constraints {
         implementation(project(":core:core-ktx"))
@@ -27,17 +26,32 @@ dependencies {
     api("androidx.annotation:annotation-experimental:1.4.1")
     api("androidx.lifecycle:lifecycle-runtime:2.6.2")
     api("androidx.versionedparcelable:versionedparcelable:1.1.1")
-    api("androidx.core:core-viewtree:1.0.0-alpha01")
+    api("androidx.core:core-viewtree:1.0.0")
+    api("androidx.lifecycle:lifecycle-common:2.6.2")
+
+    api(libs.guavaListenableFuture)
+    api(libs.jspecify)
+    api(libs.kotlinCoroutinesCore)
+    api(libs.kotlinStdlib)
+
     implementation("androidx.collection:collection:1.4.2")
     implementation("androidx.concurrent:concurrent-futures:1.0.0")
     implementation("androidx.interpolator:interpolator:1.0.0")
     implementation("androidx.tracing:tracing:1.2.0")
 
-    api(libs.kotlinStdlib)
-
     // We don't ship this as a public artifact, so it must remain a project-type dependency.
     annotationProcessor(project(":versionedparcelable:versionedparcelable-compiler"))
 
+    androidTestImplementation("androidx.activity:activity:1.0.0")
+    androidTestImplementation("androidx.appcompat:appcompat:1.1.0")
+    androidTestImplementation("androidx.lifecycle:lifecycle-common:2.9.0")
+    androidTestImplementation("androidx.lifecycle:lifecycle-runtime-testing:2.6.2")
+    androidTestImplementation(project(":internal-testutils-runtime"))
+    androidTestImplementation(project(":internal-testutils-lifecycle"))
+    androidTestImplementation(project(":internal-testutils-fonts"))
+    androidTestImplementation(project(":internal-testutils-mockito"))
+
+    androidTestImplementation("org.hamcrest:hamcrest-library:1.3")
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.kotlinStdlib)
     androidTestImplementation(libs.testExtJunit)
@@ -48,30 +62,31 @@ dependencies {
     androidTestImplementation(libs.espressoCore)
     androidTestImplementation(libs.mockitoCore)
     androidTestImplementation(libs.testUiautomator)
+    androidTestImplementation(libs.findbugs)
+    androidTestImplementation(libs.guavaAndroid)
+    androidTestImplementation(libs.hamcrestCore)
+    androidTestImplementation(libs.kotlinCoroutinesCore)
+    androidTestImplementation(libs.testMonitor)
 
-    androidTestImplementation("androidx.lifecycle:lifecycle-runtime-testing:2.6.2")
+    // DO NOT REMOVE. This is a required run time dependency for Mockito, but is not explicitly
+    // specified as a dependency by the Mockito artifact.
+    androidTestImplementation(libs.opentest4j)
 
     // Including both dexmakers allows support for all API levels plus final mocking support on
     // API 28+. The implementation is swapped based on the finality of the mock type. This
     // delegation is handled manually inside androidx.core.util.mockito.CustomMockMaker.
     androidTestImplementation(libs.dexmakerMockito)
     androidTestImplementation(libs.dexmakerMockitoInline)
-    androidTestImplementation("androidx.appcompat:appcompat:1.1.0")
-    androidTestImplementation(project(":internal-testutils-runtime"))
-    androidTestImplementation(project(":internal-testutils-lifecycle"))
-    androidTestImplementation(project(":internal-testutils-fonts"))
-    androidTestImplementation(project(":internal-testutils-mockito"))
 
     testImplementation(libs.junit)
     testImplementation(libs.testExtJunit)
     testImplementation(libs.testCore)
     testImplementation(libs.testRunner)
     testImplementation(libs.truth)
-    testImplementation(libs.robolectric)
 }
 
 android {
-    compileSdk = 35
+    compileSdk = 36
     buildFeatures {
         aidl = true
     }
@@ -103,5 +118,6 @@ androidx {
     description = "Provides backward-compatible implementations of Android platform APIs and " +
             "features."
     failOnDeprecationWarnings = false
+    enableRobolectric()
     samples(project(":core:core:core-samples"))
 }
