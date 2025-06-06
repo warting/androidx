@@ -404,6 +404,16 @@ internal abstract class NodeCoordinator(override val layoutNode: LayoutNode) :
         if (!isPlacingForAlignment) {
             captureRulersIfNeeded(measureResult)
         }
+        if (this === layoutNode.outerCoordinator) {
+            layoutNode
+                .requireOwner()
+                .rectManager
+                .onLayoutPositionChanged(
+                    layoutNode,
+                    position,
+                    !layoutNode.measurePassDelegate.placedOnce,
+                )
+        }
     }
 
     fun releaseLayer() {
@@ -1444,7 +1454,9 @@ internal abstract class NodeCoordinator(override val layoutNode: LayoutNode) :
                     }
                     val owner = layoutNode.requireOwner()
                     owner.rectManager.onLayoutLayerPositionalPropertiesChanged(layoutNode)
-                    owner.requestOnPositionedCallback(layoutNode)
+                    if (layoutNode.globallyPositionedObservers > 0) {
+                        owner.requestOnPositionedCallback(layoutNode)
+                    }
                 }
             }
         }
