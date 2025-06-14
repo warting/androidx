@@ -2649,9 +2649,10 @@ public final class AppSearchImpl implements Closeable {
         // Rewrite the given SearchSpec into SearchSpecProto, ResultSpecProto and ScoringSpecProto.
         // All processes are counted in rewriteSearchSpecLatencyMillis
         long rewriteSearchSpecLatencyStartMillis = SystemClock.elapsedRealtime();
-        SearchSpecProto finalSearchSpec = searchSpecToProtoConverter.toSearchSpecProto();
+        SearchSpecProto finalSearchSpec = searchSpecToProtoConverter.toSearchSpecProto(
+                mIsVMEnabled);
         ResultSpecProto finalResultSpec = searchSpecToProtoConverter.toResultSpecProto(
-                mNamespaceCacheLocked, mSchemaCacheLocked);
+                mNamespaceCacheLocked, mSchemaCacheLocked, mIsVMEnabled);
         ScoringSpecProto scoringSpec = searchSpecToProtoConverter.toScoringSpecProto();
         if (sStatsBuilder != null) {
             sStatsBuilder.setRewriteSearchSpecLatencyMillis((int)
@@ -3231,7 +3232,8 @@ public final class AppSearchImpl implements Closeable {
                 return;
             }
 
-            SearchSpecProto finalSearchSpec = searchSpecToProtoConverter.toSearchSpecProto();
+            SearchSpecProto finalSearchSpec = searchSpecToProtoConverter.toSearchSpecProto(
+                    mIsVMEnabled);
 
             Set<String> prefixedObservedSchemas = null;
             if (mObserverManager.isPackageObserved(packageName)) {
@@ -3831,6 +3833,37 @@ public final class AppSearchImpl implements Closeable {
     }
 
     /**
+     * Deletes all blob files managed by AppSearch.
+     *
+     * @throws AppSearchException if an I/O error occurs.
+     */
+    @GuardedBy("mReadWriteLock")
+    private void deleteBlobFilesLocked() throws AppSearchException {
+        if (!Flags.enableAppSearchManageBlobFiles()) {
+            return;
+        }
+        if (mBlobFilesDir.isFile() && !mBlobFilesDir.delete()) {
+            throw new AppSearchException(AppSearchResult.RESULT_IO_ERROR,
+                    "The blob file directory is a file and cannot delete it.");
+        }
+        if (!mBlobFilesDir.exists() && !mBlobFilesDir.mkdirs()) {
+            throw new AppSearchException(AppSearchResult.RESULT_IO_ERROR,
+                    "The blob file directory does not exist and cannot create a new one.");
+        }
+        File[] blobFiles = mBlobFilesDir.listFiles();
+        if (blobFiles == null) {
+            throw new AppSearchException(AppSearchResult.RESULT_IO_ERROR,
+                    "Cannot list the blob files.");
+        }
+        for (int i = 0; i < blobFiles.length; i++) {
+            File blobFile = blobFiles[i];
+            if (!blobFile.delete()) {
+                Log.e(TAG, "Cannot delete the blob file: " + blobFile.getName());
+            }
+        }
+    }
+
+    /**
      * Clears documents and schema across all packages and databaseNames.
      *
      * <p>This method belongs to mutate group.
@@ -3870,6 +3903,9 @@ public final class AppSearchImpl implements Closeable {
         }
 
         checkSuccess(resetResultProto.getStatus());
+
+        // Delete all blob files if AppSearch manages them.
+        deleteBlobFilesLocked();
     }
 
     /** Wrapper around schema changes */
@@ -4401,6 +4437,38 @@ public final class AppSearchImpl implements Closeable {
                     "Blob database doesn't match calling database, calling database: "
                             + callingDatabaseName + ", blob database: "
                             + blobHandle.getDatabaseName());
+        }
+    }
+
+    /** Calls getSchema in a thread safe manner. */
+    public @NonNull SchemaProto rawGetSchema() {
+        mReadWriteLock.readLock().lock();
+        try {
+            return mIcingSearchEngineLocked.getSchema().getSchema();
+        } finally {
+            mReadWriteLock.readLock().unlock();
+        }
+    }
+
+    /** Calls search in a thread safe manner. */
+    public @NonNull SearchResultProto rawSearch(
+            @NonNull SearchSpecProto spec, @NonNull ScoringSpecProto scoringSpec,
+            @NonNull ResultSpecProto resultSpec) {
+        mReadWriteLock.readLock().lock();
+        try {
+            return mIcingSearchEngineLocked.search(spec, scoringSpec, resultSpec);
+        } finally {
+            mReadWriteLock.readLock().unlock();
+        }
+    }
+
+    /** Calls getSchema in a thread safe manner. */
+    public @NonNull SearchResultProto rawGetNextPage(long nextPageToken) {
+        mReadWriteLock.readLock().lock();
+        try {
+            return mIcingSearchEngineLocked.getNextPage(nextPageToken);
+        } finally {
+            mReadWriteLock.readLock().unlock();
         }
     }
 }
