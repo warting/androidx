@@ -29,6 +29,7 @@ import androidx.xr.runtime.testing.FakeRuntimeArDevice
 import androidx.xr.runtime.testing.FakeRuntimeEarth
 import androidx.xr.runtime.testing.FakeRuntimeHand
 import androidx.xr.runtime.testing.FakeRuntimePlane
+import androidx.xr.runtime.testing.FakeRuntimeViewCamera
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
@@ -51,7 +52,7 @@ class XrResourcesManagerTest {
     @Before
     fun setUp() {
         underTest = XrResourcesManager()
-        FakeRuntimeAnchor.anchorsCreated = 0
+        FakeRuntimeAnchor.anchorsCreatedCount = 0
     }
 
     @After
@@ -79,12 +80,15 @@ class XrResourcesManagerTest {
     }
 
     @Test
-    fun initiateArDevice_setsArDevice() {
+    fun initiateArDevice_setsArDeviceAndViewCameras() {
         val runtimeArDevice = FakeRuntimeArDevice()
-
-        underTest.initiateArDevice(runtimeArDevice)
+        val runtimeViewCameras = listOf(FakeRuntimeViewCamera(), FakeRuntimeViewCamera())
+        underTest.initiateArDeviceAndViewCameras(runtimeArDevice, runtimeViewCameras)
 
         assertThat(underTest.arDevice.runtimeArDevice).isEqualTo(runtimeArDevice)
+        assertThat(underTest.viewCameras.size).isEqualTo(2)
+        assertThat(underTest.viewCameras[0].state.value.pose).isEqualTo(runtimeViewCameras[0].pose)
+        assertThat(underTest.viewCameras[1].state.value.pose).isEqualTo(runtimeViewCameras[1].pose)
     }
 
     @Test

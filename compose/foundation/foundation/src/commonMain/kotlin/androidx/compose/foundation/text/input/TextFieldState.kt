@@ -213,6 +213,17 @@ internal constructor(
     internal fun commitEdit(newValue: TextFieldBuffer) {
         val textChanged = newValue.changes.changeCount > 0
         val selectionChanged = newValue.selection != mainBuffer.selection
+
+        // TODO(135556699): Remove this when [TextFieldBuffer.addStyle] is supported by all
+        //  TextFieldBuffer instances when multi styled editing is implemented.
+        // Context; b/424167352
+        if (!textChanged && !selectionChanged) {
+            // Probably the Material layer created a TextFieldBuffer specifically to run
+            // OutputTransformation on. We should leave this TextFieldBuffer in a way that
+            // OutputTransformation can call `addStyle` on it.
+            newValue.canCallAddStyle = true
+        }
+
         if (textChanged) {
             // clear the undo history after a programmatic edit if the text content has changed
             textUndoManager.clearHistory()
@@ -753,11 +764,11 @@ private fun finalizeComposingAnnotations(
  * This is similar to calling [TextFieldState.edit], but without committing the changes back to the
  * [TextFieldState].
  *
- * **Important:** A [TextFieldBuffer] is intended for short-term use. Let the garbage collecter
+ * **Important:** A [TextFieldBuffer] is intended for short-term use. Let the garbage collector
  * dispose of it when you're finished to avoid unnecessary memory usage.
  *
  * @sample androidx.compose.foundation.samples.TextFieldStateApplyOutputTransformation
  */
 fun TextFieldState.toTextFieldBuffer(): TextFieldBuffer {
-    return TextFieldBuffer(value)
+    return TextFieldBuffer(value).apply { canCallAddStyle = true }
 }

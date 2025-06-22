@@ -127,7 +127,7 @@ private class ScrollPdfViewToPage : ViewAction {
 
     constructor(point: PdfPoint) {
         pageNum = point.pageNum
-        pointOnPage = point.pagePoint
+        pointOnPage = PointF(point.x, point.y)
     }
 
     override fun getConstraints(): Matcher<View> =
@@ -172,8 +172,8 @@ internal fun performSingleTapOnCoords(x: Float, y: Float): ViewAction {
             val screenPos = IntArray(2)
             view.getLocationOnScreen(screenPos)
 
-            val screenX = (screenPos[0] + x).toFloat()
-            val screenY = (screenPos[1] + y).toFloat()
+            val screenX = (screenPos[0] + x)
+            val screenY = (screenPos[1] + y)
 
             floatArrayOf(screenX, screenY)
         },

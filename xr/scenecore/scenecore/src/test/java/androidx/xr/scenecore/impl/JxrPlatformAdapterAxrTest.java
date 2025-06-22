@@ -20,6 +20,9 @@ import static androidx.xr.runtime.testing.math.MathAssertions.assertPose;
 import static androidx.xr.runtime.testing.math.MathAssertions.assertRotation;
 import static androidx.xr.runtime.testing.math.MathAssertions.assertVector3;
 
+import static com.android.extensions.xr.node.ReformOptions.ALLOW_MOVE;
+import static com.android.extensions.xr.node.ReformOptions.ALLOW_RESIZE;
+
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -145,10 +148,6 @@ import java.util.function.Consumer;
 @RunWith(RobolectricTestRunner.class)
 @SuppressLint("NewApi") // TODO: b/413661481 - Remove this suppression prior to JXR stable release.
 public final class JxrPlatformAdapterAxrTest {
-    // TODO(b/402408284): Remove once the constants are available in the host version of
-    // ReformOptions
-    public static final int ALLOW_MOVE = 1;
-    public static final int ALLOW_RESIZE = 2;
 
     private static final int OPEN_XR_REFERENCE_SPACE_TYPE = 1;
 
@@ -446,7 +445,7 @@ public final class JxrPlatformAdapterAxrTest {
     @Test
     public void onSpatialStateChanged_setsEnvironmentVisibility() {
         SpatialEnvironment environment = mRuntime.getSpatialEnvironment();
-        assertThat(environment.isSpatialEnvironmentPreferenceActive()).isFalse();
+        assertThat(environment.isPreferredSpatialEnvironmentActive()).isFalse();
 
         SpatialState state = ShadowSpatialState.create();
         ShadowSpatialState.extract(state)
@@ -454,7 +453,7 @@ public final class JxrPlatformAdapterAxrTest {
                         ShadowEnvironmentVisibilityState.create(
                                 EnvironmentVisibilityState.APP_VISIBLE));
         ShadowXrExtensions.extract(mXrExtensions).sendSpatialState(mActivity, state);
-        assertThat(environment.isSpatialEnvironmentPreferenceActive()).isTrue();
+        assertThat(environment.isPreferredSpatialEnvironmentActive()).isTrue();
 
         state = ShadowSpatialState.create();
         ShadowSpatialState.extract(state)
@@ -462,7 +461,7 @@ public final class JxrPlatformAdapterAxrTest {
                         ShadowEnvironmentVisibilityState.create(
                                 EnvironmentVisibilityState.INVISIBLE));
         ShadowXrExtensions.extract(mXrExtensions).sendSpatialState(mActivity, state);
-        assertThat(environment.isSpatialEnvironmentPreferenceActive()).isFalse();
+        assertThat(environment.isPreferredSpatialEnvironmentActive()).isFalse();
 
         state = ShadowSpatialState.create();
         ShadowSpatialState.extract(state)
@@ -470,7 +469,7 @@ public final class JxrPlatformAdapterAxrTest {
                         ShadowEnvironmentVisibilityState.create(
                                 EnvironmentVisibilityState.HOME_VISIBLE));
         ShadowXrExtensions.extract(mXrExtensions).sendSpatialState(mActivity, state);
-        assertThat(environment.isSpatialEnvironmentPreferenceActive()).isFalse();
+        assertThat(environment.isPreferredSpatialEnvironmentActive()).isFalse();
     }
 
     @Test
@@ -479,9 +478,9 @@ public final class JxrPlatformAdapterAxrTest {
         @SuppressWarnings(value = "unchecked")
         Consumer<Boolean> listener = (Consumer<Boolean>) mock(Consumer.class);
 
-        environment.addOnSpatialEnvironmentChangedListener(listener);
+        environment.addOnSpatialEnvironmentChangedListener(directExecutor(), listener);
 
-        assertThat(environment.isSpatialEnvironmentPreferenceActive()).isFalse();
+        assertThat(environment.isPreferredSpatialEnvironmentActive()).isFalse();
 
         // The first spatial state should always fire the listener
         SpatialState state = ShadowSpatialState.create();
@@ -499,7 +498,7 @@ public final class JxrPlatformAdapterAxrTest {
                         ShadowEnvironmentVisibilityState.create(
                                 EnvironmentVisibilityState.INVISIBLE));
         ShadowXrExtensions.extract(mXrExtensions).sendSpatialState(mActivity, state);
-        assertThat(environment.isSpatialEnvironmentPreferenceActive()).isFalse();
+        assertThat(environment.isPreferredSpatialEnvironmentActive()).isFalse();
         verify(listener).accept(false);
 
         // The third spatial state should not fire the listener since it is the same as the last
@@ -510,7 +509,7 @@ public final class JxrPlatformAdapterAxrTest {
                         ShadowEnvironmentVisibilityState.create(
                                 EnvironmentVisibilityState.INVISIBLE));
         ShadowXrExtensions.extract(mXrExtensions).sendSpatialState(mActivity, state);
-        assertThat(environment.isSpatialEnvironmentPreferenceActive()).isFalse();
+        assertThat(environment.isPreferredSpatialEnvironmentActive()).isFalse();
         verify(listener, times(2))
                 .accept(any()); // Verify the listener was not called a third time.
     }
@@ -559,7 +558,7 @@ public final class JxrPlatformAdapterAxrTest {
         @SuppressWarnings(value = "unchecked")
         Consumer<Float> listener = (Consumer<Float>) mock(Consumer.class);
 
-        environment.addOnPassthroughOpacityChangedListener(listener);
+        environment.addOnPassthroughOpacityChangedListener(directExecutor(), listener);
 
         assertThat(environment.getCurrentPassthroughOpacity()).isZero();
 
