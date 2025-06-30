@@ -49,7 +49,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.nio.file.Paths
 import java.util.concurrent.Executors
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
 @SuppressLint("SetTextI18n", "RestrictedApi")
@@ -81,9 +80,9 @@ class FsmHsmTransitionActivity : AppCompatActivity() {
         componentVisibility()
 
         // Set and get initial spatial environment preference
-        session!!.scene.spatialEnvironment.setSpatialEnvironmentPreference(null)
+        session!!.scene.spatialEnvironment.preferredSpatialEnvironment = null
         spatialEnvironmentPreference =
-            session!!.scene.spatialEnvironment.getSpatialEnvironmentPreference()
+            session!!.scene.spatialEnvironment.preferredSpatialEnvironment
 
         // Set initial main panel dimensions in the text view
         findViewById<TextView>(R.id.text_main_panel_dimensions_value).text =
@@ -183,16 +182,12 @@ class FsmHsmTransitionActivity : AppCompatActivity() {
         // Load skybox
         findViewById<Button>(R.id.button_load_skybox).also {
             it.setOnClickListener {
-                session!!
-                    .scene
-                    .spatialEnvironment
-                    .setSpatialEnvironmentPreference(
-                        environmentPreference =
-                            SpatialEnvironment.SpatialEnvironmentPreference(
-                                skybox,
-                                spatialEnvironmentPreference?.geometry,
-                            )
+                session!!.scene.spatialEnvironment.preferredSpatialEnvironment =
+                    SpatialEnvironment.SpatialEnvironmentPreference(
+                        skybox,
+                        spatialEnvironmentPreference?.geometry,
                     )
+
                 skyboxActive = true
             }
         }
@@ -200,7 +195,7 @@ class FsmHsmTransitionActivity : AppCompatActivity() {
         // Remove skybox
         findViewById<Button>(R.id.button_remove_skybox).also {
             it.setOnClickListener {
-                session!!.scene.spatialEnvironment.setSpatialEnvironmentPreference(null)
+                session!!.scene.spatialEnvironment.preferredSpatialEnvironment = null
                 skyboxActive = false
             }
         }
@@ -234,7 +229,7 @@ class FsmHsmTransitionActivity : AppCompatActivity() {
         }
 
         // Add bounds check listener for activity space bounds
-        session!!.scene.activitySpace.addBoundsChangedListener { dimensions ->
+        session!!.scene.activitySpace.addOnBoundsChangedListener { dimensions ->
             val dimsString =
                 "{w:${dimensions.width}, h:${dimensions.height}, d:${dimensions.depth}}"
             // Set activity space dimensions
@@ -251,9 +246,7 @@ class FsmHsmTransitionActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            skybox =
-                ExrImage.createFromZipAsync(session!!, Paths.get("skyboxes", "BlueSkybox.zip"))
-                    .await()
+            skybox = ExrImage.createFromZip(session!!, Paths.get("skyboxes", "BlueSkybox.zip"))
         }
     }
 

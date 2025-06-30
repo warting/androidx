@@ -51,6 +51,7 @@ import com.google.common.truth.Truth;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -97,6 +98,8 @@ public final class SurfaceEntityImplTest {
         when(splitEngineSubspaceManager.createSubspace(anyString(), anyInt()))
                 .thenReturn(expectedSubspaceNode);
 
+        // TODO: Update this test to handle Entity.dispose() for Exceptions when FakeImpress is
+        //       updated.
         FakeImpressApiImpl impressApi = new FakeImpressApiImpl();
         int subspaceImpressNode = impressApi.createImpressNode();
         String subspaceName = "stereo_surface_panel_entity_subspace_" + subspaceImpressNode;
@@ -123,6 +126,7 @@ public final class SurfaceEntityImplTest {
 
         mSurfaceEntity =
                 new SurfaceEntityImpl(
+                        mActivity,
                         parentEntity,
                         impressApi,
                         splitEngineSubspaceManager,
@@ -156,6 +160,7 @@ public final class SurfaceEntityImplTest {
         return cameraView;
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void setCanvasShape_setsCanvasShape() {
         SurfaceEntity.CanvasShape expectedCanvasShape =
@@ -181,6 +186,7 @@ public final class SurfaceEntityImplTest {
         assertThat(canvasShape.getDimensions()).isEqualTo(expectedCanvasShape.getDimensions());
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void setStereoMode_setsStereoMode() {
         int expectedStereoMode = SurfaceEntity.StereoMode.MONO;
@@ -196,6 +202,7 @@ public final class SurfaceEntityImplTest {
         assertThat(stereoMode).isEqualTo(expectedStereoMode);
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void setFeatherRadiusX_setsFeatherRadiusX() {
         float expectedFeatherRadiusX = 1;
@@ -211,6 +218,7 @@ public final class SurfaceEntityImplTest {
         assertThat(featherRadiusX).isEqualTo(expectedFeatherRadiusX);
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void setFeatherRadiusY_setsFeatherRadiusY() {
         float expectedFeatherRadiusY = 1;
@@ -226,6 +234,7 @@ public final class SurfaceEntityImplTest {
         assertThat(featherRadiusY).isEqualTo(expectedFeatherRadiusY);
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void getPerceivedResolution_noCameraView_returnsInvalidCameraView() {
         mEntityManager.clear(); // Ensure no camera views
@@ -233,6 +242,7 @@ public final class SurfaceEntityImplTest {
         assertThat(result).isInstanceOf(PerceivedResolutionResult.InvalidCameraView.class);
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void getPerceivedResolution_quadInFront_returnsSuccess() {
         CanvasShape.Quad quadShape = new CanvasShape.Quad(2.0f, 1.0f); // 2m wide, 1m high
@@ -252,6 +262,7 @@ public final class SurfaceEntityImplTest {
         Truth.assertThat(successResult.getPerceivedResolution().height).isEqualTo(250);
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void getPerceivedResolution_sphereInFront_returnsSuccess() {
         CanvasShape.Vr360Sphere sphereShape = new CanvasShape.Vr360Sphere(1.0f); // radius 1m
@@ -271,6 +282,7 @@ public final class SurfaceEntityImplTest {
         Truth.assertThat(successResult.getPerceivedResolution().height).isEqualTo(500);
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void getPerceivedResolution_quadTooClose_returnsEntityTooClose() {
         CanvasShape.Quad quadShape = new CanvasShape.Quad(2.0f, 1.0f);
@@ -286,6 +298,7 @@ public final class SurfaceEntityImplTest {
         assertThat(result).isInstanceOf(PerceivedResolutionResult.EntityTooClose.class);
     }
 
+    @Ignore // b/428211243 this test currently leaks android.view.Surface
     @Test
     public void getPerceivedResolution_quadWithScale_calculatesCorrectly() {
         CanvasShape.Quad quadShape = new CanvasShape.Quad(1.0f, 1.0f); // 1m x 1m local

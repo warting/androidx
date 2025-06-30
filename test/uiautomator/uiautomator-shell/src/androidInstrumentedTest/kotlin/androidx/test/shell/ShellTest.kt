@@ -22,7 +22,6 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.filters.SmallTest
 import androidx.test.shell.internal.instrumentationPackageMediaDir
 import java.io.File
-import org.junit.Before
 import org.junit.Test
 
 @SdkSuppress(minSdkVersion = 23)
@@ -31,11 +30,6 @@ class ShellTest {
 
     companion object {
         private const val PKG_SETTINGS: String = "com.android.settings"
-    }
-
-    @Before
-    fun setup() {
-        Shell.setShellProcessFactory { ShellProcess.create(nativeLogs = true) }
     }
 
     @Test
@@ -72,16 +66,17 @@ class ShellTest {
         with(Shell.process()) {
             val pid =
                 with(Shell.command("echo pid:$$ ; exec sleep 10")) {
-                    stdOutStream {
-                        bufferedReader()
-                            .lineSequence()
-                            .first { it.startsWith("pid:") }
-                            .split("pid:")[1]
-                            .toInt()
-                    }
+                    stdOutStream
+                        .bufferedReader()
+                        .lineSequence()
+                        .first { it.startsWith("pid:") }
+                        .split("pid:")[1]
+                        .toInt()
                 }
-            killPid(pid)
-            assertThat(getPid("sleep")).isEqualTo(-1)
+
+            assertThat(isProcessAlive(pid)).isTrue()
+            killPid(pid = pid, signal = "SIGKILL")
+            assertThat(isProcessAlive(pid)).isFalse()
         }
 
     @SuppressLint("BanThreadSleep")
@@ -89,8 +84,40 @@ class ShellTest {
     fun recording(): Unit =
         with(Shell.recorder()) {
             val file = File(instrumentationPackageMediaDir, "recording.mp4")
-            val recording = start(outputFile = file, timeLimitSeconds = 5, bitRateMb = 4)
+            val recording = start(outputFile = file, timeLimitSeconds = 3, bitRateMb = 4)
             recording.await()
             assertThat(file.length()).isGreaterThan(0L)
         }
+
+    @Test
+    fun longOutputCommand() {
+        val min = 100000
+        val max = 999999
+        val commandOutput =
+            Shell.command(
+                command = "i=$min; while [ ${"$"}i -le $max ]; do echo ${"$"}i; i=$((i+1)); done"
+            )
+
+        var i = min
+        commandOutput.stdOutStream.bufferedReader().use {
+            while (true) {
+                val line = it.readLine()
+                if (line == null) break
+                assertThat(line.trim().toInt()).isEqualTo(i)
+                i++
+            }
+        }
+    }
+
+    @Test
+    fun shortOutputCommand() {
+        val out = Shell.command("echo abc").stdOut.trim()
+        assertThat(out).isEqualTo("abc")
+    }
+
+    @Test
+    fun shortOutputCommandOnError() {
+        val out = Shell.command("echo abc >&2").stdErr.trim()
+        assertThat(out).isEqualTo("abc")
+    }
 }

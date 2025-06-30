@@ -336,16 +336,18 @@ internal fun RtHitTestResult.toHitTestResult(): HitTestResult {
 @RtSpatialPointerIconType
 internal fun SpatialPointerIcon.toRtSpatialPointerIcon(): Int {
     return when (this) {
-        SpatialPointerIconNone -> RtSpatialPointerIcon.TYPE_NONE
-        SpatialPointerIconCircle -> RtSpatialPointerIcon.TYPE_CIRCLE
+        SpatialPointerIcon.NONE -> RtSpatialPointerIcon.TYPE_NONE
+        SpatialPointerIcon.CIRCLE -> RtSpatialPointerIcon.TYPE_CIRCLE
+        SpatialPointerIcon.DEFAULT -> RtSpatialPointerIcon.TYPE_DEFAULT
+        else -> error("Unknown spatial pointer icon type: $this")
     }
 }
 
-internal fun Int.toSpatialPointerIcon(): SpatialPointerIcon? {
+internal fun Int.toSpatialPointerIcon(): SpatialPointerIcon {
     return when (this) {
-        RtSpatialPointerIcon.TYPE_NONE -> SpatialPointerIconNone
-        RtSpatialPointerIcon.TYPE_CIRCLE -> SpatialPointerIconCircle
-        RtSpatialPointerIcon.TYPE_DEFAULT -> null
+        RtSpatialPointerIcon.TYPE_NONE -> SpatialPointerIcon.NONE
+        RtSpatialPointerIcon.TYPE_CIRCLE -> SpatialPointerIcon.CIRCLE
+        RtSpatialPointerIcon.TYPE_DEFAULT -> SpatialPointerIcon.DEFAULT
         else -> error("Unknown spatial pointer icon type: $this")
     }
 }
@@ -387,7 +389,7 @@ internal suspend fun <T> ListenableFuture<T>.awaitSuspending(): T {
     return deferred.await()
 }
 
-private object DirectExecutor : Executor {
+internal object DirectExecutor : Executor {
     override fun execute(command: Runnable) {
         command.run()
     }

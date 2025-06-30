@@ -26,6 +26,7 @@ import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
@@ -96,6 +97,9 @@ open class AnnotatedAppFunctionSerializable(
             )
         }
     }
+
+    /** A description of the AppFunctionSerializable class and its intended use. */
+    val description: String by lazy { appFunctionSerializableClass.docString ?: "" }
 
     /** All the [KSDeclaration] from the AppFunctionSerializable. */
     val declarations: Sequence<KSDeclaration> by lazy { appFunctionSerializableClass.declarations }
@@ -234,9 +238,18 @@ open class AnnotatedAppFunctionSerializable(
 
     /** Returns the annotated class's properties as defined in its primary constructor. */
     open fun getProperties(): List<AppFunctionPropertyDeclaration> {
-        return checkNotNull(appFunctionSerializableClass.primaryConstructor).parameters.map {
-            valueParameter ->
-            AppFunctionPropertyDeclaration(valueParameter)
+        val primaryConstructorProperties =
+            checkNotNull(appFunctionSerializableClass.primaryConstructor).parameters
+
+        val allProperties: Map<String, KSPropertyDeclaration> =
+            appFunctionSerializableClass.getAllProperties().associateBy {
+                (it.simpleName.asString())
+            }
+
+        return primaryConstructorProperties.mapNotNull { valueParameter ->
+            allProperties[valueParameter.name?.asString()]?.let {
+                AppFunctionPropertyDeclaration(it)
+            }
         }
     }
 

@@ -18,7 +18,6 @@ package androidx.health.connect.client.permission
 import androidx.annotation.RestrictTo
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.HealthConnectFeatures
-import androidx.health.connect.client.feature.ExperimentalMindfulnessSessionApi
 import androidx.health.connect.client.feature.ExperimentalPersonalHealthRecordApi
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.ActivityIntensityRecord
@@ -148,6 +147,25 @@ public class HealthPermission internal constructor() {
          * @sample androidx.health.connect.client.samples.InsertExerciseRoute
          */
         const val PERMISSION_WRITE_EXERCISE_ROUTE = PERMISSION_PREFIX + "WRITE_EXERCISE_ROUTE"
+
+        /**
+         * A permission to read exercise routes. The string value for this permission is
+         * `android.permission.health.READ_EXERCISE_ROUTES`.
+         *
+         * This permission can't be granted via the standard permission request mechanism, and can
+         * only be granted by a user in Settings, or via the dialog launched by
+         * [androidx.health.connect.client.contracts.ExerciseRouteRequestContract].
+         *
+         * When this permission is granted, the app can read exercise routes without user
+         * interaction, however reading apps must be in the foreground unless
+         * `android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND` is also granted.
+         *
+         * When this permission is revoked, exercise routes can only be obtained by launching the
+         * [androidx.health.connect.client.contracts.ExerciseRouteRequestContract] intent.
+         *
+         * @sample androidx.health.connect.client.samples.ReadExerciseRoute
+         */
+        const val PERMISSION_READ_EXERCISE_ROUTES = PERMISSION_PREFIX + "READ_EXERCISE_ROUTES"
 
         /**
          * A permission to read data in background.
@@ -419,7 +437,6 @@ public class HealthPermission internal constructor() {
         internal const val READ_SEXUAL_ACTIVITY = PERMISSION_PREFIX + "READ_SEXUAL_ACTIVITY"
 
         // Read permissions for WELLNESS
-        @ExperimentalMindfulnessSessionApi
         internal const val READ_MINDFULNESS_SESSION = PERMISSION_PREFIX + "READ_MINDFULNESS"
 
         // Read permissions for NUTRITION.
@@ -485,7 +502,6 @@ public class HealthPermission internal constructor() {
         internal const val WRITE_NUTRITION = PERMISSION_PREFIX + "WRITE_NUTRITION"
 
         // Write permissions for WELLNESS
-        @ExperimentalMindfulnessSessionApi
         internal const val WRITE_MINDFULNESS_SESSION = PERMISSION_PREFIX + "WRITE_MINDFULNESS"
 
         // Write permissions for SLEEP.
@@ -508,7 +524,6 @@ public class HealthPermission internal constructor() {
         internal const val READ_PERMISSION_PREFIX = PERMISSION_PREFIX + "READ_"
         internal const val WRITE_PERMISSION_PREFIX = PERMISSION_PREFIX + "WRITE_"
 
-        @OptIn(ExperimentalMindfulnessSessionApi::class)
         internal val RECORD_TYPE_TO_PERMISSION =
             mapOf<KClass<out Record>, String>(
                 ActiveCaloriesBurnedRecord::class to
@@ -624,6 +639,7 @@ public class HealthPermission internal constructor() {
             add(PERMISSION_WRITE_EXERCISE_ROUTE)
             add(PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND)
             add(PERMISSION_READ_HEALTH_DATA_HISTORY)
+            add(PERMISSION_READ_EXERCISE_ROUTES)
         }
     }
 }

@@ -19,7 +19,6 @@ package androidx.xr.scenecore.impl;
 import android.app.Activity;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.concurrent.futures.ResolvableFuture;
 import androidx.xr.runtime.internal.ActivityPose;
 import androidx.xr.runtime.internal.ActivitySpace;
@@ -28,12 +27,14 @@ import androidx.xr.runtime.internal.Entity;
 import androidx.xr.runtime.internal.HitTestResult;
 import androidx.xr.runtime.internal.SpaceValue;
 import androidx.xr.runtime.internal.SpatialModeChangeListener;
+import androidx.xr.runtime.math.BoundingBox;
 import androidx.xr.runtime.math.Matrix4;
 import androidx.xr.runtime.math.Pose;
 import androidx.xr.runtime.math.Quaternion;
 import androidx.xr.runtime.math.Vector3;
 
 import com.android.extensions.xr.XrExtensions;
+import com.android.extensions.xr.node.Box3;
 import com.android.extensions.xr.node.Node;
 import com.android.extensions.xr.node.NodeTransaction;
 import com.android.extensions.xr.node.Vec3;
@@ -41,6 +42,8 @@ import com.android.extensions.xr.space.Bounds;
 import com.android.extensions.xr.space.SpatialState;
 
 import com.google.common.util.concurrent.ListenableFuture;
+
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -63,7 +66,6 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
     private final Set<OnBoundsChangedListener> mBoundsListeners =
             Collections.synchronizedSet(new HashSet<>());
 
-    private final Activity mActivity;
     private final Supplier<SpatialState> mSpatialStateProvider;
     private final AtomicReference<Dimensions> mBounds = new AtomicReference<>();
     // The current scene parent aka ActivitySpace origin transform.
@@ -72,6 +74,8 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
     // Spatial mode change handler will be invoked on every update to activity space origin we
     // receive from the node transform listener.
     private SpatialModeChangeListener mSpatialModeChangeListener;
+    private final AtomicReference<BoundingBox> mCachedRecommendedContentBox =
+            new AtomicReference<>(null);
 
     ActivitySpaceImpl(
             Node taskNode,
@@ -81,8 +85,7 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
             Supplier<SpatialState> spatialStateProvider,
             boolean unscaledGravityAlignedActivitySpace,
             ScheduledExecutorService executor) {
-        super(taskNode, extensions, entityManager, executor);
-        mActivity = activity;
+        super(activity, taskNode, extensions, entityManager, executor);
         mSpatialStateProvider = spatialStateProvider;
         mUnscaledGravityAlignedActivitySpace = unscaledGravityAlignedActivitySpace;
         Log.i(
@@ -92,23 +95,20 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
     }
 
     /** Returns the identity pose since this entity defines the origin of the activity space. */
-    @NonNull
     @Override
-    public Pose getPoseInActivitySpace() {
+    public @NonNull Pose getPoseInActivitySpace() {
         return new Pose();
     }
 
     /** Returns the identity pose since we assume the activity space is the world space root. */
-    @NonNull
     @Override
-    public Pose getActivitySpacePose() {
+    public @NonNull Pose getActivitySpacePose() {
 
         return new Pose();
     }
 
-    @NonNull
     @Override
-    public Vector3 getActivitySpaceScale() {
+    public @NonNull Vector3 getActivitySpaceScale() {
         return new Vector3(1.0f, 1.0f, 1.0f);
     }
 
@@ -202,9 +202,8 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
         }
     }
 
-    @NonNull
     @Override
-    public Dimensions getBounds() {
+    public @NonNull Dimensions getBounds() {
         // The bounds are kept in sync with the Extensions in the onBoundsChangedEvent callback. We
         // only
         // invoke getSpatialState if they've never been set.
@@ -280,7 +279,7 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
         HitTestResultConsumer hitTestConsumer = new HitTestResultConsumer(hitTestFuture);
 
         mExtensions.hitTest(
-                mActivity,
+                getActivity(),
                 new Vec3(origin.getX(), origin.getY(), origin.getZ()),
                 new Vec3(direction.getX(), direction.getY(), direction.getZ()),
                 RuntimeUtils.getHitTestFilter(hitTestFilter),
@@ -359,5 +358,36 @@ final class ActivitySpaceImpl extends SystemSpaceEntityImpl implements ActivityS
                 },
                 mExecutor);
         return updatedHitTestFuture;
+    }
+
+    /**
+     * Return a recommended box for content to be placed in when in Full Space Mode.
+     *
+     * <p>The box is relative to the ActivitySpace's coordinate system. It is not scaled by the
+     * ActivitySpace's transform. The dimensions are always in meters. This provides a
+     * device-specific default volume that developers can use to size their content appropriately.
+     *
+     * @return a [BoundingBox] sized to place content in.
+     */
+    @Override
+    @NonNull
+    public BoundingBox getRecommendedContentBoxInFullSpace() {
+        return mCachedRecommendedContentBox.updateAndGet(
+                currentBox -> {
+                    if (currentBox != null) {
+                        return currentBox;
+                    }
+
+                    Box3 recommendedBox = mExtensions.getRecommendedContentBoxInFullSpace();
+                    return new BoundingBox(
+                            new Vector3(
+                                    recommendedBox.getMin().x,
+                                    recommendedBox.getMin().y,
+                                    recommendedBox.getMin().z),
+                            new Vector3(
+                                    recommendedBox.getMax().x,
+                                    recommendedBox.getMax().y,
+                                    recommendedBox.getMax().z));
+                });
     }
 }

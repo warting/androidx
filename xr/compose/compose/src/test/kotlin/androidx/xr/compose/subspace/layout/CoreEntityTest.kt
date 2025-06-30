@@ -24,7 +24,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.xr.compose.spatial.ApplicationSubspace
-import androidx.xr.compose.subspace.MainPanel
+import androidx.xr.compose.subspace.SpatialActivityPanel
+import androidx.xr.compose.subspace.SpatialAndroidViewPanel
+import androidx.xr.compose.subspace.SpatialMainPanel
 import androidx.xr.compose.subspace.SpatialPanel
 import androidx.xr.compose.subspace.node.SubspaceModifierNodeElement
 import androidx.xr.compose.testing.SubspaceTestingActivity
@@ -34,7 +36,6 @@ import androidx.xr.compose.unit.IntVolumeSize
 import androidx.xr.scenecore.PanelEntity
 import androidx.xr.scenecore.scene
 import com.google.common.truth.Truth.assertThat
-import java.lang.IllegalArgumentException
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import org.hamcrest.Matchers.containsString
@@ -69,14 +70,12 @@ class CoreEntityTest {
     }
 
     @Test
-    fun coreEntity_coreContentlessEntity_shouldThrowIfNotContentless() {
+    fun coreEntity_coreGroupEntity_shouldThrowIfNotGroupEntity() {
         composeTestRule.setContent { TestSetup {} }
 
         val session = composeTestRule.activity.session
         assertNotNull(session)
-        assertFailsWith<IllegalArgumentException> {
-            CoreContentlessEntity(session.scene.activitySpace)
-        }
+        assertFailsWith<IllegalArgumentException> { CoreGroupEntity(session.scene.activitySpace) }
     }
 
     @Test
@@ -84,7 +83,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    SpatialPanel(
+                    SpatialAndroidViewPanel(
                         factory = { View(it) },
                         SubspaceModifier.width(100.dp).height(100.dp).testTag("panel"),
                     )
@@ -121,7 +120,9 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    MainPanel(SubspaceModifier.width(100.dp).height(100.dp).testTag("mainPanel"))
+                    SpatialMainPanel(
+                        SubspaceModifier.width(100.dp).height(100.dp).testTag("mainPanel")
+                    )
                 }
             }
         }
@@ -138,7 +139,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    SpatialPanel(
+                    SpatialActivityPanel(
                         intent = Intent(composeTestRule.activity, SpatialPanelActivity::class.java),
                         SubspaceModifier.width(100.dp).height(100.dp).testTag("panel"),
                     )
@@ -158,7 +159,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    SpatialPanel(
+                    SpatialAndroidViewPanel(
                         factory = { View(it) },
                         SubspaceModifier.width(0.dp).height(0.dp).testTag("panel"),
                     )
@@ -183,7 +184,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    SpatialPanel(
+                    SpatialAndroidViewPanel(
                         factory = { View(it) },
                         SubspaceModifier.width(0.dp).height(0.dp).testTag("panel"),
                     )
@@ -208,7 +209,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    MainPanel(SubspaceModifier.width(0.dp).height(0.dp).testTag("mainPanel"))
+                    SpatialMainPanel(SubspaceModifier.width(0.dp).height(0.dp).testTag("mainPanel"))
                 }
             }
         }
@@ -230,7 +231,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    SpatialPanel(
+                    SpatialActivityPanel(
                         intent = Intent(composeTestRule.activity, SpatialPanelActivity::class.java),
                         SubspaceModifier.width(0.dp).height(0.dp).testTag("panel"),
                     )
@@ -255,7 +256,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    SpatialPanel(
+                    SpatialAndroidViewPanel(
                         factory = { View(it) },
                         SubspaceModifier.testTag("panel")
                             .resizable()
@@ -306,7 +307,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    MainPanel(
+                    SpatialMainPanel(
                         SubspaceModifier.testTag("mainPanel")
                             .resizable()
                             .then(ForceZeroRenderSizeElement())
@@ -331,7 +332,7 @@ class CoreEntityTest {
         composeTestRule.setContent {
             TestSetup {
                 ApplicationSubspace {
-                    SpatialPanel(
+                    SpatialActivityPanel(
                         intent = Intent(composeTestRule.activity, SpatialPanelActivity::class.java),
                         SubspaceModifier.testTag("panel")
                             .resizable()

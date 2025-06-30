@@ -17,20 +17,14 @@
 package androidx.test.shell
 
 import android.annotation.SuppressLint
-import androidx.test.shell.internal.CircularBuffer
-import androidx.test.shell.internal.ShellInstaller
-import androidx.test.shell.internal.uiAutomation
 import java.io.DataOutputStream
-import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.lang.Thread.sleep
-import java.net.InetSocketAddress
 import java.net.Socket
-import java.util.concurrent.atomic.AtomicBoolean
+import java.net.SocketException
 import kotlin.concurrent.thread
-import kotlin.random.Random
 
 /**
  * Represents a process that is running sh as a shell user.
@@ -64,84 +58,26 @@ import kotlin.random.Random
  */
 public class ShellProcess
 internal constructor(
-    private val shellExecFile: File,
-    private val command: String,
-    private val stdInSocketPort: Int,
-    private val stdOutSocketPort: Int,
-    private val stdErrSocketPort: Int,
-    private val connectToNativeProcessTimeoutMs: Int,
-    private val shellProcessVerboseLogs: Boolean,
-    stdOutBufferSize: Int,
-    stdErrBufferSize: Int,
+    private val stdInSocket: Socket,
+    private val stdOutSocket: Socket,
+    private val stdErrSocket: Socket,
 ) : AutoCloseable {
 
-    public companion object {
-        private const val DEFAULT_STDOUT_BUFFER_SIZE = 32 * 1024
-        private const val DEFAULT_STDERR_BUFFER_SIZE = 32 * 1024
-        private const val LOCALHOST = "localhost"
+    // A data output stream to write in the process standard input.
+    private val stdInOutputStream: DataOutputStream = DataOutputStream(stdInSocket.outputStream)
 
-        /**
-         * Creates a new [ShellProcess].
-         *
-         * Shell process connects to an internal native utility via tcp. The given base port and the
-         * two following ones are used.
-         *
-         * @param baseTcpPort a base tcp port to use to communicate with the native utility. Note
-         *   that the given port and the 2 following ones are used.
-         * @param stdOutBufferSize the size of the circular buffer where to store the stdout of the
-         *   running shell process.
-         * @param stdErrBufferSize the size of the circular buffer where to store the stderr of the
-         *   running shell process.
-         * @param connectToNativeProcessTimeoutMs timeout in ms to connect to the native process.
-         * @param nativeLogs whether the native cli process should print Android logs. The tag used
-         *   on logcat is `NativeShellProcess`.
-         * @return a running shell process, ready to accept commands.
-         * @throws IOException if the underlying native utility does not start.
-         */
-        @JvmStatic
-        @JvmOverloads
-        public fun create(
-            baseTcpPort: Int = Random.nextInt(from = 10240, until = 65536 - 3),
-            stdOutBufferSize: Int = DEFAULT_STDOUT_BUFFER_SIZE,
-            stdErrBufferSize: Int = DEFAULT_STDERR_BUFFER_SIZE,
-            connectToNativeProcessTimeoutMs: Int = 1000,
-            nativeLogs: Boolean = false,
-        ): ShellProcess {
-            return ShellProcess(
-                    stdInSocketPort = baseTcpPort,
-                    stdOutSocketPort = baseTcpPort + 1,
-                    stdErrSocketPort = baseTcpPort + 2,
-                    shellExecFile = ShellInstaller.shellExecutableFile,
-                    command = "sh",
-                    stdOutBufferSize = stdOutBufferSize,
-                    stdErrBufferSize = stdErrBufferSize,
-                    connectToNativeProcessTimeoutMs = connectToNativeProcessTimeoutMs,
-                    shellProcessVerboseLogs = nativeLogs,
-                )
-                .also { it.start() }
-        }
-    }
+    // A wrapper around the stdout socket buffer to catch [SocketException] that may arise from the
+    // process unexpected termination.
+    private val stdOutSocketBuffer = SocketBuffer(socket = stdOutSocket)
 
-    // These are for the input socket only
-    private lateinit var stdInSocketClient: Socket
-    private lateinit var stdInOutputStream: DataOutputStream
-
-    // Whether the process is still active
-    private val closedRef = AtomicBoolean()
-
-    // Reader thread for stdout and stderr
-    private lateinit var stdOutReadThread: Thread
-    private lateinit var stdErrReadThread: Thread
-
-    private val stdOutCircularBuffer = CircularBuffer(size = stdOutBufferSize)
-    private val stdErrCircularBuffer = CircularBuffer(size = stdErrBufferSize)
+    // A wrapper around the stderr socket buffer to catch [SocketException] that may arise from the
+    // process unexpected termination.
+    private val stdErrSocketBuffer = SocketBuffer(socket = stdErrSocket)
 
     /**
-     * An [InputStream] for the process standard output. Note that this is a circular buffer and is
-     * capped by the given [stdOutBufferSize]. When the buffer is full, the kernel has an an
-     * additional 64Kb of buffer. When also that is full, the shell process may stop until some
-     * buffer becomes a available. If a large output is expected but it's not important to capture
-     * it, a shell command may be launched piping in /dev/null.
+     * An [InputStream] for the process standard output. Note that this is backed by a tcp
+     * connection to the native cli utility. If a large output is expected but it's not important to
+     * capture it, a shell command may be launched piping in /dev/null.
      *
      * For example:
      * ```
@@ -149,13 +85,11 @@ internal constructor(
      * ```
      */
     public val stdOut: InputStream
-        get() = stdOutCircularBuffer.inputStream
+        get() = stdOutSocketBuffer.inputStream
 
     /**
-     * An [InputStream] for the process standard error. Note that this is a circular buffer and is
-     * capped by the given [stdOutBufferSize]. When the buffer is full, the kernel has an an
-     * additional 64Kb of buffer. When also that is full, the shell process may stop until some
-     * buffer becomes a available. If a large output is expected but it's not important to capture
+     * An [InputStream] for the process standard error. Note that this is backed by a tcp connection
+     * to the native cli utility. If a large output is expected but it's not important to capture
      * it, a shell command may be launched piping in /dev/null.
      *
      * For example:
@@ -164,14 +98,14 @@ internal constructor(
      * ```
      */
     public val stdErr: InputStream
-        get() = stdErrCircularBuffer.inputStream
+        get() = stdErrSocketBuffer.inputStream
 
     /** An [OutputStream] for the process standard output. */
     public val stdIn: OutputStream
         get() = stdInOutputStream
 
     /** Returns whether the process is closed. */
-    public fun isClosed(): Boolean = closedRef.get()
+    public fun isClosed(): Boolean = stdOutSocketBuffer.isClosed()
 
     /**
      * Writes a string in the process standard input.
@@ -179,92 +113,104 @@ internal constructor(
      * @param string a utf-8 string to write in the process stdin.
      */
     public fun writeLine(string: String) {
-        stdInOutputStream.write(string.toByteArray(Charsets.UTF_8))
-        stdInOutputStream.writeBytes(System.lineSeparator())
+        stdInOutputStream.write("$string${System.lineSeparator()}".toByteArray(Charsets.UTF_8))
     }
 
     /**
      * Closes the current process. Internally this simply sends the shell process the exit command.
      * This means that the process is not immediately terminated, but gracefully shutdown finishing
      * prior commands execution. Once a shell process is closed, further calls to close don't have
-     * any effect, as the [androidx.test.shell.ShellProcess.stdIn] will be closed after the first
-     * one.
+     * any effect, as the [stdIn] will be closed after the first one.
      */
     override fun close() {
-        if (!isClosed()) writeLine("exit")
-    }
-
-    private fun start() {
-        val cmd =
-            setOf(
-                    if (shellProcessVerboseLogs) "1" else "0",
-                    stdInSocketPort,
-                    stdOutSocketPort,
-                    stdErrSocketPort,
-                    command,
-                )
-                .joinToString(" ")
-                .let { "${shellExecFile.absolutePath} $it" }
-
-        // Runs the command, non blocking.
-        uiAutomation.executeShellCommand(cmd)
-
-        // Initializes the input socket, this is also the signal that the process started.
-        var retry = 0
-        var socket: Socket? = null
-        while (socket == null) {
+        if (!isClosed()) {
             try {
-                socket = Socket(LOCALHOST, stdInSocketPort)
-            } catch (e: IOException) {
-                // Thrown for connection refused.
-                if (++retry > connectToNativeProcessTimeoutMs)
-                    throw IOException("Can't connect to shell process.", e)
+                writeLine("exit")
 
-                // Before retrying to connect wait a bit.
-                @SuppressLint("BanThreadSleep") sleep(1)
+                // After closing this ShellProcess, the stdin socket is immediately closed as well.
+                stdInSocket.close()
+
+                // Spin up a clean up thread that periodically checks when the shell process
+                // connections are complete. This is necessary because if the native process
+                // terminates unexpectedly, the sockets can only be closed either calling socket
+                // or if an I/O fails. SocketBuffer#isClosed performs a health check that, when
+                // it fails, triggers the socket clean up.
+                thread {
+                    while (!stdOutSocketBuffer.isClosed() || !stdErrSocketBuffer.isClosed()) {
+                        @SuppressLint("BanThreadSleep") sleep(200)
+                    }
+                }
+            } catch (_: IOException) {
+                // This may throw when there are multiple rapid calls to close() so that
+                // `isClosed` returns false but right before writing in the stream, the socket
+                // actually closes.
+                // Nothing do do here anyway, the socket was already closing and the fact the
+                // IOException is throws means the stream is no more accessible.
             }
         }
-        stdInSocketClient = socket
-        stdInOutputStream = DataOutputStream(socket.outputStream)
-        closedRef.set(false)
+    }
+}
 
-        // Initializes stdout and stderr sockets and threads to read from those.
-        stdOutReadThread =
-            asyncReadFromSocket(
-                socketPort = stdOutSocketPort,
-                circularBuffer = stdOutCircularBuffer,
-            )
-        stdErrReadThread =
-            asyncReadFromSocket(
-                socketPort = stdErrSocketPort,
-                circularBuffer = stdErrCircularBuffer,
-            )
+/**
+ * Wrapper around [InputStream] of a [Socket]. This is needed because if the underlying process
+ * doesn't terminate correctly (for example if killed), the server side of the socket doesn't send
+ * the FIN package to indicate the end of the stream. When that happens, if the client attends to
+ * read but the connection doesn't exist anymore, a [SocketException] is thrown. An unexpected
+ * termination of the child process is completely normal in this scenario, so we can just ignore the
+ * [SocketException].
+ */
+private class SocketBuffer(private val socket: Socket) {
+
+    private val socketInputStream by lazy { socket.inputStream }
+    private var closed: Boolean = false
+
+    fun markClosed() {
+        if (closed) return
+        socket.close()
+        closed = true
     }
 
-    private fun asyncReadFromSocket(socketPort: Int, circularBuffer: CircularBuffer) = thread {
-        val socketAddress = InetSocketAddress(LOCALHOST, socketPort)
-        val socket = Socket()
-
-        try {
-            socket.connect(socketAddress)
-            val dis = socket.inputStream
-            val buffer = ByteArray(4096)
-            while (socket.isConnected && !closedRef.get()) {
-                val read = dis.read(buffer, 0, buffer.size)
-                if (read == -1) break
-                circularBuffer.outputStream.write(buffer, 0, read)
-            }
-        } finally {
-            socket.close()
-
-            circularBuffer.markClosed()
-
-            // Close also the input stream
-            stdInSocketClient.close()
-            stdInOutputStream.close()
-
-            // Mark this shell process as closed
-            closedRef.set(true)
+    fun isClosed(): Boolean {
+        if (closed) return true
+        return try {
+            socket.sendUrgentData(0x00)
+            false
+        } catch (_: IOException) {
+            markClosed()
+            true
         }
     }
+
+    val inputStream =
+        object : InputStream() {
+
+            override fun close() = markClosed()
+
+            override fun read(): Int =
+                try {
+                    socketInputStream.read()
+                } catch (_: SocketException) {
+                    // Can happen if the native process ends unexpectedly.
+                    markClosed()
+                    -1
+                }
+
+            override fun read(b: ByteArray, offset: Int, len: Int): Int =
+                try {
+                    socketInputStream.read(b, offset, len)
+                } catch (_: SocketException) {
+                    // Can happen if the native process ends unexpectedly.
+                    markClosed()
+                    -1
+                }
+
+            override fun available(): Int =
+                try {
+                    socketInputStream.available()
+                } catch (_: SocketException) {
+                    // Can happen if the native process ends unexpectedly.
+                    markClosed()
+                    -1
+                }
+        }
 }

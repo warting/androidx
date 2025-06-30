@@ -28,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.xr.runtime.Config
 import androidx.xr.runtime.Session
+import androidx.xr.runtime.math.FloatSize2d
 import androidx.xr.runtime.math.FloatSize3d
 import androidx.xr.runtime.math.IntSize2d
 import androidx.xr.runtime.math.Pose
@@ -55,7 +56,6 @@ import kotlin.math.sqrt
 import kotlin.time.TimeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
 @SuppressLint("SetTextI18n", "RestrictedApi")
@@ -128,7 +128,7 @@ class TransformationActivity : AppCompatActivity() {
             while (true) {
 
                 // Update debug panels
-                val anchorState = anchor!!.getState()
+                val anchorState = anchor!!.state
                 for (panel in debugTextPanelsToUpdate) {
                     if (panel == anchorDebugPanel) {
                         anchorDebugPanel.view.setLine(
@@ -161,7 +161,7 @@ class TransformationActivity : AppCompatActivity() {
         anchor =
             AnchorEntity.create(
                 session!!,
-                FloatSize3d(0.1f, 0.1f),
+                FloatSize2d(0.1f, 0.1f),
                 PlaneOrientation.ANY,
                 PlaneSemanticType.ANY,
             )
@@ -191,15 +191,12 @@ class TransformationActivity : AppCompatActivity() {
                     "onActivitySpaceUpdatedCount",
                     (++onActivitySpaceUpdatedCount).toString(),
                 )
-                session!!
-                    .scene
-                    .activitySpace
-                    .setOnSpaceUpdatedListener({
-                        it.view.setLine(
-                            "onActivitySpaceUpdatedCount",
-                            (++onActivitySpaceUpdatedCount).toString(),
-                        )
-                    })
+                session!!.scene.activitySpace.addOnSpaceUpdatedListener {
+                    it.view.setLine(
+                        "onActivitySpaceUpdatedCount",
+                        (++onActivitySpaceUpdatedCount).toString(),
+                    )
+                }
             }
     }
 
@@ -219,6 +216,13 @@ class TransformationActivity : AppCompatActivity() {
 
         view.setLine("worldSpacePose", trackedEntity.activitySpacePose.toFormattedString())
         view.setLine("worldSpaceScale", trackedEntity.getScale().toString())
+        if (
+            trackedEntity == sunEntity ||
+                trackedEntity == planetEntity ||
+                trackedEntity == moonEntity
+        ) {
+            view.setLine("local scale", trackedEntity.getScale(Space.PARENT).toString())
+        }
 
         val activitySpacePose =
             trackedEntity.transformPoseTo(Pose.Identity, session!!.scene.activitySpace)
@@ -265,9 +269,8 @@ class TransformationActivity : AppCompatActivity() {
 
     private suspend fun loadModels() {
         solarSystemEntityModel =
-            GltfModel.createAsync(session!!, Paths.get("models", "Dragon_Evolved.gltf")).await()
-        staticEntityModel =
-            GltfModel.createAsync(session!!, Paths.get("models", "xyzArrows.glb")).await()
+            GltfModel.create(session!!, Paths.get("models", "Dragon_Evolved.gltf"))
+        staticEntityModel = GltfModel.create(session!!, Paths.get("models", "xyzArrows.glb"))
     }
 
     private fun entitySolarSystem() {

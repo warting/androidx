@@ -265,7 +265,11 @@ internal constructor(
 
     private val componentList = mutableListOf<Component>()
 
-    override var contentDescription: String = ""
+    override var contentDescription: String
+        get() = rtEntity.contentDescription
+        set(value) {
+            rtEntity.contentDescription = value
+        }
 
     override var parent: Entity?
         get() = rtEntity.parent?.let { entityManager.getEntityForRtEntity(it) }
@@ -323,6 +327,8 @@ internal constructor(
         removeAllComponents()
         entityManager.removeEntity(this)
         rtEntity.dispose()
+        // TODO b/427314036: Set rtEntity to null here and add checkDisposed() to all public
+        //                   methods.
     }
 
     override fun addComponent(component: Component): Boolean {

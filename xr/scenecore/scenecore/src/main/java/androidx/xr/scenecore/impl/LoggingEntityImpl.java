@@ -16,9 +16,9 @@
 
 package androidx.xr.scenecore.impl;
 
+import android.content.Context;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.concurrent.futures.ResolvableFuture;
 import androidx.xr.runtime.internal.ActivityPose;
 import androidx.xr.runtime.internal.Entity;
@@ -31,21 +31,23 @@ import androidx.xr.runtime.math.Vector3;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.jspecify.annotations.NonNull;
+
 import java.util.List;
 import java.util.concurrent.Executor;
 
 /** Implementation of a RealityCore Entity that logs its function calls. */
 class LoggingEntityImpl extends BaseEntity implements LoggingEntity {
 
-    private static final String TAG = "RealityCoreRuntime";
+    private static final String TAG = "SceneCore";
 
-    LoggingEntityImpl() {
+    LoggingEntityImpl(Context context) {
+        super(context);
         Log.i(TAG, "Creating LoggingEntity.");
     }
 
-    @NonNull
     @Override
-    public Pose getPose(@SpaceValue int relativeTo) {
+    public @NonNull Pose getPose(@SpaceValue int relativeTo) {
         Log.i(
                 TAG,
                 "Getting Logging Entity pose: "
@@ -61,16 +63,14 @@ class LoggingEntityImpl extends BaseEntity implements LoggingEntity {
         super.setPose(pose, relativeTo);
     }
 
-    @NonNull
     @Override
-    public Pose getActivitySpacePose() {
+    public @NonNull Pose getActivitySpacePose() {
         Log.i(TAG, "Getting Logging Entity activitySpacePose.");
         return new Pose();
     }
 
-    @NonNull
     @Override
-    public Pose transformPoseTo(@NonNull Pose pose, @NonNull ActivityPose destination) {
+    public @NonNull Pose transformPoseTo(@NonNull Pose pose, @NonNull ActivityPose destination) {
         Log.i(
                 TAG,
                 "Transforming pose "
@@ -83,10 +83,9 @@ class LoggingEntityImpl extends BaseEntity implements LoggingEntity {
     // ResolvableFuture is marked as RestrictTo(LIBRARY_GROUP_PREFIX), which is intended for classes
     // within AndroidX. We're in the process of migrating to AndroidX. Without suppressing this
     // warning, however, we get a build error - go/bugpattern/RestrictTo.
-    @NonNull
     @SuppressWarnings("RestrictTo")
     @Override
-    public ListenableFuture<HitTestResult> hitTest(
+    public @NonNull ListenableFuture<HitTestResult> hitTest(
             @NonNull Vector3 origin,
             @NonNull Vector3 direction,
             @HitTestFilterValue int hitTestFilter) {
@@ -136,9 +135,8 @@ class LoggingEntityImpl extends BaseEntity implements LoggingEntity {
         super.setParent(parent);
     }
 
-    @NonNull
     @Override
-    public List<Entity> getChildren() {
+    public @NonNull List<Entity> getChildren() {
         Log.i(TAG, "Getting Logging Entity children: " + super.getChildren());
         return super.getChildren();
     }

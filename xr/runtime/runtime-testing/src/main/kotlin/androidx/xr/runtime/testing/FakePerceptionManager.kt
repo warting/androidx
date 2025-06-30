@@ -19,7 +19,9 @@ package androidx.xr.runtime.testing
 import androidx.annotation.RestrictTo
 import androidx.xr.runtime.internal.Anchor
 import androidx.xr.runtime.internal.AnchorInvalidUuidException
+import androidx.xr.runtime.internal.DepthMap
 import androidx.xr.runtime.internal.Earth
+import androidx.xr.runtime.internal.Face
 import androidx.xr.runtime.internal.Hand
 import androidx.xr.runtime.internal.HitResult
 import androidx.xr.runtime.internal.PerceptionManager
@@ -44,7 +46,13 @@ public class FakePerceptionManager : PerceptionManager, AnchorHolder {
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
     override val viewCameras: List<FakeRuntimeViewCamera> = listOf(FakeRuntimeViewCamera())
 
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    override val userFace: Face? = FakeRuntimeFace()
+
     override val earth: Earth = FakeRuntimeEarth()
+
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    override val depthMaps: MutableList<DepthMap> = mutableListOf(FakeRuntimeDepthMap())
 
     private val hitResults = mutableListOf<HitResult>()
     private val anchorUuids = mutableListOf<UUID>()

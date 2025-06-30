@@ -18,7 +18,6 @@ package androidx.xr.scenecore
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Rect
 import android.os.Build
 import android.view.View
 import android.widget.TextView
@@ -47,6 +46,8 @@ import androidx.xr.runtime.internal.PixelDimensions as RtPixelDimensions
 import androidx.xr.runtime.internal.Space as RtSpace
 import androidx.xr.runtime.internal.SpatialCapabilities as RtSpatialCapabilities
 import androidx.xr.runtime.internal.SurfaceEntity as RtSurfaceEntity
+import androidx.xr.runtime.math.BoundingBox
+import androidx.xr.runtime.math.FloatSize2d
 import androidx.xr.runtime.math.FloatSize3d
 import androidx.xr.runtime.math.IntSize2d
 import androidx.xr.runtime.math.Pose
@@ -63,6 +64,7 @@ import java.util.function.Consumer
 import kotlin.test.assertFailsWith
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
+import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -93,7 +95,7 @@ class EntityTest {
     private val mockPanelEntityImpl = mock<RtPanelEntity>()
     private val mockAnchorEntityImpl = mock<RtAnchorEntity>()
     private val mockActivityPanelEntity = mock<RtActivityPanelEntity>()
-    private val mockContentlessEntity = mock<RtEntity>()
+    private val mockGroupEntity = mock<RtEntity>()
     private val mockSurfaceEntity = mock<RtSurfaceEntity>()
     private val entityManager = EntityManager()
     private lateinit var session: Session
@@ -105,7 +107,7 @@ class EntityTest {
     private lateinit var panelEntity: PanelEntity
     private lateinit var anchorEntity: AnchorEntity
     private lateinit var activityPanelEntity: ActivityPanelEntity
-    private lateinit var contentlessEntity: Entity
+    private lateinit var groupEntity: Entity
     private lateinit var surfaceEntity: SurfaceEntity
 
     private val entityActivity =
@@ -241,6 +243,12 @@ class EntityTest {
             boundsChangedListener?.onBoundsChanged(dimensions)
         }
 
+        override val recommendedContentBoxInFullSpace: BoundingBox =
+            BoundingBox(
+                min = Vector3(-1.73f / 2, -1.61f / 2, -0.5f / 2),
+                max = Vector3(1.73f / 2, 1.61f / 2, 0.5f / 2),
+            )
+
         override fun <T : RtComponent> getComponentsOfType(type: Class<out T>): List<T> =
             emptyList()
 
@@ -252,7 +260,7 @@ class EntityTest {
 
     @RequiresApi(Build.VERSION_CODES.O)
     @Before
-    fun setUp() {
+    fun setUp() = runBlocking {
         whenever(mockEntityPlatformAdapter.spatialEnvironment).thenReturn(mock())
         val mockActivitySpace = mock<RtActivitySpace>()
         whenever(mockEntityPlatformAdapter.activitySpace).thenReturn(mockActivitySpace)
@@ -295,8 +303,8 @@ class EntityTest {
         whenever(mockAnchorEntityImpl.state).thenReturn(RtAnchorEntity.State.UNANCHORED)
         whenever(mockPlatformAdapter.createActivityPanelEntity(any(), any(), any(), any(), any()))
             .thenReturn(mockActivityPanelEntity)
-        whenever(mockPlatformAdapter.createEntity(any(), any(), any()))
-            .thenReturn(mockContentlessEntity)
+        whenever(mockPlatformAdapter.createGroupEntity(any(), any(), any()))
+            .thenReturn(mockGroupEntity)
         whenever(mockPlatformAdapter.createSurfaceEntity(any(), any(), any(), any(), any(), any()))
             .thenReturn(mockSurfaceEntity)
         whenever(mockPlatformAdapter.mainPanelEntity).thenReturn(mockPanelEntityImpl)
@@ -304,7 +312,7 @@ class EntityTest {
         lifecycleManager = session.runtime.lifecycleManager
         session.configure(Config(headTracking = Config.HeadTrackingMode.LAST_KNOWN))
         activitySpace = ActivitySpace.create(mockPlatformAdapter, entityManager)
-        gltfModel = GltfModel.createAsync(session, Paths.get("test.glb")).get()
+        gltfModel = GltfModel.create(session, Paths.get("test.glb"))
         gltfModelEntity = GltfModelEntity.create(mockPlatformAdapter, entityManager, gltfModel)
         panelEntity =
             PanelEntity.create(
@@ -320,7 +328,7 @@ class EntityTest {
             AnchorEntity.create(
                 mockPlatformAdapter,
                 entityManager,
-                FloatSize3d(),
+                FloatSize2d(),
                 PlaneOrientation.ANY,
                 PlaneSemanticType.ANY,
                 10.seconds.toJavaDuration(),
@@ -334,7 +342,7 @@ class EntityTest {
                 "test",
                 activity,
             )
-        contentlessEntity = ContentlessEntity.create(mockPlatformAdapter, entityManager, "test")
+        groupEntity = GroupEntity.create(mockPlatformAdapter, entityManager, "test")
         surfaceEntity =
             SurfaceEntity.create(
                 lifecycleManager = lifecycleManager,
@@ -354,7 +362,7 @@ class EntityTest {
             AnchorEntity.create(
                 mockPlatformAdapter,
                 entityManager,
-                FloatSize3d(),
+                FloatSize2d(),
                 PlaneOrientation.ANY,
                 PlaneSemanticType.ANY,
             )
@@ -367,7 +375,7 @@ class EntityTest {
         session.configure(Config(planeTracking = PlaneTrackingMode.DISABLED))
 
         assertFailsWith<IllegalStateException> {
-            AnchorEntity.create(session, FloatSize3d(), PlaneOrientation.ANY, PlaneSemanticType.ANY)
+            AnchorEntity.create(session, FloatSize2d(), PlaneOrientation.ANY, PlaneSemanticType.ANY)
         }
     }
 
@@ -403,19 +411,19 @@ class EntityTest {
         whenever(mockActivityPanelEntity.parent).thenReturn(rtActivitySpace)
         whenever(mockPanelEntityImpl.parent).thenReturn(mockActivityPanelEntity)
         whenever(mockGltfModelEntityImpl.parent).thenReturn(mockPanelEntityImpl)
-        whenever(mockContentlessEntity.parent).thenReturn(mockGltfModelEntityImpl)
-        whenever(mockAnchorEntityImpl.parent).thenReturn(mockContentlessEntity)
+        whenever(mockGroupEntity.parent).thenReturn(mockGltfModelEntityImpl)
+        whenever(mockAnchorEntityImpl.parent).thenReturn(mockGroupEntity)
 
         assertThat(activityPanelEntity.parent).isEqualTo(activitySpace)
         assertThat(panelEntity.parent).isEqualTo(activityPanelEntity)
         assertThat(gltfModelEntity.parent).isEqualTo(panelEntity)
-        assertThat(contentlessEntity.parent).isEqualTo(gltfModelEntity)
-        assertThat(anchorEntity.parent).isEqualTo(contentlessEntity)
+        assertThat(groupEntity.parent).isEqualTo(gltfModelEntity)
+        assertThat(anchorEntity.parent).isEqualTo(groupEntity)
 
         verify(mockActivityPanelEntity).parent
         verify(mockPanelEntityImpl).parent
         verify(mockGltfModelEntityImpl).parent
-        verify(mockContentlessEntity).parent
+        verify(mockGroupEntity).parent
         verify(mockAnchorEntityImpl).parent
     }
 
@@ -424,19 +432,19 @@ class EntityTest {
         whenever(mockActivityPanelEntity.parent).thenReturn(null)
         whenever(mockPanelEntityImpl.parent).thenReturn(null)
         whenever(mockGltfModelEntityImpl.parent).thenReturn(null)
-        whenever(mockContentlessEntity.parent).thenReturn(null)
+        whenever(mockGroupEntity.parent).thenReturn(null)
         whenever(mockAnchorEntityImpl.parent).thenReturn(null)
 
         assertThat(activityPanelEntity.parent).isEqualTo(null)
         assertThat(panelEntity.parent).isEqualTo(null)
         assertThat(gltfModelEntity.parent).isEqualTo(null)
-        assertThat(contentlessEntity.parent).isEqualTo(null)
+        assertThat(groupEntity.parent).isEqualTo(null)
         assertThat(anchorEntity.parent).isEqualTo(null)
 
         verify(mockActivityPanelEntity).parent
         verify(mockPanelEntityImpl).parent
         verify(mockGltfModelEntityImpl).parent
-        verify(mockContentlessEntity).parent
+        verify(mockGroupEntity).parent
         verify(mockAnchorEntityImpl).parent
     }
 
@@ -512,14 +520,14 @@ class EntityTest {
         gltfModelEntity.setAlpha(alpha, Space.PARENT)
         anchorEntity.setAlpha(alpha, Space.ACTIVITY)
         activityPanelEntity.setAlpha(alpha, Space.REAL_WORLD)
-        contentlessEntity.setAlpha(alpha)
+        groupEntity.setAlpha(alpha)
         activitySpace.setAlpha(alpha)
 
         verify(mockPanelEntityImpl).setAlpha(alpha, RtSpace.PARENT)
         verify(mockGltfModelEntityImpl).setAlpha(alpha, RtSpace.PARENT)
         verify(mockAnchorEntityImpl).setAlpha(alpha, RtSpace.ACTIVITY)
         verify(mockActivityPanelEntity).setAlpha(alpha, RtSpace.REAL_WORLD)
-        verify(mockContentlessEntity).setAlpha(alpha, RtSpace.PARENT)
+        verify(mockGroupEntity).setAlpha(alpha, RtSpace.PARENT)
         assertThat(testActivitySpace.setAlphaCalled).isTrue()
     }
 
@@ -550,14 +558,14 @@ class EntityTest {
         gltfModelEntity.setHidden(true)
         anchorEntity.setHidden(true)
         activityPanelEntity.setHidden(false)
-        contentlessEntity.setHidden(false)
+        groupEntity.setHidden(false)
         activitySpace.setHidden(false)
 
         verify(mockPanelEntityImpl).setHidden(true)
         verify(mockGltfModelEntityImpl).setHidden(true)
         verify(mockAnchorEntityImpl).setHidden(true)
         verify(mockActivityPanelEntity).setHidden(false)
-        verify(mockContentlessEntity).setHidden(false)
+        verify(mockGroupEntity).setHidden(false)
         assertThat(testActivitySpace.setHiddenCalled).isTrue()
     }
 
@@ -591,7 +599,7 @@ class EntityTest {
         // by the runtime Entity.
         anchorEntity.setScale(scale, Space.ACTIVITY)
         activityPanelEntity.setScale(scale, Space.REAL_WORLD)
-        contentlessEntity.setScale(scale)
+        groupEntity.setScale(scale)
         // Note that in production we expect this to do nothing.
         activitySpace.setScale(scale)
 
@@ -599,7 +607,7 @@ class EntityTest {
         verify(mockGltfModelEntityImpl).setScale(any(), eq(RtSpace.PARENT))
         verify(mockAnchorEntityImpl).setScale(any(), eq(RtSpace.ACTIVITY))
         verify(mockActivityPanelEntity).setScale(any(), eq(RtSpace.REAL_WORLD))
-        verify(mockContentlessEntity).setScale(any(), eq(RtSpace.PARENT))
+        verify(mockGroupEntity).setScale(any(), eq(RtSpace.PARENT))
         assertThat(testActivitySpace.setScaleCalled).isTrue()
     }
 
@@ -634,20 +642,20 @@ class EntityTest {
         whenever(mockGltfModelEntityImpl.transformPoseTo(any(), any())).thenReturn(Pose())
         whenever(mockAnchorEntityImpl.transformPoseTo(any(), any())).thenReturn(Pose())
         whenever(mockActivityPanelEntity.transformPoseTo(any(), any())).thenReturn(Pose())
-        whenever(mockContentlessEntity.transformPoseTo(any(), any())).thenReturn(Pose())
+        whenever(mockGroupEntity.transformPoseTo(any(), any())).thenReturn(Pose())
         val pose = Pose.Identity
 
         assertThat(panelEntity.transformPoseTo(pose, panelEntity)).isEqualTo(pose)
         assertThat(gltfModelEntity.transformPoseTo(pose, panelEntity)).isEqualTo(pose)
         assertThat(anchorEntity.transformPoseTo(pose, panelEntity)).isEqualTo(pose)
         assertThat(activityPanelEntity.transformPoseTo(pose, panelEntity)).isEqualTo(pose)
-        assertThat(contentlessEntity.transformPoseTo(pose, panelEntity)).isEqualTo(pose)
+        assertThat(groupEntity.transformPoseTo(pose, panelEntity)).isEqualTo(pose)
 
         verify(mockPanelEntityImpl).transformPoseTo(any(), any())
         verify(mockGltfModelEntityImpl).transformPoseTo(any(), any())
         verify(mockAnchorEntityImpl).transformPoseTo(any(), any())
         verify(mockActivityPanelEntity).transformPoseTo(any(), any())
-        verify(mockContentlessEntity).transformPoseTo(any(), any())
+        verify(mockGroupEntity).transformPoseTo(any(), any())
     }
 
     @Test
@@ -773,13 +781,13 @@ class EntityTest {
     @Test
     fun activitySpaceGetBounds_callsImplGetBounds() {
         val activitySpace = ActivitySpace.create(mockPlatformAdapter, entityManager)
-        val bounds = activitySpace.getBounds()
-        assertThat(bounds).isNotNull()
+
+        assertThat(activitySpace.bounds).isNotNull()
         assertThat(testActivitySpace.getBoundsCalled).isTrue()
     }
 
     @Test
-    fun activitySpaceSetBoundsListener_receivesBoundsChangedCallback() {
+    fun activitySpaceAddBoundsListener_receivesBoundsChangedCallback() {
         val activitySpace = ActivitySpace.create(mockPlatformAdapter, entityManager)
         var called = false
         val boundsChangedListener =
@@ -790,43 +798,48 @@ class EntityTest {
                 called = true
             }
 
-        activitySpace.addBoundsChangedListener(directExecutor(), boundsChangedListener)
+        activitySpace.addOnBoundsChangedListener(directExecutor(), boundsChangedListener)
         testActivitySpace.sendBoundsChanged(RtDimensions(0.3f, 0.2f, 0.1f))
         assertThat(called).isTrue()
 
         called = false
-        activitySpace.removeBoundsChangedListener(boundsChangedListener)
+        activitySpace.removeOnBoundsChangedListener(boundsChangedListener)
         testActivitySpace.sendBoundsChanged(RtDimensions(0.5f, 0.5f, 0.5f))
         assertThat(called).isFalse()
     }
 
     @Test
-    fun setOnSpaceUpdatedListener_withNullParams_callsRuntimeSetOnSpaceUpdatedListener() {
+    fun addRemoveOnSpaceUpdatedListener_callsRuntimeSetOnSpaceUpdatedListener() {
         val mockRtActivitySpace = mock<RtActivitySpace>()
         whenever(mockPlatformAdapter.activitySpace).thenReturn(mockRtActivitySpace)
         val activitySpace = ActivitySpace.create(mockPlatformAdapter, entityManager)
 
-        activitySpace.setOnSpaceUpdatedListener(null)
+        val listener = Runnable { print("Hello, World") }
+        activitySpace.addOnSpaceUpdatedListener(listener)
+
+        verify(mockRtActivitySpace).setOnSpaceUpdatedListener(any(), eq(null))
+
+        activitySpace.removeOnSpaceUpdatedListener(listener)
         verify(mockRtActivitySpace).setOnSpaceUpdatedListener(eq(null), eq(null))
     }
 
     @Test
-    fun setOnSpaceUpdatedListener_receivesRuntimeSetOnSpaceUpdatedListenerCallbacks() {
+    fun addOnSpaceUpdatedListener_receivesRuntimeSetOnSpaceUpdatedListenerCallbacks() {
         val mockRtActivitySpace = mock<RtActivitySpace>()
         whenever(mockPlatformAdapter.activitySpace).thenReturn(mockRtActivitySpace)
         val activitySpace = ActivitySpace.create(mockPlatformAdapter, entityManager)
 
         var listenerCalled = false
         val captor = argumentCaptor<Runnable>()
-        activitySpace.setOnSpaceUpdatedListener({ listenerCalled = true }, directExecutor())
-        verify(mockRtActivitySpace).setOnSpaceUpdatedListener(captor.capture(), any())
+        activitySpace.addOnSpaceUpdatedListener(directExecutor()) { listenerCalled = true }
+        verify(mockRtActivitySpace).setOnSpaceUpdatedListener(captor.capture(), anyOrNull())
         captor.firstValue.run()
         assertThat(listenerCalled).isTrue()
     }
 
     @Test
     fun setOnSpaceUpdatedListener_anchorEntity_withNullParams_callsRuntimeSetOnSpaceUpdatedListener() {
-        anchorEntity.setOnSpaceUpdatedListener(null, null)
+        anchorEntity.setOnSpaceUpdatedListener(null)
         verify(mockAnchorEntityImpl).setOnSpaceUpdatedListener(eq(null), eq(null))
     }
 
@@ -834,7 +847,7 @@ class EntityTest {
     fun setOnSpaceUpdatedListener_anchorEntity_receivesRuntimeSetOnSpaceUpdatedListenerCallbacks() {
         var listenerCalled = false
         val captor = argumentCaptor<Runnable>()
-        anchorEntity.setOnSpaceUpdatedListener({ listenerCalled = true }, directExecutor())
+        anchorEntity.setOnSpaceUpdatedListener(directExecutor()) { listenerCalled = true }
 
         verify(mockAnchorEntityImpl).setOnSpaceUpdatedListener(captor.capture(), any())
         assertThat(listenerCalled).isFalse()
@@ -858,19 +871,19 @@ class EntityTest {
     }
 
     @Test
-    fun contentlessEntity_isCreated() {
-        val entity = ContentlessEntity.create(session, "test")
+    fun groupEntity_isCreated() {
+        val entity = GroupEntity.create(session, "test")
         assertThat(entity).isNotNull()
     }
 
     @Test
-    fun contentlessEntity_canSetPose() {
-        val entity = ContentlessEntity.create(session, "test")
+    fun groupEntity_canSetPose() {
+        val entity = GroupEntity.create(session, "test")
         val setPose = Pose.Identity
         entity.setPose(setPose)
 
         val captor = argumentCaptor<Pose>()
-        verify(mockContentlessEntity).setPose(captor.capture(), eq(RtSpace.PARENT))
+        verify(mockGroupEntity).setPose(captor.capture(), eq(RtSpace.PARENT))
 
         val pose = captor.firstValue
         assertThat(pose.translation.x).isEqualTo(setPose.translation.x)
@@ -879,25 +892,25 @@ class EntityTest {
     }
 
     @Test
-    fun contentlessEntity_canGetPose() {
-        whenever(mockContentlessEntity.getPose(RtSpace.PARENT)).thenReturn(Pose())
+    fun groupEntity_canGetPose() {
+        whenever(mockGroupEntity.getPose(RtSpace.PARENT)).thenReturn(Pose())
 
-        val entity = ContentlessEntity.create(session, "test")
+        val entity = GroupEntity.create(session, "test")
         val pose = Pose.Identity
 
         assertThat(entity.getPose()).isEqualTo(pose)
-        verify(mockContentlessEntity).getPose(RtSpace.PARENT)
+        verify(mockGroupEntity).getPose(RtSpace.PARENT)
     }
 
     @Test
-    fun contentlessEntity_canGetActivitySpacePose() {
-        whenever(mockContentlessEntity.activitySpacePose).thenReturn(Pose())
+    fun groupEntity_canGetActivitySpacePose() {
+        whenever(mockGroupEntity.activitySpacePose).thenReturn(Pose())
 
-        val entity = ContentlessEntity.create(session, "test")
+        val entity = GroupEntity.create(session, "test")
         val pose = Pose.Identity
 
         assertThat(entity.activitySpacePose).isEqualTo(pose)
-        verify(mockContentlessEntity).activitySpacePose
+        verify(mockGroupEntity).activitySpacePose
     }
 
     @Test
@@ -1251,27 +1264,32 @@ class EntityTest {
 
     @Test
     fun createGltfResourceAsync_callsRuntimeLoadGltf() {
-        val mockGltfModelResource = mock<RtGltfModelResource>()
-        whenever(mockEntityPlatformAdapter.loadGltfByAssetName(anyString()))
-            .thenReturn(Futures.immediateFuture(mockGltfModelResource))
-        @Suppress("UNUSED_VARIABLE", "NewApi")
-        val unused = GltfModel.createAsync(entitySession, Paths.get("test.glb"))
+        runBlocking {
+            val mockGltfModelResource = mock<RtGltfModelResource>()
+            whenever(mockEntityPlatformAdapter.loadGltfByAssetName(anyString()))
+                .thenReturn(Futures.immediateFuture(mockGltfModelResource))
+            @Suppress("UNUSED_VARIABLE", "NewApi")
+            val unused = GltfModel.create(entitySession, Paths.get("test.glb"))
 
-        verify(mockEntityPlatformAdapter).loadGltfByAssetName("test.glb")
+            verify(mockEntityPlatformAdapter).loadGltfByAssetName("test.glb")
+        }
     }
 
     @Test
     fun createGltfEntity_callsRuntimeCreateGltfEntity() {
-        whenever(mockEntityPlatformAdapter.loadGltfByAssetName(anyString()))
-            .thenReturn(Futures.immediateFuture(mock()))
-        whenever(mockEntityPlatformAdapter.createGltfEntity(any(), any(), any())).thenReturn(mock())
-        @Suppress("NewApi")
-        val gltfModelFuture = GltfModel.createAsync(entitySession, Paths.get("test.glb"))
-        @Suppress("UNUSED_VARIABLE")
-        val unused = GltfModelEntity.create(entitySession, gltfModelFuture.get())
+        runBlocking {
+            whenever(mockEntityPlatformAdapter.loadGltfByAssetName(anyString()))
+                .thenReturn(Futures.immediateFuture(mock()))
+            whenever(mockEntityPlatformAdapter.createGltfEntity(any(), any(), any()))
+                .thenReturn(mock())
+            @Suppress("NewApi")
+            val gltfModel = GltfModel.create(entitySession, Paths.get("test.glb"))
+            @Suppress("UNUSED_VARIABLE")
+            val unused = GltfModelEntity.create(entitySession, gltfModel)
 
-        verify(mockEntityPlatformAdapter).loadGltfByAssetName(eq("test.glb"))
-        verify(mockEntityPlatformAdapter).createGltfEntity(any(), any(), any())
+            verify(mockEntityPlatformAdapter).loadGltfByAssetName(eq("test.glb"))
+            verify(mockEntityPlatformAdapter).createGltfEntity(any(), any(), any())
+        }
     }
 
     @Test
@@ -1310,7 +1328,7 @@ class EntityTest {
         val unused =
             AnchorEntity.create(
                 entitySession,
-                FloatSize3d(),
+                FloatSize2d(),
                 PlaneOrientation.ANY,
                 PlaneSemanticType.ANY,
             )
@@ -1331,9 +1349,15 @@ class EntityTest {
             )
             .thenReturn(mock())
         @Suppress("UNUSED_VARIABLE")
-        val unused = ActivityPanelEntity.create(entitySession, Rect(0, 0, 640, 480), "test")
+        val unused = ActivityPanelEntity.create(entitySession, IntSize2d(640, 480), "test")
 
         verify(mockEntityPlatformAdapter)
             .createActivityPanelEntity(any(), any(), any(), any(), any())
+    }
+
+    @Test
+    fun surfaceEntity_useAferDisposeRaisesIllegalStateException() {
+        surfaceEntity.dispose()
+        verify(mockSurfaceEntity).dispose()
     }
 }

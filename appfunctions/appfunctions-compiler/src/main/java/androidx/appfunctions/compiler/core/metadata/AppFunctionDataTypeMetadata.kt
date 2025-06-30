@@ -86,6 +86,7 @@ data class AppFunctionAllOfTypeMetadata(
     val matchAll: List<AppFunctionDataTypeMetadata>,
     val qualifiedName: String?,
     val isNullable: Boolean,
+    val description: String,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
         val allOfDocuments = matchAll.map { it.toAppFunctionDataTypeMetadataDocument() }
@@ -94,6 +95,7 @@ data class AppFunctionAllOfTypeMetadata(
             allOf = allOfDocuments,
             isNullable = isNullable,
             objectQualifiedName = qualifiedName,
+            description = description,
         )
     }
 
@@ -103,25 +105,23 @@ data class AppFunctionAllOfTypeMetadata(
 }
 
 data class AppFunctionObjectTypeMetadata(
-    val properties: Map<String, AppFunctionDataTypeMetadata>,
+    val properties: List<AppFunctionNamedDataTypeMetadata>,
     val required: List<String>,
     val qualifiedName: String?,
     val isNullable: Boolean,
+    val description: String,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
-        val properties =
-            properties.map { (name, dataType) ->
-                AppFunctionNamedDataTypeMetadataDocument(
-                    name = checkNotNull(name),
-                    dataTypeMetadata = dataType.toAppFunctionDataTypeMetadataDocument(),
-                )
-            }
         return AppFunctionDataTypeMetadataDocument(
             type = TYPE,
-            properties = properties,
+            properties =
+                properties.map { property ->
+                    property.toAppFunctionNamedDataTypeMetadataDocument()
+                },
             required = required,
             objectQualifiedName = qualifiedName,
             isNullable = isNullable,
+            description = description,
         )
     }
 
@@ -168,12 +168,33 @@ data class AppFunctionPrimitiveTypeMetadata(
     }
 }
 
+data class AppFunctionNamedDataTypeMetadata(
+    val name: String,
+    val dataTypeMetadata: AppFunctionDataTypeMetadata,
+    val description: String,
+) {
+    fun toAppFunctionNamedDataTypeMetadataDocument(): AppFunctionNamedDataTypeMetadataDocument =
+        AppFunctionNamedDataTypeMetadataDocument(
+            name = checkNotNull(name),
+            dataTypeMetadata = dataTypeMetadata.toAppFunctionDataTypeMetadataDocument(),
+            description = description,
+        )
+}
+
 data class AppFunctionNamedDataTypeMetadataDocument(
     val namespace: String = APP_FUNCTION_NAMESPACE,
     val id: String = APP_FUNCTION_ID_EMPTY,
     val name: String,
     val dataTypeMetadata: AppFunctionDataTypeMetadataDocument,
-)
+    val description: String = "",
+) {
+    fun toAppFunctionNamedDataTypeMetadata(): AppFunctionNamedDataTypeMetadata =
+        AppFunctionNamedDataTypeMetadata(
+            name = name,
+            dataTypeMetadata = dataTypeMetadata.toAppFunctionDataTypeMetadata(),
+            description = description,
+        )
+}
 
 data class AppFunctionDataTypeMetadataDocument(
     val namespace: String = APP_FUNCTION_NAMESPACE,
@@ -186,6 +207,7 @@ data class AppFunctionDataTypeMetadataDocument(
     val dataTypeReference: String? = null,
     val isNullable: Boolean = false,
     val objectQualifiedName: String? = null,
+    val description: String = "",
 ) {
     fun toAppFunctionDataTypeMetadata(): AppFunctionDataTypeMetadata =
         when (type) {
@@ -200,15 +222,15 @@ data class AppFunctionDataTypeMetadataDocument(
                 check(properties.isNotEmpty()) {
                     "Properties must be present for object type can't be empty"
                 }
-                val propertiesMap =
-                    properties.associate {
-                        it.name to it.dataTypeMetadata.toAppFunctionDataTypeMetadata()
-                    }
                 AppFunctionObjectTypeMetadata(
-                    properties = propertiesMap,
+                    properties =
+                        properties.map { property ->
+                            property.toAppFunctionNamedDataTypeMetadata()
+                        },
                     required = required,
                     qualifiedName = objectQualifiedName,
                     isNullable = isNullable,
+                    description = description,
                 )
             }
             AppFunctionDataTypeMetadata.TYPE_REFERENCE ->
@@ -224,6 +246,7 @@ data class AppFunctionDataTypeMetadataDocument(
                     matchAll = allOf.map { it.toAppFunctionDataTypeMetadata() },
                     qualifiedName = objectQualifiedName,
                     isNullable = isNullable,
+                    description = description,
                 )
             in AppFunctionDataTypeMetadata.PRIMITIVE_TYPES ->
                 AppFunctionPrimitiveTypeMetadata(type = type, isNullable = isNullable)

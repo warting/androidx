@@ -16,10 +16,9 @@
 
 package androidx.xr.scenecore.impl;
 
+import android.content.Context;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.xr.runtime.internal.SystemSpaceEntity;
 import androidx.xr.runtime.math.Matrix4;
 import androidx.xr.runtime.math.Pose;
@@ -27,6 +26,9 @@ import androidx.xr.runtime.math.Vector3;
 
 import com.android.extensions.xr.XrExtensions;
 import com.android.extensions.xr.node.Node;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.util.Arrays;
@@ -52,11 +54,12 @@ abstract class SystemSpaceEntityImpl extends AndroidXrEntity implements SystemSp
     private Executor mSpaceUpdatedExecutor;
 
     SystemSpaceEntityImpl(
+            Context context,
             Node node,
             XrExtensions extensions,
             EntityManager entityManager,
             ScheduledExecutorService executor) {
-        super(node, extensions, entityManager, executor);
+        super(context, node, extensions, entityManager, executor);
 
         // The underlying CPM node is always expected to be updated in response to changes to
         // the coordinate space represented by a SystemSpaceEntityImpl so we subscribe at
@@ -107,17 +110,20 @@ abstract class SystemSpaceEntityImpl extends AndroidXrEntity implements SystemSp
         // TODO: b/353511649 - Make SystemSpaceEntityImpl thread safe.
         mOpenXrReferenceSpacePose = Matrix4Ext.getUnscaled(openXrReferenceSpaceTransform).getPose();
 
-        // TODO: b/367780918 - Consider using Matrix4.scale when it is fixed.
-        // Retrieve the scale from the matrix. The scale can be retrieved from the matrix by getting
-        // the magnitude of one of the rows of the matrix. Note that we are assuming uniform scale.
+        // Matrix4.scale returns either a positive or negative scale based on the rotation
+        // matrix determinant, but we keep it positive for now to avoid any unexpected issues.
         // SpaceFlinger might apply a scale to the task node, for example if the user caused the
         // main panel to scale in Homespace mode.
-        float data00 = openXrReferenceSpaceTransform.getData()[0];
-        float data01 = openXrReferenceSpaceTransform.getData()[1];
-        float data02 = openXrReferenceSpaceTransform.getData()[2];
-        float scale = (float) Math.sqrt(data00 * data00 + data01 * data01 + data02 * data02);
-        mWorldSpaceScale = new Vector3(scale, scale, scale);
-        this.setScaleInternal(new Vector3(scale, scale, scale));
+        Vector3 actualScale = openXrReferenceSpaceTransform.getScale();
+        if (actualScale.getX() < 0 || actualScale.getY() < 0 || actualScale.getZ() < 0) {
+            Log.d(
+                    "SystemSpaceEntity",
+                    "Received an OpenXrReferenceSpaceTransform with negative scale");
+        }
+        // TODO: b/367780918 - Use the original scale, when the new matrix decomposition is tested
+        // thoroughly.
+        mWorldSpaceScale = Vector3.abs(actualScale);
+        this.setScaleInternal(mWorldSpaceScale.copy());
         onSpaceUpdated();
     }
 
@@ -137,9 +143,8 @@ abstract class SystemSpaceEntityImpl extends AndroidXrEntity implements SystemSp
                                         RuntimeUtils.getMatrix(transform.getTransform())));
     }
 
-    @NonNull
     @Override
-    public Vector3 getWorldSpaceScale() {
+    public @NonNull Vector3 getWorldSpaceScale() {
         return mWorldSpaceScale;
     }
 

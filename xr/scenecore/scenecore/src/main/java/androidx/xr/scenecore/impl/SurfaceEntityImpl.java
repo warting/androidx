@@ -16,11 +16,10 @@
 
 package androidx.xr.scenecore.impl;
 
+import android.content.Context;
 import android.util.Log;
 import android.view.Surface;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.xr.runtime.internal.CameraViewActivityPose;
 import androidx.xr.runtime.internal.Dimensions;
 import androidx.xr.runtime.internal.Entity;
@@ -37,6 +36,9 @@ import com.android.extensions.xr.node.NodeTransaction;
 import com.google.androidxr.splitengine.SplitEngineSubspaceManager;
 import com.google.androidxr.splitengine.SubspaceNode;
 import com.google.ar.imp.apibindings.ImpressApi;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -58,8 +60,7 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
     @ContentSecurityLevel
     private int mContentSecurityLevel = SurfaceEntity.ContentSecurityLevel.NONE;
 
-    @SuperSampling
-    private int mSuperSampling = SurfaceEntity.SuperSampling.DEFAULT;
+    @SuperSampling private int mSuperSampling = SurfaceEntity.SuperSampling.DEFAULT;
 
     private CanvasShape mCanvasShape;
     private float mFeatherRadiusX = 0.0f;
@@ -89,8 +90,7 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
     }
 
     // Converts SurfaceEntity's SuperSampling to a boolean for Impress.
-    private static boolean toImpressSuperSampling(
-            @SuperSampling int superSampling) {
+    private static boolean toImpressSuperSampling(@SuperSampling int superSampling) {
         switch (superSampling) {
             case SuperSampling.NONE:
                 return false;
@@ -107,6 +107,7 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
     }
 
     SurfaceEntityImpl(
+            Context context,
             Entity parentEntity,
             ImpressApi impressApi,
             SplitEngineSubspaceManager splitEngineSubspaceManager,
@@ -117,7 +118,7 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
             CanvasShape canvasShape,
             @ContentSecurityLevel int contentSecurityLevel,
             @SuperSampling int superSampling) {
-        super(extensions.createNode(), extensions, entityManager, executor);
+        super(context, extensions.createNode(), extensions, entityManager, executor);
         mImpressApi = impressApi;
         mSplitEngineSubspaceManager = splitEngineSubspaceManager;
         mStereoMode = stereoMode;
@@ -186,8 +187,12 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
 
     @Override
     public void setStereoMode(@StereoMode int mode) {
+        try {
+            mImpressApi.setStereoModeForStereoSurface(mEntityImpressNode, mode);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e);
+        }
         mStereoMode = mode;
-        mImpressApi.setStereoModeForStereoSurface(mEntityImpressNode, mode);
     }
 
     @Override
@@ -210,7 +215,11 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
             }
             alphaMaskToken = ((TextureResourceImpl) alphaMask).getTextureToken();
         }
-        mImpressApi.setPrimaryAlphaMaskForStereoSurface(mEntityImpressNode, alphaMaskToken);
+        try {
+            mImpressApi.setPrimaryAlphaMaskForStereoSurface(mEntityImpressNode, alphaMaskToken);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Override
@@ -222,23 +231,34 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
             }
             alphaMaskToken = ((TextureResourceImpl) alphaMask).getTextureToken();
         }
-        mImpressApi.setAuxiliaryAlphaMaskForStereoSurface(mEntityImpressNode, alphaMaskToken);
+        try {
+            mImpressApi.setAuxiliaryAlphaMaskForStereoSurface(mEntityImpressNode, alphaMaskToken);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Override
     public Surface getSurface() {
-        // TODO Either cache the surface in the constructor, or change this interface
-        // to
+        // TODO Either cache the surface in the constructor, or change this interface to
         // return a Future.
-        return mImpressApi.getSurfaceFromStereoSurface(mEntityImpressNode);
+        try {
+          return mImpressApi.getSurfaceFromStereoSurface(mEntityImpressNode);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalStateException(e);
+        }
     }
 
     @Override
     public void setFeatherRadiusX(float radius) {
         mFeatherRadiusX = radius;
-        // For now, we set both the left/right and top/bottom feather radius at the same time.
-        mImpressApi.setFeatherRadiusForStereoSurface(
+        try {
+            // For now, we set both the left/right and top/bottom feather radius at the same time.
+            mImpressApi.setFeatherRadiusForStereoSurface(
                 mEntityImpressNode, mFeatherRadiusX, mFeatherRadiusY);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Override
@@ -249,9 +269,13 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
     @Override
     public void setFeatherRadiusY(float radius) {
         mFeatherRadiusY = radius;
-        // For now, we set both the left/right and top/bottom feather radius at the same time.
-        mImpressApi.setFeatherRadiusForStereoSurface(
-                mEntityImpressNode, mFeatherRadiusX, mFeatherRadiusY);
+      try {
+          // For now, we set both the left/right and top/bottom feather radius at the same time.
+          mImpressApi.setFeatherRadiusForStereoSurface(
+                  mEntityImpressNode, mFeatherRadiusX, mFeatherRadiusY);
+      } catch (IllegalArgumentException e) {
+          throw new IllegalStateException(e);
+      }
     }
 
     @Override
@@ -298,8 +322,12 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
         mColorRange = colorRange;
         mMaxContentLightLevel = maxCLL;
         mContentColorMetadataSet = true;
-        mImpressApi.setContentColorMetadataForStereoSurface(
-                mEntityImpressNode, colorSpace, colorTransfer, colorRange, maxCLL);
+        try {
+            mImpressApi.setContentColorMetadataForStereoSurface(
+                    mEntityImpressNode, colorSpace, colorTransfer, colorRange, maxCLL);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Override
@@ -319,9 +347,8 @@ final class SurfaceEntityImpl extends AndroidXrEntity implements SurfaceEntity {
         return mEntityImpressNode;
     }
 
-    @NonNull
     @Override
-    public PerceivedResolutionResult getPerceivedResolution() {
+    public @NonNull PerceivedResolutionResult getPerceivedResolution() {
         // Get the Camera View with which to compute Perceived Resolution
         CameraViewActivityPose cameraView =
                 PerceivedResolutionUtils.getPerceivedResolutionCameraView(mEntityManager);

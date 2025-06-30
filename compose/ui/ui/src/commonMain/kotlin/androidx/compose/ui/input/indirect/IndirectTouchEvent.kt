@@ -37,6 +37,9 @@ sealed interface IndirectTouchEvent {
 
     /** The reason the [IndirectTouchEvent] was sent. */
     val type: IndirectTouchEventType
+
+    /** Main coordinate axis to use for movement. */
+    val primaryAxis: IndirectTouchEventPrimaryAxis
 }
 
 // Work around for Kotlin cross module sealed interfaces.
@@ -47,6 +50,7 @@ internal interface PlatformIndirectTouchEvent : IndirectTouchEvent
 @kotlin.jvm.JvmInline
 @ExperimentalIndirectTouchTypeApi
 value class IndirectTouchEventType private constructor(internal val value: Int) {
+    @ExperimentalIndirectTouchTypeApi
     companion object {
 
         /** An unknown reason for the event. */
@@ -69,4 +73,22 @@ value class IndirectTouchEventType private constructor(internal val value: Int) 
             Move -> "Move"
             else -> "Unknown"
         }
+}
+
+/** Indicates the primary axis to use for movement of an [IndirectTouchEvent]. */
+@kotlin.jvm.JvmInline
+@ExperimentalIndirectTouchTypeApi
+value class IndirectTouchEventPrimaryAxis private constructor(internal val value: Int) {
+    @ExperimentalIndirectTouchTypeApi
+    companion object {
+
+        /** No primary coordinate axis specified for movement. */
+        val Unspecified = IndirectTouchEventPrimaryAxis(0)
+
+        /** X coordinate axis specified as the primary movement axis. */
+        val X = IndirectTouchEventPrimaryAxis(1)
+
+        /** Y coordinate axis specified as the primary movement axis. */
+        val Y = IndirectTouchEventPrimaryAxis(2)
+    }
 }

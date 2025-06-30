@@ -11,27 +11,39 @@ package androidx.xr.runtime.testing {
     ctor public FakeActivityPose();
     method public androidx.xr.runtime.math.Pose getActivitySpacePose();
     method public androidx.xr.runtime.math.Vector3 getActivitySpaceScale();
+    method public final androidx.xr.runtime.internal.HitTestResult getHitTestResult();
     method public androidx.xr.runtime.math.Vector3 getWorldSpaceScale();
     method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.HitTestResult> hitTest(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, @androidx.xr.runtime.internal.ActivityPose.HitTestFilterValue int hitTestFilter);
+    method public final void setHitTestResult(androidx.xr.runtime.internal.HitTestResult);
     method public androidx.xr.runtime.math.Pose transformPoseTo(androidx.xr.runtime.math.Pose pose, androidx.xr.runtime.internal.ActivityPose destination);
     property public androidx.xr.runtime.math.Pose activitySpacePose;
     property public androidx.xr.runtime.math.Vector3 activitySpaceScale;
+    property public final androidx.xr.runtime.internal.HitTestResult hitTestResult;
     property public androidx.xr.runtime.math.Vector3 worldSpaceScale;
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeActivitySpace extends androidx.xr.runtime.testing.FakeSystemSpaceEntity implements androidx.xr.runtime.internal.ActivitySpace {
     ctor public FakeActivitySpace();
     method public void addOnBoundsChangedListener(androidx.xr.runtime.internal.ActivitySpace.OnBoundsChangedListener listener);
+    method public androidx.xr.runtime.internal.HitTestResult getActivitySpaceHitTestResult();
     method public androidx.xr.runtime.internal.Dimensions getBounds();
+    method public java.util.Set<androidx.xr.runtime.internal.ActivitySpace.OnBoundsChangedListener> getOnBoundsChangedListeners();
+    method public androidx.xr.runtime.math.BoundingBox getRecommendedContentBoxInFullSpace();
     method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.HitTestResult> hitTestRelativeToActivityPose(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, @androidx.xr.runtime.internal.ActivityPose.HitTestFilterValue int hitTestFilter, androidx.xr.runtime.internal.ActivityPose activityPose);
+    method public void onBoundsChanged(androidx.xr.runtime.internal.Dimensions bounds);
     method public void removeOnBoundsChangedListener(androidx.xr.runtime.internal.ActivitySpace.OnBoundsChangedListener listener);
+    method public void setActivitySpaceHitTestResult(androidx.xr.runtime.internal.HitTestResult);
+    property public androidx.xr.runtime.internal.HitTestResult activitySpaceHitTestResult;
     property public androidx.xr.runtime.internal.Dimensions bounds;
+    property public java.util.Set<androidx.xr.runtime.internal.ActivitySpace.OnBoundsChangedListener> onBoundsChangedListeners;
+    property public androidx.xr.runtime.math.BoundingBox recommendedContentBoxInFullSpace;
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeAnchorEntity extends androidx.xr.runtime.testing.FakeSystemSpaceEntity implements androidx.xr.runtime.internal.AnchorEntity {
     ctor public FakeAnchorEntity();
     method public long getNativePointer();
     method public int getState();
+    method public void onStateChanged(int newState);
     method public void setOnStateChangedListener(androidx.xr.runtime.internal.AnchorEntity.OnStateChangedListener onStateChangedListener);
     property public long nativePointer;
     property public int state;
@@ -47,10 +59,23 @@ package androidx.xr.runtime.testing {
     method public android.media.AudioTrack.Builder setSoundFieldAttributes(android.media.AudioTrack.Builder builder, androidx.xr.runtime.internal.SoundFieldAttributes attributes);
   }
 
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class FakeCameraViewActivityPose extends androidx.xr.runtime.testing.FakeActivityPose implements androidx.xr.runtime.internal.CameraViewActivityPose {
+    ctor public FakeCameraViewActivityPose();
+    method public int getCameraType();
+    method public androidx.xr.runtime.internal.PixelDimensions getDisplayResolutionInPixels();
+    method public androidx.xr.runtime.internal.CameraViewActivityPose.Fov getFov();
+    property public int cameraType;
+    property public androidx.xr.runtime.internal.PixelDimensions displayResolutionInPixels;
+    property public androidx.xr.runtime.internal.CameraViewActivityPose.Fov fov;
+  }
+
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class FakeComponent implements androidx.xr.runtime.internal.Component {
     ctor public FakeComponent();
+    method public final boolean getCanBeAttached();
     method public boolean onAttach(androidx.xr.runtime.internal.Entity entity);
     method public void onDetach(androidx.xr.runtime.internal.Entity entity);
+    method public final void setCanBeAttached(boolean);
+    property public final boolean canBeAttached;
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class FakeEntity extends androidx.xr.runtime.testing.FakeActivityPose implements androidx.xr.runtime.internal.Entity {
@@ -65,6 +90,7 @@ package androidx.xr.runtime.testing {
     method public java.util.List<androidx.xr.runtime.internal.Component> getComponents();
     method public <T extends androidx.xr.runtime.internal.Component> java.util.List<T> getComponentsOfType(Class<? extends T> type);
     method public String getContentDescription();
+    method public final java.util.Map<androidx.xr.runtime.internal.InputEventListener,java.util.concurrent.Executor> getInputEventListenerMap();
     method public androidx.xr.runtime.internal.Entity? getParent();
     method public androidx.xr.runtime.math.Pose getPose(@androidx.xr.runtime.internal.SpaceValue int relativeTo);
     method public androidx.xr.runtime.math.Vector3 getScale(@androidx.xr.runtime.internal.SpaceValue int relativeTo);
@@ -80,6 +106,7 @@ package androidx.xr.runtime.testing {
     method public void setScale(androidx.xr.runtime.math.Vector3 scale, @androidx.xr.runtime.internal.SpaceValue int relativeTo);
     property public java.util.List<androidx.xr.runtime.internal.Entity> children;
     property public String contentDescription;
+    property public final java.util.Map<androidx.xr.runtime.internal.InputEventListener,java.util.concurrent.Executor> inputEventListenerMap;
     property public androidx.xr.runtime.internal.Entity? parent;
   }
 
@@ -89,7 +116,11 @@ package androidx.xr.runtime.testing {
     method public void setMaterialOverride(androidx.xr.runtime.internal.MaterialResource material, String meshName);
     method public void startAnimation(boolean loop, String? animationName);
     method public void stopAnimation();
-    property @androidx.xr.runtime.internal.GltfEntity.AnimationState public int animationState;
+    property @androidx.xr.runtime.internal.GltfEntity.AnimationStateValue public int animationState;
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeInteractableComponent extends androidx.xr.runtime.testing.FakeComponent implements androidx.xr.runtime.internal.InteractableComponent {
+    ctor public FakeInteractableComponent();
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeJxrPlatformAdapter implements androidx.xr.runtime.internal.JxrPlatformAdapter {
@@ -102,8 +133,8 @@ package androidx.xr.runtime.testing {
     method public androidx.xr.runtime.internal.AnchorEntity createAnchorEntity(androidx.xr.runtime.internal.Anchor anchor);
     method public androidx.xr.runtime.internal.AnchorEntity createAnchorEntity(androidx.xr.runtime.internal.Dimensions bounds, androidx.xr.runtime.internal.PlaneType planeType, androidx.xr.runtime.internal.PlaneSemantic planeSemantic, java.time.Duration searchTimeout);
     method public androidx.xr.runtime.internal.AnchorPlacement createAnchorPlacementForPlanes(java.util.Set<androidx.xr.runtime.internal.PlaneType> planeTypeFilter, java.util.Set<androidx.xr.runtime.internal.PlaneSemantic> planeSemanticFilter);
-    method public androidx.xr.runtime.internal.Entity createEntity(androidx.xr.runtime.math.Pose pose, String name, androidx.xr.runtime.internal.Entity parent);
     method public androidx.xr.runtime.internal.GltfEntity createGltfEntity(androidx.xr.runtime.math.Pose pose, androidx.xr.runtime.internal.GltfModelResource loadedGltf, androidx.xr.runtime.internal.Entity parentEntity);
+    method public androidx.xr.runtime.internal.Entity createGroupEntity(androidx.xr.runtime.math.Pose pose, String name, androidx.xr.runtime.internal.Entity parent);
     method public androidx.xr.runtime.internal.InteractableComponent createInteractableComponent(java.util.concurrent.Executor executor, androidx.xr.runtime.internal.InputEventListener listener);
     method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource>? createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec spec);
     method public androidx.xr.runtime.internal.LoggingEntity createLoggingEntity(androidx.xr.runtime.math.Pose pose);
@@ -233,13 +264,16 @@ package androidx.xr.runtime.testing {
     method public void setConfig(androidx.xr.runtime.Config);
     method public void setHasCreatePermission(boolean);
     method public void setHasMissingPermission(boolean);
+    method public void setShouldSupportFaceTracking(boolean);
     method public void setShouldSupportPlaneTracking(boolean);
+    method public boolean shouldSupportFaceTracking();
     method public boolean shouldSupportPlaneTracking();
     method public void stop();
     method public suspend Object? update(kotlin.coroutines.Continuation<? super kotlin.time.ComparableTimeMark>);
     property public androidx.xr.runtime.Config config;
     property public boolean hasCreatePermission;
     property public boolean hasMissingPermission;
+    property @RestrictTo({androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX}) public boolean shouldSupportFaceTracking;
     property public boolean shouldSupportPlaneTracking;
     property public androidx.xr.runtime.testing.FakeLifecycleManager.State state;
     property public kotlin.time.TestTimeSource timeSource;
@@ -248,7 +282,7 @@ package androidx.xr.runtime.testing {
   }
 
   public static final class FakeLifecycleManager.Companion {
-    property public java.util.List<? extends java.lang.String> TestPermissions;
+    property public java.util.List<java.lang.String> TestPermissions;
   }
 
   public enum FakeLifecycleManager.State {
@@ -268,11 +302,13 @@ package androidx.xr.runtime.testing {
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeMovableComponent extends androidx.xr.runtime.testing.FakeComponent implements androidx.xr.runtime.internal.MovableComponent {
     ctor public FakeMovableComponent();
     method public void addMoveEventListener(java.util.concurrent.Executor executor, androidx.xr.runtime.internal.MoveEventListener moveEventListener);
+    method public java.util.Map<androidx.xr.runtime.internal.MoveEventListener,java.util.concurrent.Executor> getMoveEventListenersMap();
     method public int getScaleWithDistanceMode();
     method public androidx.xr.runtime.internal.Dimensions getSize();
     method public void removeMoveEventListener(androidx.xr.runtime.internal.MoveEventListener moveEventListener);
     method public void setScaleWithDistanceMode(int);
     method public void setSize(androidx.xr.runtime.internal.Dimensions);
+    property public java.util.Map<androidx.xr.runtime.internal.MoveEventListener,java.util.concurrent.Executor> moveEventListenersMap;
     property public int scaleWithDistanceMode;
     property public androidx.xr.runtime.internal.Dimensions size;
   }
@@ -301,11 +337,13 @@ package androidx.xr.runtime.testing {
     method public void detachAnchor(androidx.xr.runtime.internal.Anchor anchor);
     method public java.util.List<androidx.xr.runtime.internal.Anchor> getAnchors();
     method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public androidx.xr.runtime.testing.FakeRuntimeArDevice getArDevice();
+    method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public java.util.List<androidx.xr.runtime.internal.DepthMap> getDepthMaps();
     method public androidx.xr.runtime.internal.Earth getEarth();
     method public androidx.xr.runtime.internal.Hand? getLeftHand();
     method public java.util.List<java.util.UUID> getPersistedAnchorUuids();
     method public androidx.xr.runtime.internal.Hand? getRightHand();
     method public java.util.List<androidx.xr.runtime.internal.Trackable> getTrackables();
+    method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public androidx.xr.runtime.internal.Face? getUserFace();
     method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public java.util.List<androidx.xr.runtime.testing.FakeRuntimeViewCamera> getViewCameras();
     method public java.util.List<androidx.xr.runtime.internal.HitResult> hitTest(androidx.xr.runtime.math.Ray ray);
     method public boolean isTrackingAvailable();
@@ -316,16 +354,23 @@ package androidx.xr.runtime.testing {
     method public void unpersistAnchor(java.util.UUID uuid);
     property public java.util.List<androidx.xr.runtime.internal.Anchor> anchors;
     property @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public androidx.xr.runtime.testing.FakeRuntimeArDevice arDevice;
+    property @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public java.util.List<androidx.xr.runtime.internal.DepthMap> depthMaps;
     property public androidx.xr.runtime.internal.Earth earth;
     property public boolean isTrackingAvailable;
     property public androidx.xr.runtime.internal.Hand? leftHand;
     property public androidx.xr.runtime.internal.Hand? rightHand;
     property public java.util.List<androidx.xr.runtime.internal.Trackable> trackables;
+    property @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public androidx.xr.runtime.internal.Face? userFace;
     property @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public java.util.List<androidx.xr.runtime.testing.FakeRuntimeViewCamera> viewCameras;
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakePointerCaptureComponent extends androidx.xr.runtime.testing.FakeComponent implements androidx.xr.runtime.internal.PointerCaptureComponent {
+    ctor public FakePointerCaptureComponent();
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeResizableComponent extends androidx.xr.runtime.testing.FakeComponent implements androidx.xr.runtime.internal.ResizableComponent {
     ctor public FakeResizableComponent();
+    ctor public FakeResizableComponent(optional androidx.xr.runtime.internal.Dimensions size, optional androidx.xr.runtime.internal.Dimensions minimumSize, optional androidx.xr.runtime.internal.Dimensions maximumSize, optional float fixedAspectRatio, optional boolean autoHideContent, optional boolean autoUpdateSize, optional boolean forceShowResizeOverlay);
     method public void addResizeEventListener(java.util.concurrent.Executor executor, androidx.xr.runtime.internal.ResizeEventListener resizeEventListener);
     method public boolean getAutoHideContent();
     method public boolean getAutoUpdateSize();
@@ -333,6 +378,7 @@ package androidx.xr.runtime.testing {
     method public boolean getForceShowResizeOverlay();
     method public androidx.xr.runtime.internal.Dimensions getMaximumSize();
     method public androidx.xr.runtime.internal.Dimensions getMinimumSize();
+    method public java.util.Map<androidx.xr.runtime.internal.ResizeEventListener,java.util.concurrent.Executor> getResizeEventListenersMap();
     method public androidx.xr.runtime.internal.Dimensions getSize();
     method public void removeResizeEventListener(androidx.xr.runtime.internal.ResizeEventListener resizeEventListener);
     method public void setAutoHideContent(boolean);
@@ -348,7 +394,12 @@ package androidx.xr.runtime.testing {
     property public boolean forceShowResizeOverlay;
     property public androidx.xr.runtime.internal.Dimensions maximumSize;
     property public androidx.xr.runtime.internal.Dimensions minimumSize;
+    property public java.util.Map<androidx.xr.runtime.internal.ResizeEventListener,java.util.concurrent.Executor> resizeEventListenersMap;
     property public androidx.xr.runtime.internal.Dimensions size;
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) internal final class FakeResource implements androidx.xr.runtime.internal.ExrImageResource androidx.xr.runtime.internal.GltfModelResource androidx.xr.runtime.internal.MaterialResource androidx.xr.runtime.internal.Resource androidx.xr.runtime.internal.TextureResource {
+    ctor public FakeResource(long token);
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRuntime implements androidx.xr.runtime.internal.Runtime {
@@ -364,7 +415,7 @@ package androidx.xr.runtime.testing {
 
   public final class FakeRuntimeAnchor implements androidx.xr.runtime.internal.Anchor {
     method public void detach();
-    method public static int getAnchorsCreated();
+    method public static int getAnchorsCreatedCount();
     method public androidx.xr.runtime.internal.Anchor.PersistenceState getPersistenceState();
     method public androidx.xr.runtime.math.Pose getPose();
     method public androidx.xr.runtime.TrackingState getTrackingState();
@@ -372,7 +423,7 @@ package androidx.xr.runtime.testing {
     method public boolean isAttached();
     method public boolean isTrackingAvailable();
     method public void persist();
-    method public static void setAnchorsCreated(int);
+    method public static void setAnchorsCreatedCount(int);
     method public void setPersistenceState(androidx.xr.runtime.internal.Anchor.PersistenceState);
     method public void setPose(androidx.xr.runtime.math.Pose);
     method public void setTrackingState(androidx.xr.runtime.TrackingState);
@@ -388,10 +439,10 @@ package androidx.xr.runtime.testing {
   }
 
   public static final class FakeRuntimeAnchor.Companion {
-    method public int getAnchorsCreated();
-    method public void setAnchorsCreated(int);
+    method public int getAnchorsCreatedCount();
+    method public void setAnchorsCreatedCount(int);
     property public static int ANCHOR_RESOURCE_LIMIT;
-    property public static int anchorsCreated;
+    property public static int anchorsCreatedCount;
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRuntimeArDevice implements androidx.xr.runtime.internal.ArDevice {
@@ -404,6 +455,51 @@ package androidx.xr.runtime.testing {
   }
 
   public static final class FakeRuntimeArDevice.Companion {
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRuntimeAugmentedObject implements androidx.xr.runtime.internal.AugmentedObject {
+    ctor public FakeRuntimeAugmentedObject();
+    ctor public FakeRuntimeAugmentedObject(optional androidx.xr.runtime.math.Pose centerPose, optional androidx.xr.runtime.math.Vector3 extents, optional androidx.xr.runtime.AugmentedObjectCategory category, optional androidx.xr.runtime.TrackingState trackingState, optional java.util.Collection<androidx.xr.runtime.internal.Anchor> anchors);
+    method public androidx.xr.runtime.internal.Anchor createAnchor(androidx.xr.runtime.math.Pose pose);
+    method public void detachAnchor(androidx.xr.runtime.internal.Anchor anchor);
+    method public java.util.Collection<androidx.xr.runtime.internal.Anchor> getAnchors();
+    method public androidx.xr.runtime.AugmentedObjectCategory getCategory();
+    method public androidx.xr.runtime.math.Pose getCenterPose();
+    method public androidx.xr.runtime.math.Vector3 getExtents();
+    method public androidx.xr.runtime.TrackingState getTrackingState();
+    method public void persistAnchor(androidx.xr.runtime.internal.Anchor anchor);
+    method public void setCategory(androidx.xr.runtime.AugmentedObjectCategory);
+    method public void setCenterPose(androidx.xr.runtime.math.Pose);
+    method public void setExtents(androidx.xr.runtime.math.Vector3);
+    method public void setTrackingState(androidx.xr.runtime.TrackingState);
+    property public java.util.Collection<androidx.xr.runtime.internal.Anchor> anchors;
+    property public androidx.xr.runtime.AugmentedObjectCategory category;
+    property public androidx.xr.runtime.math.Pose centerPose;
+    property public androidx.xr.runtime.math.Vector3 extents;
+    property public androidx.xr.runtime.TrackingState trackingState;
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRuntimeDepthMap implements androidx.xr.runtime.internal.DepthMap {
+    ctor public FakeRuntimeDepthMap();
+    ctor public FakeRuntimeDepthMap(optional int width, optional int height, optional java.nio.FloatBuffer? rawDepthMap, optional java.nio.ByteBuffer? rawConfidenceMap, optional java.nio.FloatBuffer? smoothDepthMap, optional java.nio.ByteBuffer? smoothConfidenceMap);
+    method public int getHeight();
+    method public java.nio.ByteBuffer? getRawConfidenceMap();
+    method public java.nio.FloatBuffer? getRawDepthMap();
+    method public java.nio.ByteBuffer? getSmoothConfidenceMap();
+    method public java.nio.FloatBuffer? getSmoothDepthMap();
+    method public int getWidth();
+    method public void setHeight(int);
+    method public void setRawConfidenceMap(java.nio.ByteBuffer?);
+    method public void setRawDepthMap(java.nio.FloatBuffer?);
+    method public void setSmoothConfidenceMap(java.nio.ByteBuffer?);
+    method public void setSmoothDepthMap(java.nio.FloatBuffer?);
+    method public void setWidth(int);
+    property public int height;
+    property public java.nio.ByteBuffer? rawConfidenceMap;
+    property public java.nio.FloatBuffer? rawDepthMap;
+    property public java.nio.ByteBuffer? smoothConfidenceMap;
+    property public java.nio.FloatBuffer? smoothDepthMap;
+    property public int width;
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRuntimeEarth implements androidx.xr.runtime.internal.Earth {
@@ -429,6 +525,23 @@ package androidx.xr.runtime.testing {
     property public androidx.xr.runtime.internal.Earth.GeospatialPoseResult? nextGeospatialPoseResult;
     property public androidx.xr.runtime.math.Pose? nextPose;
     property public androidx.xr.runtime.internal.Earth.State state;
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRuntimeFace implements androidx.xr.runtime.internal.Face {
+    ctor public FakeRuntimeFace();
+    ctor public FakeRuntimeFace(optional androidx.xr.runtime.TrackingState trackingState, optional boolean isValid, optional float[] blendShapeValues, optional float[] confidenceValues);
+    method public float[] getBlendShapeValues();
+    method public float[] getConfidenceValues();
+    method public androidx.xr.runtime.TrackingState getTrackingState();
+    method public boolean isValid();
+    method public void setBlendShapeValues(float[]);
+    method public void setConfidenceValues(float[]);
+    method public void setTrackingState(androidx.xr.runtime.TrackingState);
+    method public void setValid(boolean);
+    property public float[] blendShapeValues;
+    property public float[] confidenceValues;
+    property public boolean isValid;
+    property public androidx.xr.runtime.TrackingState trackingState;
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRuntimeFactory implements androidx.xr.runtime.internal.RuntimeFactory {
@@ -518,19 +631,20 @@ package androidx.xr.runtime.testing {
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeSpatialEnvironment implements androidx.xr.runtime.internal.SpatialEnvironment {
     ctor public FakeSpatialEnvironment();
-    method public void addOnPassthroughOpacityChangedListener(java.util.function.Consumer<java.lang.Float> listener);
-    method public void addOnSpatialEnvironmentChangedListener(java.util.function.Consumer<java.lang.Boolean> listener);
+    method public void addOnPassthroughOpacityChangedListener(java.util.concurrent.Executor executor, java.util.function.Consumer<java.lang.Float> listener);
+    method public void addOnSpatialEnvironmentChangedListener(java.util.concurrent.Executor executor, java.util.function.Consumer<java.lang.Boolean> listener);
     method public float getCurrentPassthroughOpacity();
-    method public Float? getPassthroughOpacityPreference();
-    method public androidx.xr.runtime.internal.SpatialEnvironment.SpatialEnvironmentPreference? getSpatialEnvironmentPreference();
-    method public boolean isSpatialEnvironmentPreferenceActive();
+    method public float getPreferredPassthroughOpacity();
+    method public androidx.xr.runtime.internal.SpatialEnvironment.SpatialEnvironmentPreference? getPreferredSpatialEnvironment();
+    method public boolean isPreferredSpatialEnvironmentActive();
     method public void removeOnPassthroughOpacityChangedListener(java.util.function.Consumer<java.lang.Float> listener);
     method public void removeOnSpatialEnvironmentChangedListener(java.util.function.Consumer<java.lang.Boolean> listener);
-    method public int setPassthroughOpacityPreference(Float? passthroughOpacityPreference);
-    method public int setSpatialEnvironmentPreference(androidx.xr.runtime.internal.SpatialEnvironment.SpatialEnvironmentPreference? preference);
+    method public void setPreferredPassthroughOpacity(float);
+    method public void setPreferredSpatialEnvironment(androidx.xr.runtime.internal.SpatialEnvironment.SpatialEnvironmentPreference?);
     property public float currentPassthroughOpacity;
-    property public Float? passthroughOpacityPreference;
-    property public androidx.xr.runtime.internal.SpatialEnvironment.SpatialEnvironmentPreference? spatialEnvironmentPreference;
+    property public boolean isPreferredSpatialEnvironmentActive;
+    property public float preferredPassthroughOpacity;
+    property public androidx.xr.runtime.internal.SpatialEnvironment.SpatialEnvironmentPreference? preferredSpatialEnvironment;
   }
 
   public final class FakeSpatialModeChangeListener implements androidx.xr.runtime.internal.SpatialModeChangeListener {
@@ -602,6 +716,7 @@ package androidx.xr.runtime.testing {
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class FakeSystemSpaceEntity extends androidx.xr.runtime.testing.FakeEntity implements androidx.xr.runtime.internal.SystemSpaceEntity {
     ctor public FakeSystemSpaceEntity();
+    method public final void onSpaceUpdated();
     method public void setOnSpaceUpdatedListener(Runnable? listener, java.util.concurrent.Executor? executor);
   }
 

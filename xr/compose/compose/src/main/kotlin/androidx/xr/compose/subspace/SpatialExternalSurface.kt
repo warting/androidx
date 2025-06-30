@@ -21,6 +21,7 @@ import androidx.annotation.RestrictTo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ExperimentalComposeApi
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -77,12 +78,18 @@ private class SpatialExternalSurfaceScopeInstance(private val entity: CoreSurfac
     SpatialExternalSurfaceScope {
 
     private var executedInit = false
+    private var executedDestroy = false
+    private var pendingOnCreate: ((Surface) -> Unit)? = null
     private var pendingOnDestroy: ((Surface) -> Unit)? = null
 
     override fun onSurfaceCreated(onSurfaceCreated: (Surface) -> Unit) {
+        pendingOnCreate = onSurfaceCreated
+    }
+
+    internal fun executeOnCreate() {
         if (!executedInit) {
             executedInit = true
-            onSurfaceCreated(entity.surfaceEntity.getSurface())
+            pendingOnCreate?.let { it(entity.surfaceEntity.getSurface()) }
         }
     }
 
@@ -91,8 +98,11 @@ private class SpatialExternalSurfaceScopeInstance(private val entity: CoreSurfac
     }
 
     internal fun executeOnDestroy() {
-        pendingOnDestroy?.let { it(entity.surfaceEntity.getSurface()) }
-        entity.dispose()
+        if (!executedDestroy) {
+            executedDestroy = true
+            pendingOnDestroy?.let { it(entity.surfaceEntity.getSurface()) }
+            entity.dispose()
+        }
     }
 }
 
@@ -101,12 +111,18 @@ private class SpatialExternalSphereSurfaceScopeInstance(
 ) : SpatialExternalSurfaceScope {
 
     private var executedInit = false
+    private var executedDestroy = false
+    private var pendingOnCreate: ((Surface) -> Unit)? = null
     private var pendingOnDestroy: ((Surface) -> Unit)? = null
 
     override fun onSurfaceCreated(onSurfaceCreated: (Surface) -> Unit) {
+        pendingOnCreate = onSurfaceCreated
+    }
+
+    internal fun executeOnCreate() {
         if (!executedInit) {
             executedInit = true
-            onSurfaceCreated(entity.surfaceEntity.getSurface())
+            pendingOnCreate?.let { it(entity.surfaceEntity.getSurface()) }
         }
     }
 
@@ -115,8 +131,11 @@ private class SpatialExternalSphereSurfaceScopeInstance(
     }
 
     internal fun executeOnDestroy() {
-        pendingOnDestroy?.let { it(entity.surfaceEntity.getSurface()) }
-        entity.dispose()
+        if (!executedDestroy) {
+            executedDestroy = true
+            pendingOnDestroy?.let { it(entity.surfaceEntity.getSurface()) }
+            entity.dispose()
+        }
     }
 }
 
@@ -137,46 +156,42 @@ public value class StereoMode private constructor(public val value: Int) {
 /** Protection levels for the Surface content. */
 @JvmInline
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-public value class ContentSecurityLevel private constructor(public val value: Int) {
+public value class SurfaceProtection private constructor(public val value: Int) {
     public companion object {
         /** No security is applied. */
-        public val None: ContentSecurityLevel =
-            ContentSecurityLevel(SurfaceEntity.ContentSecurityLevel.NONE)
+        public val None: SurfaceProtection =
+            SurfaceProtection(SurfaceEntity.ContentSecurityLevel.NONE)
         /**
-         * Protects digital rights content that is encoded in a scheme supported by the device. This
-         * will prevent recordings of the Surface content. This protection level is only usable with
-         * secure media content. A protected Surface can't play non-drm digital content.
+         * Sets the underlying Surface to set the
+         * [android.hardware.HardwareBuffer.USAGE_PROTECTED_CONTENT] flag. This is mainly used to
+         * protect DRM video content.
          */
-        public val DrmProtected: ContentSecurityLevel =
-            ContentSecurityLevel(SurfaceEntity.ContentSecurityLevel.PROTECTED)
+        public val Protected: SurfaceProtection =
+            SurfaceProtection(SurfaceEntity.ContentSecurityLevel.PROTECTED)
     }
 }
 
 /**
  * A Composable that creates and owns an Android Surface into which the application can render
- * stereo image content. This Surface is then texture mapped to the canvas, and if a stereoscopic
- * StereoMode is specified, then the User will see left and right eye content mapped to the
- * appropriate display. Width and height will default to 400 pixels if it is not specified using
- * size modifiers.
+ * stereo image content. This can be thought of as the spatial equivalent of AndroidExternalSurface.
+ * This Surface is texture mapped to the canvas, and if a stereoscopic StereoMode is specified, then
+ * the User will see left and right eye content mapped to the appropriate display. Width and height
+ * will default to 400 pixels if it is not specified using size modifiers.
  *
  * Note that this Surface does not capture input events. It is also not currently possible to
  * synchronize StereoMode changes with application rendering or video decoding. This composable
  * currently cannot render in front of other panels, so movable modifier usage is not recommended if
- * there are other panels in the layout, aside from the content block of this Composable. Digital
- * rights management provided by different media players will require the proper
- * [contentSecurityLevel] to be set.
+ * there are other panels in the layout, aside from the content block of this Composable.
+ *
+ * Playing certain content will require the proper [SurfaceProtection]. This is mainly used to
+ * protect DRM video content.
  *
  * @param modifier SubspaceModifiers to apply to the SpatialSurfacePanel.
  * @param stereoMode The [StereoMode] which describes how parts of the surface are displayed to the
  *   user's eyes. This will affect how the content is interpreted and displayed on the surface.
  * @param featheringEffect A [SpatialFeatheringEffect] to apply to to canvas of the surface exposed
  *   from [SpatialExternalSurfaceScope.onSurfaceCreated].
- * @param contentSecurityLevel Sets a security level of the Surface to secure digital content. Using
- *   DrmProtected is currently in an Experimental state. Currently this field does not support
- *   recomposition, and there might be rendering issues if creating a new SpatialExternalSurface
- *   immediately after removing a DrmProtected one from composition. Playing a list of mixed drm and
- *   non drm content with one Surface is not supported. There may also be rendering issues if the
- *   AndroidManifest includes a full space start mode for the Activity using this Composable.
+ * @param surfaceProtection Sets the Surface's protection from CPU access.
  * @param content Content block where the surface can be accessed using
  *   [SpatialExternalSurfaceScope.onSurfaceCreated]. Composable content will be rendered over the
  *   Surface canvas. If using [StereoMode.SideBySide] or [StereoMode.TopBottom], it is recommended
@@ -190,46 +205,56 @@ public fun SpatialExternalSurface(
     stereoMode: StereoMode,
     modifier: SubspaceModifier = SubspaceModifier,
     featheringEffect: SpatialFeatheringEffect = ZeroFeatheringEffect,
-    contentSecurityLevel: ContentSecurityLevel = ContentSecurityLevel.None,
+    surfaceProtection: SurfaceProtection = SurfaceProtection.None,
     content: @Composable @SubspaceComposable SpatialExternalSurfaceScope.() -> Unit,
 ) {
     val session = LocalSession.current
 
-    val coreSurfaceEntity = rememberCoreSurfaceEntity {
-        SurfaceEntity.create(
-            session = checkNotNull(session) { "Session is required" },
-            stereoMode = stereoMode.value,
-            contentSecurityLevel = contentSecurityLevel.value,
-        )
-    }
-    val instance = remember { SpatialExternalSurfaceScopeInstance(coreSurfaceEntity) }
+    // When surface protection changes, the surface entity has to be recreated because protection is
+    // a non mutable setting.
+    val coreSurfaceEntity =
+        rememberCoreSurfaceEntity(key = surfaceProtection) {
+            SurfaceEntity.create(
+                session = checkNotNull(session) { "Session is required" },
+                stereoMode = stereoMode.value,
+                contentSecurityLevel = surfaceProtection.value,
+            )
+        }
+    val instance =
+        remember(coreSurfaceEntity) { SpatialExternalSurfaceScopeInstance(coreSurfaceEntity) }
 
     // Stereo mode can update during a recomposition.
     coreSurfaceEntity.stereoMode = stereoMode.value
-
     coreSurfaceEntity.setFeatheringEffect(featheringEffect)
 
-    DisposableEffect(instance) { onDispose { instance.executeOnDestroy() } }
+    DisposableEffect(instance) {
+        instance.executeOnCreate()
+        onDispose { instance.executeOnDestroy() }
+    }
 
-    SubspaceLayout(
-        modifier = modifier,
-        coreEntity = coreSurfaceEntity,
-        content = { instance.content() },
-        measurePolicy = SpatialBoxMeasurePolicy(SpatialAlignment.Center, false),
-    )
+    key(coreSurfaceEntity) {
+        SubspaceLayout(
+            modifier = modifier,
+            coreEntity = coreSurfaceEntity,
+            content = { instance.content() },
+            measurePolicy = SpatialBoxMeasurePolicy(SpatialAlignment.Center, false),
+        )
+    }
 }
 
 /**
  * A Composable that creates and owns an Android Surface into which the application can render
- * stereo image content inside a 180 degree hemisphere dome. This Surface is then texture mapped to
- * the canvas, and if a stereoscopic StereoMode is specified, then the User will see left and right
- * eye content mapped to the appropriate display. This is an environment-like Composable that will
- * appear centered around the user's head position.
+ * stereo image content inside a 180 degree hemisphere dome. This Surface is texture mapped to the
+ * canvas, and if a stereoscopic StereoMode is specified, then the User will see left and right eye
+ * content mapped to the appropriate display. This is an environment-like Composable that will
+ * appear centered around the user's head position. If head tracking isn't already configured, an
+ * attempt will be made to configure it.
  *
  * Note that this Surface does not capture input events. It is also not currently possible to
- * synchronize StereoMode changes with application rendering or video decoding. This Composable does
- * not support movable or resizable modifiers. Digital rights management provided by different media
- * players will require the proper [contentSecurityLevel] to be set.
+ * synchronize StereoMode changes with application rendering or video decoding.
+ *
+ * Playing certain content will require the proper [SurfaceProtection]. This is mainly used to
+ * protect DRM video content.
  *
  * @param modifier SubspaceModifiers to apply to the hemisphere. A sphere's measured size is
  *   automatically inferred from [radius] and does not need to be set through a modifier.
@@ -240,11 +265,7 @@ public fun SpatialExternalSurface(
  *   from [SpatialExternalSurfaceScope.onSurfaceCreated]. For hemisphere domes, vertical feathering
  *   applies to the top and bottom poles of the dome, while horizontal feathering applies to the
  *   left and right sides.
- * @param contentSecurityLevel Sets a security level of the Surface to secure digital content. Using
- *   DrmProtected is currently in an Experimental state. Currently this field does not support
- *   recomposition, and there might be rendering issues if creating a new SpatialExternalSurface
- *   immediately after removing a DrmProtected one from composition. Playing a list of mixed drm and
- *   non drm content with one Surface is not supported.
+ * @param surfaceProtection Sets the Surface's protection from CPU access.
  * @param content Content block where the surface can be accessed using
  *   [SpatialExternalSurfaceScope.onSurfaceCreated]. Composable content will be rendered in front of
  *   the user, slightly below the current gaze level. This default location is scaled with radius.
@@ -258,7 +279,7 @@ public fun SpatialExternalSurface180Hemisphere(
     modifier: SubspaceModifier = SubspaceModifier,
     radius: Dp = SpatialExternalSurfaceDefaults.sphereRadius,
     featheringEffect: SpatialFeatheringEffect = ZeroFeatheringEffect,
-    contentSecurityLevel: ContentSecurityLevel = ContentSecurityLevel.None,
+    surfaceProtection: SurfaceProtection = SurfaceProtection.None,
     content: @Composable @SubspaceComposable SpatialExternalSurfaceScope.() -> Unit,
 ) {
     SpatialExternalSurfaceSphere(
@@ -267,7 +288,7 @@ public fun SpatialExternalSurface180Hemisphere(
         modifier = modifier,
         radius = radius,
         featheringEffect = featheringEffect,
-        contentSecurityLevel = contentSecurityLevel,
+        surfaceProtection = surfaceProtection,
         content = content,
     )
 }
@@ -277,12 +298,14 @@ public fun SpatialExternalSurface180Hemisphere(
  * stereo image content inside a 360 degree sphere dome. This Surface is then texture mapped to the
  * canvas, and if a stereoscopic StereoMode is specified, then the User will see left and right eye
  * content mapped to the appropriate display. This is an environment-like Composable that will
- * appear centered around the user's head position.
+ * appear centered around the user's head position. If head tracking isn't already configured, an
+ * attempt will be made to configure it.
  *
  * Note that this Surface does not capture input events. It is also not currently possible to
- * synchronize StereoMode changes with application rendering or video decoding. This Composable does
- * not support movable or resizable modifiers. Digital rights management provided by different media
- * players will require the proper [contentSecurityLevel] to be set.
+ * synchronize StereoMode changes with application rendering or video decoding.
+ *
+ * Playing certain content will require the proper [SurfaceProtection]. This is mainly used to
+ * protect DRM video content.
  *
  * @param modifier SubspaceModifiers to apply to the sphere. A sphere's measured size is
  *   automatically inferred from [radius] and does not need to be set through a modifier.
@@ -293,11 +316,7 @@ public fun SpatialExternalSurface180Hemisphere(
  *   from [SpatialExternalSurfaceScope.onSurfaceCreated]. For sphere domes, vertical feathering
  *   applies to the top and bottom poles of the dome, while horizontal feathering applies to the
  *   left and right sides where the video is stitched together.
- * @param contentSecurityLevel Sets a security level of the Surface to secure digital content. Using
- *   DrmProtected is currently in an Experimental state. Currently this field does not support
- *   recomposition, and there might be rendering issues if creating a new SpatialExternalSurface
- *   immediately after removing a DrmProtected one from composition. Playing a list of mixed drm and
- *   non drm content with one Surface is not supported.
+ * @param surfaceProtection Sets the Surface's protection from CPU access.
  * @param content Content block where the surface can be accessed using
  *   [SpatialExternalSurfaceScope.onSurfaceCreated]. Composable content will be rendered in front of
  *   the user, slightly below the current gaze level. This default location is scaled with radius.
@@ -311,7 +330,7 @@ public fun SpatialExternalSurface360Sphere(
     modifier: SubspaceModifier = SubspaceModifier,
     radius: Dp = SpatialExternalSurfaceDefaults.sphereRadius,
     featheringEffect: SpatialFeatheringEffect = ZeroFeatheringEffect,
-    contentSecurityLevel: ContentSecurityLevel = ContentSecurityLevel.None,
+    surfaceProtection: SurfaceProtection = SurfaceProtection.None,
     content: @Composable @SubspaceComposable SpatialExternalSurfaceScope.() -> Unit,
 ) {
     SpatialExternalSurfaceSphere(
@@ -320,7 +339,7 @@ public fun SpatialExternalSurface360Sphere(
         modifier = modifier,
         radius = radius,
         featheringEffect = featheringEffect,
-        contentSecurityLevel = contentSecurityLevel,
+        surfaceProtection = surfaceProtection,
         content = content,
     )
 }
@@ -333,52 +352,59 @@ private fun SpatialExternalSurfaceSphere(
     modifier: SubspaceModifier = SubspaceModifier,
     radius: Dp = SpatialExternalSurfaceDefaults.sphereRadius,
     featheringEffect: SpatialFeatheringEffect = ZeroFeatheringEffect,
-    contentSecurityLevel: ContentSecurityLevel = ContentSecurityLevel.None,
+    surfaceProtection: SurfaceProtection = SurfaceProtection.None,
     content: @Composable @SubspaceComposable SpatialExternalSurfaceScope.() -> Unit,
 ) {
     val session = LocalSession.current
-
     val meterRadius = radius.toMeter().value
-    val coreSurfaceEntity = rememberCoreSphereSurfaceEntity {
-        SurfaceEntity.create(
-            session = checkNotNull(session) { "Session is required" },
-            stereoMode = stereoMode.value,
-            contentSecurityLevel = contentSecurityLevel.value,
-            canvasShape =
-                if (isHemisphere) {
-                    SurfaceEntity.CanvasShape.Vr180Hemisphere(meterRadius)
-                } else {
-                    SurfaceEntity.CanvasShape.Vr360Sphere(meterRadius)
-                },
-        )
-    }
-    val instance = remember { SpatialExternalSphereSurfaceScopeInstance(coreSurfaceEntity) }
+    val coreSurfaceEntity =
+        rememberCoreSphereSurfaceEntity(surfaceProtection) {
+            SurfaceEntity.create(
+                session = checkNotNull(session) { "Session is required" },
+                stereoMode = stereoMode.value,
+                contentSecurityLevel = surfaceProtection.value,
+                canvasShape =
+                    if (isHemisphere) {
+                        SurfaceEntity.CanvasShape.Vr180Hemisphere(meterRadius)
+                    } else {
+                        SurfaceEntity.CanvasShape.Vr360Sphere(meterRadius)
+                    },
+            )
+        }
+
+    val instance =
+        remember(coreSurfaceEntity) { SpatialExternalSphereSurfaceScopeInstance(coreSurfaceEntity) }
 
     coreSurfaceEntity.stereoMode = stereoMode.value
     coreSurfaceEntity.radius = meterRadius
     coreSurfaceEntity.setFeatheringEffect(featheringEffect)
 
-    DisposableEffect(instance) { onDispose { instance.executeOnDestroy() } }
+    DisposableEffect(instance) {
+        instance.executeOnCreate()
+        onDispose { instance.executeOnDestroy() }
+    }
 
-    val density = LocalDensity.current
-    SubspaceLayout(
-        modifier = modifier,
-        coreEntity = coreSurfaceEntity,
-        content = {
-            SpatialBox(
-                modifier =
-                    modifier
-                        .fillMaxSize()
-                        .offset(
-                            z = radius * SPHERE_CONTENT_Z_OFFSET_PERCENT,
-                            y = radius * SPHERE_CONTENT_Y_OFFSET_PERCENT,
-                        )
-            ) {
-                instance.content()
-            }
-        },
-        measurePolicy = SphereMeasurePolicy(with(density) { radius.roundToPx() }),
-    )
+    key(coreSurfaceEntity) {
+        val density = LocalDensity.current
+        SubspaceLayout(
+            modifier = modifier,
+            coreEntity = coreSurfaceEntity,
+            content = {
+                SpatialBox(
+                    modifier =
+                        modifier
+                            .fillMaxSize()
+                            .offset(
+                                z = radius * SPHERE_CONTENT_Z_OFFSET_PERCENT,
+                                y = radius * SPHERE_CONTENT_Y_OFFSET_PERCENT,
+                            )
+                ) {
+                    instance.content()
+                }
+            },
+            measurePolicy = SphereMeasurePolicy(with(density) { radius.roundToPx() }),
+        )
+    }
 }
 
 /** Uses [radius] to measure a cube out of the hemisphere or front half of a sphere. */

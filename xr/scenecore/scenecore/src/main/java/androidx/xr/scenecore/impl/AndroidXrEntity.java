@@ -16,9 +16,9 @@
 
 package androidx.xr.scenecore.impl;
 
+import android.content.Context;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.xr.runtime.internal.ActivitySpace;
 import androidx.xr.runtime.internal.Entity;
 import androidx.xr.runtime.internal.HitTestResult;
@@ -40,6 +40,8 @@ import com.android.extensions.xr.node.ReformEvent;
 import com.android.extensions.xr.node.ReformOptions;
 
 import com.google.common.util.concurrent.ListenableFuture;
+
+import org.jspecify.annotations.NonNull;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,10 +71,12 @@ abstract class AndroidXrEntity extends BaseEntity implements Entity {
     private ReformOptions mReformOptions;
 
     AndroidXrEntity(
+            Context context,
             Node node,
             XrExtensions extensions,
             EntityManager entityManager,
             ScheduledExecutorService executor) {
+        super(context);
         mNode = node;
         mExtensions = extensions;
         mEntityManager = entityManager;
@@ -80,9 +84,8 @@ abstract class AndroidXrEntity extends BaseEntity implements Entity {
         mEntityManager.setEntityForNode(node, (Entity) this);
     }
 
-    @NonNull
     @Override
-    public Pose getPose(@SpaceValue int relativeTo) {
+    public @NonNull Pose getPose(@SpaceValue int relativeTo) {
         switch (relativeTo) {
             case Space.PARENT:
                 return super.getPose(relativeTo);
@@ -204,7 +207,7 @@ abstract class AndroidXrEntity extends BaseEntity implements Entity {
     public void setParent(Entity parent) {
         if ((parent != null) && !(parent instanceof AndroidXrEntity)) {
             Log.e(
-                    "RealityCoreRuntime",
+                    "SceneCore",
                     "Cannot set non-AndroidXrEntity as a parent of a AndroidXrEntity");
             return;
         }
@@ -445,8 +448,7 @@ abstract class AndroidXrEntity extends BaseEntity implements Entity {
     }
 
     @Override
-    @NonNull
-    public ListenableFuture<HitTestResult> hitTest(
+    public @NonNull ListenableFuture<HitTestResult> hitTest(
             @NonNull Vector3 origin,
             @NonNull Vector3 direction,
             @HitTestFilterValue int hitTestFilter) {
