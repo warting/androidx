@@ -61,12 +61,11 @@ androidXMultiplatform {
             )
         }
         stableAidl {
-            version 1
+            version = 1
         }
         compilations.withType(KotlinMultiplatformAndroidHostTestCompilation) {
             it.returnDefaultValues = true
         }
-        experimentalProperties["android.lint.useK2Uast"] = false
 
         // Needed for api tasks and docs generation
         sourceSets {

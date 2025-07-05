@@ -41,7 +41,6 @@ import java.nio.file.Paths
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
 internal class AnchorRenderer(
@@ -61,8 +60,7 @@ internal class AnchorRenderer(
         updateJob =
             SupervisorJob(
                 coroutineScope.launch() {
-                    gltfAnchorModel =
-                        GltfModel.createAsync(session, Paths.get("models/xyzArrows.glb")).await()
+                    gltfAnchorModel = GltfModel.create(session, Paths.get("models/xyzArrows.glb"))
                     planeRenderer.renderedPlanes.collect { attachInteractableComponents(it) }
                 }
             )
@@ -85,7 +83,7 @@ internal class AnchorRenderer(
             if (planeModel.entity.getComponents().isEmpty()) {
                 planeModel.entity.addComponent(
                     InteractableComponent.create(session, activity.mainExecutor) { event ->
-                        if (event.action.equals(InputEvent.ACTION_DOWN)) {
+                        if (event.action.equals(InputEvent.Action.ACTION_DOWN)) {
                             val up =
                                 session.scene.spatialUser.head?.activitySpacePose?.up ?: Vector3.Up
                             val perceptionRayPose =

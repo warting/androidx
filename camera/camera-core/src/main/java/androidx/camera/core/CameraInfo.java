@@ -37,6 +37,7 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -556,15 +557,58 @@ public interface CameraInfo {
      * Returns if the {@link GroupableFeature} groups set to the provided {@link SessionConfig} is
      * supported.
      *
+     * <p> This API can be used before calling `bindToLifecycle` API to know if binding a
+     * {@link SessionConfig} with some given combination of feature groups will work or not.
+     *
+     * <p> The following pseudo-code shows an example of how to use this API:
+     * <pre>{@code
+     * // Disable the unsupported feature options in app feature menu UI once some features have
+     * // already been selected and adding these features will lead to an unsupported configuration.
+     * void disableUnsupportedFeatures(Set<GroupableFeature> selectedFeatures,
+     *         Set<GroupableFeature> appFeatureOptions) {
+     *     for (GroupableFeature featureOption : appFeatureOptions) {
+     *         if (selectedFeatures.contains(featureOption)) { continue; }
+     *
+     *         List<GroupableFeature> combinedFeatures = new ArrayList<>(selectedFeatures);
+     *         combinedFeatures.add(featureOption);
+     *         SessionConfig sessionConfig =
+     *             new SessionConfig.Builder(useCases)
+     *                 .addRequiredFeatureGroup(combinedFeatures.toArray(new Feature[0]))
+     *                 .build();
+     *
+     *         if (!cameraInfo.isFeatureGroupSupported(sessionConfig)) {
+     *             disableFeatureOptionInUi(featureOption); // e.g. app logic to disable a menu item
+     *         }
+     *     }
+     * }}</pre>
+     *
      * @param sessionConfig The {@link SessionConfig} containing some required or preferred
      *   feature groups.
      * @return Whether the feature group is supported or not.
      * @throws IllegalArgumentException If some features conflict with each other by having
      *   different values for the same feature type and can thus never be supported together.
+     * @see androidx.camera.core.featuregroup.GroupableFeature
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP) // TODO: Expose the API for public release.
     @ExperimentalSessionConfig
     default boolean isFeatureGroupSupported(@NonNull SessionConfig sessionConfig) {
         return false;
+    }
+
+    /**
+     * Returns the unique, stable CameraX identifier for this camera, if available.
+     *
+     * <p>For most standard CameraX implementations, this will return a non-null identifier.
+     * However, some legacy or testing implementations may not have a valid identifier, in which
+     * case this method will return {@code null}.
+     *
+     * @return The {@link CameraIdentifier} for this camera, or {@code null} if one is not
+     * available.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    @Nullable
+    default CameraIdentifier getCameraIdentifier() {
+        // For classes that implement CameraInfo but do not override this method,
+        // return null to indicate that no identifier is available.
+        return null;
     }
 }

@@ -24,6 +24,7 @@ import android.widget.Button
 import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.xr.runtime.Session
 import androidx.xr.runtime.SessionCreateSuccess
 import androidx.xr.runtime.math.IntSize2d
@@ -35,9 +36,10 @@ import androidx.xr.scenecore.GltfModelEntity
 import androidx.xr.scenecore.MovableComponent
 import androidx.xr.scenecore.PanelEntity
 import androidx.xr.scenecore.SpatialPointerComponent
-import androidx.xr.scenecore.SpatialPointerIconNone
+import androidx.xr.scenecore.SpatialPointerIcon
 import androidx.xr.scenecore.scene
 import java.nio.file.Paths
+import kotlinx.coroutines.launch
 
 @Suppress("Deprecation")
 // TODO - b/421386891: is/setHidden is deprecated; this activity needs to be updated to use
@@ -70,16 +72,10 @@ class VisibilityTestActivity : AppCompatActivity() {
         }
 
         childPanelEntity2 = createPanelEntity(session, "Child Panel 2", childPanelEntity1)
-        val dragonModelFuture =
-            GltfModel.createAsync(session, Paths.get("models", "Dragon_Evolved.gltf"))
-        dragonModelFuture.addListener(
-            {
-                val dragonModel = dragonModelFuture.get()
-                setUpScene(dragonModel)
-            },
-            // This will cause the listener to be run on the UI thread
-            Runnable::run,
-        )
+        lifecycleScope.launch {
+            val dragonModel = GltfModel.create(session, Paths.get("models", "Dragon_Evolved.gltf"))
+            setUpScene(dragonModel)
+        }
     }
 
     private fun setUpScene(dragonModel: GltfModel) {
@@ -135,7 +131,7 @@ class VisibilityTestActivity : AppCompatActivity() {
             _,
             isChecked: Boolean ->
             childPanel1PointerComponent.spatialPointerIcon =
-                if (isChecked) SpatialPointerIconNone else null
+                if (isChecked) SpatialPointerIcon.NONE else SpatialPointerIcon.DEFAULT
         }
         findViewById<Switch>(R.id.hide_panel2).setOnCheckedChangeListener { _, isChecked: Boolean ->
             childPanelEntity2?.setHidden(isChecked)
@@ -182,7 +178,7 @@ class VisibilityTestActivity : AppCompatActivity() {
                 Pose(Vector3(-0.5f, -0.1f, 0f)),
             )
         panelEntity.parent = parent
-        if (!panelEntity.addComponent(MovableComponent.create(session, false, false, emptySet()))) {
+        if (!panelEntity.addComponent(MovableComponent.createSystemMovable(session, false))) {
             throw RuntimeException("Failed to add movable component to panel")
         }
         panelContentView.findViewById<TextView>(R.id.textView).text = name

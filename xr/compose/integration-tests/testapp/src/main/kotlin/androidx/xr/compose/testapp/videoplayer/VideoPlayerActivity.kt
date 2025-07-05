@@ -123,7 +123,7 @@ class VideoPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         session = (Session.create(this) as SessionCreateSuccess).session
-        session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+        session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
         session.configure(Config(headTracking = Config.HeadTrackingMode.LAST_KNOWN))
 
         checkExternalStoragePermission()
@@ -188,12 +188,11 @@ class VideoPlayerActivity : ComponentActivity() {
     }
 
     private fun togglePassthrough(session: Session) {
-        val passthroughOpacity: Float =
-            session.scene.spatialEnvironment.getCurrentPassthroughOpacity()
+        val passthroughOpacity: Float = session.scene.spatialEnvironment.currentPassthroughOpacity
         Log.i("TogglePassthrough", "TogglePassthrough!")
         when (passthroughOpacity) {
-            0.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(1.0f)
-            1.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+            0.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 1.0f
+            1.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
         }
     }
 
@@ -287,7 +286,7 @@ class VideoPlayerActivity : ComponentActivity() {
     private fun SystemApisCard(session: Session) {
         val movableComponentMP = remember { mutableStateOf<MovableComponent?>(null) }
         if (movableComponentMP.value == null) {
-            movableComponentMP.value = MovableComponent.create(session)
+            movableComponentMP.value = MovableComponent.createSystemMovable(session)
             session.scene.mainPanelEntity.addComponent(movableComponentMP.value!!)
         }
         Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
@@ -475,7 +474,11 @@ class VideoPlayerActivity : ComponentActivity() {
                 value = featherRadiusX,
                 onValueChange = {
                     featherRadiusX = it
-                    surfaceEntity!!.featherRadiusX = featherRadiusX
+                    surfaceEntity!!.edgeFeather =
+                        SurfaceEntity.EdgeFeatheringParams.SmoothFeather(
+                            featherRadiusX,
+                            featherRadiusY,
+                        )
                 },
                 valueRange = 0.0f..0.5f,
             )
@@ -484,7 +487,11 @@ class VideoPlayerActivity : ComponentActivity() {
                 value = featherRadiusY,
                 onValueChange = {
                     featherRadiusY = it
-                    surfaceEntity!!.featherRadiusY = featherRadiusY
+                    surfaceEntity!!.edgeFeather =
+                        SurfaceEntity.EdgeFeatheringParams.SmoothFeather(
+                            featherRadiusX,
+                            featherRadiusY,
+                        )
                 },
                 valueRange = 0.0f..0.5f,
             )
@@ -638,7 +645,7 @@ class VideoPlayerActivity : ComponentActivity() {
                 SurfaceEntity.create(session, stereoMode, pose, canvasShape, surfaceContentLevel)
             // Make the video player movable (to make it easier to look at it from different
             // angles and distances)
-            movableComponent = MovableComponent.create(session)
+            movableComponent = MovableComponent.createSystemMovable(session)
             // The quad has a radius of 1.0 meters
             movableComponent!!.size = FloatSize3d(1.0f, 1.0f, 1.0f)
             // component?.size = coordinates.size.toDimensionsInMeters(density)

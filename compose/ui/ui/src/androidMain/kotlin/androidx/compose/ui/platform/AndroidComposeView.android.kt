@@ -132,6 +132,7 @@ import androidx.compose.ui.input.InputModeManagerImpl
 import androidx.compose.ui.input.indirect.AndroidIndirectTouchEvent
 import androidx.compose.ui.input.indirect.IndirectTouchEvent
 import androidx.compose.ui.input.indirect.convertActionToIndirectTouchEventType
+import androidx.compose.ui.input.indirect.indirectScrollAxis
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType.Companion.KeyDown
 import androidx.compose.ui.input.key.onKeyEvent
@@ -198,8 +199,8 @@ import androidx.compose.ui.util.trace
 import androidx.compose.ui.viewinterop.AndroidViewHolder
 import androidx.compose.ui.viewinterop.InteropView
 import androidx.core.view.AccessibilityDelegateCompat
-import androidx.core.view.InputDeviceCompat.SOURCE_CLASS_POINTER
 import androidx.core.view.InputDeviceCompat.SOURCE_ROTARY_ENCODER
+import androidx.core.view.InputDeviceCompat.SOURCE_TOUCH_NAVIGATION
 import androidx.core.view.MotionEventCompat.AXIS_SCROLL
 import androidx.core.view.ViewCompat
 import androidx.core.view.ViewConfigurationCompat.getScaledHorizontalScrollFactor
@@ -1071,10 +1072,6 @@ internal class AndroidComposeView(context: Context, coroutineContext: CoroutineC
         // There is nothing focusable and we've looped around all Views back to this one, so
         // we just return false to indicate that nothing can be focused.
         if (processingRequestFocusForNextNonChildView) return false
-
-        // If there is currently a focusRequest() in operation, a clearFocus() due to AndroidView
-        // may cause a recursive requestFocus(). This prevents that reentrant call.
-        if (focusOwner.focusTransactionManager.ongoingTransaction) return false
 
         val focusDirection = toFocusDirection(direction) ?: Enter
 
@@ -2206,14 +2203,16 @@ internal class AndroidComposeView(context: Context, coroutineContext: CoroutineC
                 }
             else -> {
                 @OptIn(ExperimentalIndirectTouchTypeApi::class)
-                if (!motionEvent.isFromSource(SOURCE_CLASS_POINTER)) {
+                if (motionEvent.isFromSource(SOURCE_TOUCH_NAVIGATION)) {
                     val indirectTouchEvent =
                         AndroidIndirectTouchEvent(
                             position = Offset(motionEvent.x, motionEvent.y),
                             uptimeMillis = motionEvent.eventTime,
                             type = convertActionToIndirectTouchEventType(motionEvent.actionMasked),
+                            primaryAxis = indirectScrollAxis(motionEvent),
                             nativeEvent = motionEvent,
                         )
+
                     val handled =
                         focusOwner.dispatchIndirectTouchEvent(indirectTouchEvent) {
                             super.dispatchGenericMotionEvent(motionEvent)

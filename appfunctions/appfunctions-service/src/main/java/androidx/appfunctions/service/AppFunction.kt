@@ -66,19 +66,34 @@ package androidx.appfunctions.service
  * [androidx.appfunctions.AppFunctionInvalidArgumentException] with a detailed message explaining
  * why it is invalid.
  *
+ * For a detailed list of supported types and the rules governing their serialization, see
+ * [androidx.appfunctions.AppFunctionSerializable].
+ *
  * @see AppFunctionConfiguration.Builder.addEnclosingClassFactory
  * @see androidx.appfunctions.AppFunctionException
+ * @see androidx.appfunctions.AppFunctionSerializable
  */
 // Use BINARY here so that the annotation is kept around at the aggregation stage.
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.FUNCTION)
 public annotation class AppFunction(
     /**
-     * Indicates whether this function is enabled. The default value is "true".
+     * Indicates whether this function is enabled. The default value is `true`.
      *
      * If set to `false`, this function will be unavailable for invocation by other applications
      * unless explicitly enabled at runtime. When disabled, any attempt to call this function by
      * another application will be rejected.
      */
-    public val isEnabled: Boolean = true
+    public val isEnabled: Boolean = true,
+
+    /**
+     * Whether to use the function's KDoc as a function's description to the agent. The default
+     * value is `false`.
+     *
+     * If set to `true`, the KDoc will be set as the function's
+     * [androidx.appfunctions.metadata.AppFunctionMetadata.description]. The caller will use this
+     * description to interpret when and how to use the function, including allowed parameters,
+     * return type and thrown exceptions.
+     */
+    public val isDescribedByKdoc: Boolean = false,
 )

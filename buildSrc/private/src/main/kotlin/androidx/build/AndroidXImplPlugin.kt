@@ -51,6 +51,7 @@ import com.android.build.api.dsl.AarMetadata
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.CommonExtension
 import com.android.build.api.dsl.KotlinMultiplatformAndroidDeviceTestCompilation
+import com.android.build.api.dsl.KotlinMultiplatformAndroidHostTestCompilation
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.dsl.PrivacySandboxSdkExtension
@@ -94,7 +95,6 @@ import org.gradle.api.artifacts.ComponentMetadataRule
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.Usage
-import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.configuration.BuildFeatures
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.plugins.JavaPlugin
@@ -141,9 +141,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
  * A plugin which enables all of the Gradle customizations for AndroidX. This plugin reacts to other
  * plugins being added and adds required and optional functionality.
  */
-abstract class AndroidXImplPlugin
-@Inject
-constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Project> {
+abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
     @get:Inject abstract val registry: BuildEventsListenerRegistry
     @get:Inject abstract val buildFeatures: BuildFeatures
 
@@ -162,8 +160,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         // Perform different actions based on which plugins have been applied to the project.
         // Many of the actions overlap, ex. API tracking.
         project.plugins.configureEach { plugin ->
-            // PrivacySandboxSdkPlugin b/397703898, KotlinMultiplatformAndroidPlugin b/393137152
-            @Suppress("UnstableApiUsage")
             when (plugin) {
                 is JavaGradlePluginPlugin -> configureGradlePluginPlugin(project)
                 is JavaPlugin -> configureWithJavaPlugin(project, androidXExtension)
@@ -184,7 +180,8 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                         plugin,
                         androidXKmpExtension,
                     )
-                is PrivacySandboxSdkPlugin -> configureWithPrivacySandboxSdkPlugin(project)
+                is @Suppress("UnstableApiUsage") PrivacySandboxSdkPlugin -> // b/397703898
+                configureWithPrivacySandboxSdkPlugin(project)
                 is ProtobufPlugin -> configureProtobufPlugin(project)
             }
         }
@@ -208,11 +205,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         }
 
         project.configureTaskTimeouts()
-        project.configureMavenArtifactUpload(
-            androidXExtension,
-            androidXKmpExtension,
-            componentFactory,
-        ) {
+        project.configureMavenArtifactUpload(androidXExtension, androidXKmpExtension) {
             if (buildFeatures.isIsolatedProjectsEnabled()) return@configureMavenArtifactUpload
             project.addCreateLibraryBuildInfoFileTasks(androidXExtension, androidXKmpExtension)
         }
@@ -436,7 +429,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                 project.plugins.hasPlugin(LibraryPlugin::class.java) ||
                     project.plugins.hasPlugin(AppPlugin::class.java) ||
                     project.plugins.hasPlugin(TestPlugin::class.java) ||
-                    @Suppress("UnstableApiUsage")
                     project.plugins.hasPlugin(KotlinMultiplatformAndroidPlugin::class.java)
             }
         val defaultJavaTargetVersion =
@@ -585,6 +577,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     private fun configureWithAppPlugin(project: Project, androidXExtension: AndroidXExtension) {
         project.extensions.getByType<ApplicationExtension>().apply {
             configureAndroidBaseOptions(project, androidXExtension)
+            @Suppress("deprecation") // TODO(aurimas): migrate to new API
             defaultConfig.targetSdk = project.defaultAndroidConfig.targetSdk
             val debugSigningConfig = signingConfigs.getByName("debug")
             // Use a local debug keystore to avoid build server issues.
@@ -622,6 +615,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     private fun configureWithTestPlugin(project: Project, androidXExtension: AndroidXExtension) {
         project.extensions.getByType<TestExtension>().apply {
             configureAndroidBaseOptions(project, androidXExtension)
+            @Suppress("deprecation") // TODO(aurimas): migrate to new API
             defaultConfig.targetSdk = project.defaultAndroidConfig.targetSdk
             val debugSigningConfig = signingConfigs.getByName("debug")
             // Use a local debug keystore to avoid build server issues.
@@ -735,22 +729,17 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             finalizeDsl {
                 it.aarMetadata.configure(it.compileSdk)
                 it.lint.targetSdk = project.defaultAndroidConfig.targetSdk
-                // When b/409613130 is fixed, set it.testOptions.targetSdk =
-                // project.defaultAndroidConfig.targetSdk
                 project.setUpBlankProguardFileForKmpAarIfNeeded(
                     kotlinMultiplatformAndroidTarget.optimization.consumerKeepRules
                 )
+                kotlinMultiplatformAndroidTarget.configureTargetSdkForTests(it.compileSdk)
             }
         }
 
         project.configureProjectForApiTasks(AndroidMultiplatformApiTaskConfig, androidXExtension)
         project.configureProjectForKzipTasks(AndroidMultiplatformApiTaskConfig, androidXExtension)
-        kotlinMultiplatformAndroidComponentsExtension.onVariants { variant ->
-            project.configureMultiplatformSourcesForAndroid(
-                variant.name,
-                kotlinMultiplatformAndroidTarget,
-                androidXExtension.samplesProjects,
-            )
+        kotlinMultiplatformAndroidComponentsExtension.onVariants {
+            project.configureMultiplatformSourcesForAndroid(androidXExtension.samplesProjects)
         }
 
         project.configurePublicResourcesStub(project.multiplatformExtension!!)
@@ -838,6 +827,17 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     private fun configureWithPrivacySandboxSdkPlugin(project: Project) {
         project.extensions.getByType<PrivacySandboxSdkExtension>().apply {
             configureLocalAsbSigning(experimentalProperties, project.getKeystore())
+        }
+        // Workaround for b/389890488
+        project.configurations.configureEach { configuration ->
+            if (configuration.isCanBeResolved) {
+                configuration.attributes { attributeContainer ->
+                    attributeContainer.attribute(
+                        BuildTypeAttr.ATTRIBUTE,
+                        project.objects.named(BuildTypeAttr::class.java, "release"),
+                    )
+                }
+            }
         }
     }
 
@@ -931,6 +931,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         libraryAndroidComponentsExtension.apply {
             finalizeDsl {
+                @Suppress("deprecation") // TODO(aurimas): migrate to new API
                 it.defaultConfig.aarMetadata.configure(it.compileSdk)
                 it.lint.targetSdk = project.defaultAndroidConfig.targetSdk
                 it.testOptions.targetSdk = project.defaultAndroidConfig.targetSdk
@@ -1101,17 +1102,27 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         // Suppress output of android:compileSdkVersion and related attributes (b/277836549).
         androidResources.additionalParameters += "--no-compile-sdk-metadata"
 
+        @Suppress("deprecation") // TODO(aurimas): migrate to new API
         compileSdk = project.defaultAndroidConfig.compileSdk
 
         buildToolsVersion = project.defaultAndroidConfig.buildToolsVersion
 
         defaultConfig.ndk.abiFilters.addAll(SUPPORTED_BUILD_ABIS)
+        @Suppress("DEPRECATION") // TODO(aurimas): migrate to new API
         defaultConfig.minSdk = defaultMinSdk
         defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         testOptions.animationsDisabled = !project.isMacrobenchmark()
 
+        @Suppress("deprecation") // TODO(aurimas): migrate to new API
         project.afterEvaluate {
+            check(
+                !androidXExtension.shouldPublish() || !compileOptions.isCoreLibraryDesugaringEnabled
+            ) {
+                "AndroidX libraries are not permitted to use core library desugaring as it " +
+                    "forces library users to also enable core library desugaring."
+            }
+
             val minSdkVersion = defaultConfig.minSdk!!
             check(minSdkVersion >= defaultMinSdk) {
                 "minSdkVersion $minSdkVersion lower than the default of $defaultMinSdk"
@@ -1210,6 +1221,22 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         project.configureTestConfigGeneration(buildFeatures.isIsolatedProjectsEnabled())
         project.configureFtlRunner(componentsExtension)
+    }
+
+    // TODO(b/425976012): Set targetSdkForTests to project.defaultAndroidConfig.targetSdk
+    private fun KotlinMultiplatformAndroidLibraryTarget.configureTargetSdkForTests(
+        compileSdk: Int?
+    ) {
+        checkNotNull(compileSdk) {
+            "compileSdk must be set for tests. call `configureTargetSdkForTests` in the `finalizeDsl` block"
+        }
+        compilations
+            .withType(KotlinMultiplatformAndroidDeviceTestCompilation::class.java)
+            .configureEach { it.targetSdk { version = release(compileSdk) } }
+
+        compilations
+            .withType(KotlinMultiplatformAndroidHostTestCompilation::class.java)
+            .configureEach { it.targetSdk { version = release(compileSdk.coerceAtMost(35)) } }
     }
 
     /**

@@ -19,17 +19,23 @@ package androidx.pdf
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
+import android.net.Uri
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.util.Size
 import androidx.annotation.RequiresExtension
+import androidx.pdf.models.FormEditRecord
+import androidx.pdf.models.FormWidgetInfo
 import androidx.pdf.utils.TestUtils
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.filters.SmallTest
 import com.google.common.truth.Truth.assertThat
+import java.io.File
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertNotNull
 import kotlinx.coroutines.Dispatchers
@@ -93,9 +99,9 @@ class SandboxedPdfDocumentTest {
             val expectedWidth = 612
             val pageIterator = pageInfos.iterator()
 
-            assertThat(pageInfos.size == 2)
+            assertThat(pageInfos.size == 2).isTrue()
             for (index: Int in pageRange) {
-                assertThat(pageIterator.hasNext())
+                assertThat(pageIterator.hasNext()).isTrue()
                 val pageInfo = pageIterator.next()
                 assertThat(pageInfo.pageNum == index).isTrue()
                 assertThat(pageInfo.height == expectedHeight).isTrue()
@@ -237,7 +243,7 @@ class SandboxedPdfDocumentTest {
 
             assertNotNull(selection)
             assertNotNull(expectedSelection)
-            assertThat(selection?.size == expectedSelection?.size)
+            assertThat(selection?.size == expectedSelection?.size).isTrue()
             for (index: Int in 0..selection!!.size - 1) {
                 assertThat(selection[index].text == expectedSelection!![index].text).isTrue()
             }
@@ -316,6 +322,62 @@ class SandboxedPdfDocumentTest {
         assertThat(bitmap.height == tileRegion.height()).isTrue()
         assertFalse(bitmap.checkIsAllWhite())
         // TODO(b/377922353): Update this test for a more accurate bitmap comparison
+    }
+
+    @Test
+    fun write_modifiedFormFields_returnsModifiedDocument() = runTest {
+        val document = openDocument("click_form.pdf")
+        val pageNum = 0
+        val editableFormWidget =
+            document.getFormWidgetInfos(pageNum).find {
+                !it.readOnly && it.widgetType == FormWidgetInfo.WIDGET_TYPE_CHECKBOX
+            }
+        requireNotNull(editableFormWidget)
+
+        // assert that the check-box is unselected
+        assertThat(editableFormWidget.textValue).isEqualTo("false")
+
+        val editRecord =
+            FormEditRecord(
+                pageNumber = pageNum,
+                widgetIndex = editableFormWidget.widgetIndex,
+                clickPoint =
+                    Point(
+                        editableFormWidget.widgetRect.centerX(),
+                        editableFormWidget.widgetRect.centerY(),
+                    ),
+            )
+
+        // Apply edit to select the check-box
+        document.applyEdit(pageNum, editRecord)
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val editedPdfFile = File(context.cacheDir, "edited_test_pdf.pdf")
+        var pfd: ParcelFileDescriptor? = null
+        try {
+            if (!editedPdfFile.exists()) {
+                editedPdfFile.createNewFile()
+            }
+            pfd = ParcelFileDescriptor.open(editedPdfFile, ParcelFileDescriptor.MODE_READ_WRITE)
+
+            document.write(pfd!!)
+            document.close()
+
+            val editedDocumentUri = Uri.fromFile(editedPdfFile)
+
+            val editedDocument =
+                SandboxedPdfLoader(context, Dispatchers.Main).openDocument(editedDocumentUri)
+            val editedFormWidget =
+                editedDocument.getFormWidgetInfos(pageNum).find {
+                    it.widgetIndex == editableFormWidget.widgetIndex
+                }
+            // assert that the check-box is selected in the edited pdf.
+            assertThat(editedFormWidget?.textValue).isEqualTo("true")
+            editedDocument.close()
+        } finally {
+            pfd?.close()
+            editedPdfFile.delete()
+        }
     }
 
     companion object {

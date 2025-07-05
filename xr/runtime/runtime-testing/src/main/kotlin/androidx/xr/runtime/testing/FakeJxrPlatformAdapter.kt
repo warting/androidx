@@ -21,6 +21,8 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import androidx.annotation.RestrictTo
+import androidx.xr.runtime.SubspaceNodeHolder
+import androidx.xr.runtime.TypeHolder
 import androidx.xr.runtime.internal.ActivityPanelEntity
 import androidx.xr.runtime.internal.ActivitySpace
 import androidx.xr.runtime.internal.Anchor
@@ -65,6 +67,7 @@ import androidx.xr.runtime.math.Vector3
 import androidx.xr.runtime.math.Vector4
 import com.google.androidxr.splitengine.SubspaceNode
 import com.google.common.util.concurrent.Futures.immediateFailedFuture
+import com.google.common.util.concurrent.Futures.immediateFuture
 import com.google.common.util.concurrent.ListenableFuture
 import java.time.Duration
 import java.util.UUID
@@ -100,9 +103,10 @@ public class FakeJxrPlatformAdapter : JxrPlatformAdapter {
 
     override val activitySpace: ActivitySpace = FakeActivitySpace()
 
-    override val headActivityPose: HeadActivityPose? = null
+    override val headActivityPose: HeadActivityPose? =
+        object : HeadActivityPose, FakeActivityPose() {}
 
-    override val activitySpaceRootImpl: Entity = FakeEntity()
+    override val activitySpaceRootImpl: Entity = activitySpace
 
     override val spatialCapabilities: SpatialCapabilities = SpatialCapabilities(0)
 
@@ -123,22 +127,21 @@ public class FakeJxrPlatformAdapter : JxrPlatformAdapter {
 
     override fun getCameraViewActivityPose(
         @CameraViewActivityPose.CameraType cameraType: Int
-    ): CameraViewActivityPose? = null
+    ): CameraViewActivityPose? = FakeCameraViewActivityPose()
 
     @Suppress("AsyncSuffixFuture")
     override fun loadGltfByAssetName(assetName: String): ListenableFuture<GltfModelResource> =
-        immediateFailedFuture<GltfModelResource>(NotImplementedError())
+        immediateFuture(FakeGltfModelResource(0))
 
     @Suppress("AsyncSuffixFuture")
     override fun loadGltfByByteArray(
         assetData: ByteArray,
         assetKey: String,
-    ): ListenableFuture<GltfModelResource> =
-        immediateFailedFuture<GltfModelResource>(NotImplementedError())
+    ): ListenableFuture<GltfModelResource> = immediateFuture(FakeGltfModelResource(0))
 
     @Suppress("AsyncSuffixFuture")
     override fun loadExrImageByAssetName(assetName: String): ListenableFuture<ExrImageResource> =
-        immediateFailedFuture<ExrImageResource>(NotImplementedError())
+        immediateFuture(FakeExrImageResource(0))
 
     @Suppress("AsyncSuffixFuture")
     override fun loadExrImageByByteArray(
@@ -430,12 +433,16 @@ public class FakeJxrPlatformAdapter : JxrPlatformAdapter {
 
     override fun createAnchorEntity(anchor: Anchor): AnchorEntity = FakeAnchorEntity()
 
-    override fun createEntity(pose: Pose, name: String, parent: Entity): Entity = FakeEntity()
+    override fun createGroupEntity(pose: Pose, name: String, parent: Entity): Entity = FakeEntity()
 
     override fun createSubspaceNodeEntity(
-        subspaceNode: SubspaceNode,
+        subspaceNodeHolder: SubspaceNodeHolder<*>,
         size: Dimensions,
-    ): SubspaceNodeEntity = FakeSubspaceNodeEntity(subspaceNode, size)
+    ): SubspaceNodeEntity =
+        FakeSubspaceNodeEntity(
+            TypeHolder.assertGetValue(subspaceNodeHolder, SubspaceNode::class.java),
+            size,
+        )
 
     @Suppress("ExecutorRegistration")
     override fun createInteractableComponent(

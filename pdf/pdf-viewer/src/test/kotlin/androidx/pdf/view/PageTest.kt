@@ -22,6 +22,7 @@ import android.graphics.Point
 import android.graphics.Rect
 import android.graphics.RectF
 import androidx.pdf.PdfDocument
+import androidx.pdf.PdfRect
 import androidx.pdf.content.PdfPageTextContent
 import androidx.pdf.models.FormWidgetInfo
 import com.google.common.truth.Truth.assertThat
@@ -170,8 +171,13 @@ class PageTest {
         // location in View
         val expectedHighlightLoc =
             RectF().apply {
-                set(highlight.area.pageRect)
-                offset(leftEdgeInView.toFloat(), topEdgeInView.toFloat())
+                set(
+                    highlight.area.left,
+                    highlight.area.top,
+                    highlight.area.right,
+                    highlight.area.bottom,
+                )
+                offset(leftEdgeInView, topEdgeInView)
             }
         verify(canvasSpy).drawRect(eq(expectedHighlightLoc), argThat { color == highlight.color })
 
@@ -224,7 +230,9 @@ class PageTest {
 
     @Test
     fun maybeUpdateFormWidgetInfos_updatesFormWidgetInfos() {
-        page.maybeUpdateFormWidgetInfos()
+        page.maybeUpdateFormWidgetInfos(
+            FormWidgetMetadataLoader(pdfDocument, PdfFormFillingState(10), mock())
+        )
         testDispatcher.scheduler.runCurrent()
         assertThat(page.formWidgetInfos).isNotNull()
         assertThat(page.formWidgetInfos?.size).isEqualTo(2)

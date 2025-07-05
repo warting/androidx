@@ -68,6 +68,11 @@ class AppFunctionMetadataCreatorHelper {
                 AppFunctionAnnotation.PROPERTY_IS_ENABLED,
                 Boolean::class,
             )
+        val isDescribedByKdoc =
+            appFunctionAnnotation?.requirePropertyValueOfType(
+                AppFunctionAnnotation.PROPERTY_IS_DESCRIBED_BY_KDOC,
+                Boolean::class,
+            )
         val schemaCategory =
             schemaDefinitionAnnotation?.requirePropertyValueOfType(
                 AppFunctionSchemaDefinitionAnnotation.PROPERTY_CATEGORY,
@@ -86,7 +91,13 @@ class AppFunctionMetadataCreatorHelper {
                 )
                 ?.toLong()
 
-        return AppFunctionAnnotationProperties(enabled, schemaName, schemaVersion, schemaCategory)
+        return AppFunctionAnnotationProperties(
+            enabled,
+            isDescribedByKdoc,
+            schemaName,
+            schemaVersion,
+            schemaCategory,
+        )
     }
 
     /**
@@ -126,14 +137,17 @@ class AppFunctionMetadataCreatorHelper {
                         seenDataTypeQualifiers,
                         resolvedAnnotatedSerializableProxies,
                         allowSerializableInterfaceTypes,
+                        // Parameter description will be provided through
+                        // AppFunctionParameterMetadata.
+                        description = "",
                     )
 
             add(
                 AppFunctionParameterMetadata(
                     name = checkNotNull(parameter.name).asString(),
-                    // TODO(b/394553462): Parse required state from annotation.
-                    isRequired = true,
+                    isRequired = !parameter.hasDefault,
                     dataType = dataTypeMetadata,
+                    // TODO(b/428155914): Add parameter description.
                 )
             )
         }
@@ -167,6 +181,8 @@ class AppFunctionMetadataCreatorHelper {
             seenDataTypeQualifiers,
             resolvedAnnotatedSerializableProxies,
             allowSerializableInterfaceTypes,
+            // Response description will be provided through AppFunctionResponseMetadata.
+            description = "",
         )
     }
 
@@ -175,6 +191,7 @@ class AppFunctionMetadataCreatorHelper {
         seenDataTypeQualifiers: MutableSet<String>,
         resolvedAnnotatedSerializableProxies: ResolvedAnnotatedSerializableProxies,
         allowSerializableInterfaceTypes: Boolean,
+        description: String,
     ): AppFunctionDataTypeMetadata {
         val appFunctionTypeReference = AppFunctionTypeReference(this)
         return when (appFunctionTypeReference.typeCategory) {
@@ -182,6 +199,7 @@ class AppFunctionMetadataCreatorHelper {
                 AppFunctionPrimitiveTypeMetadata(
                     type = appFunctionTypeReference.toAppFunctionDataType(),
                     isNullable = appFunctionTypeReference.isNullable,
+                    description = description,
                 )
             PRIMITIVE_ARRAY ->
                 AppFunctionArrayTypeMetadata(
@@ -189,8 +207,10 @@ class AppFunctionMetadataCreatorHelper {
                         AppFunctionPrimitiveTypeMetadata(
                             type = appFunctionTypeReference.determineArrayItemType(),
                             isNullable = false,
+                            description = "",
                         ),
                     isNullable = appFunctionTypeReference.isNullable,
+                    description = description,
                 )
             PRIMITIVE_LIST ->
                 AppFunctionArrayTypeMetadata(
@@ -200,8 +220,10 @@ class AppFunctionMetadataCreatorHelper {
                             isNullable =
                                 AppFunctionTypeReference(appFunctionTypeReference.itemTypeReference)
                                     .isNullable,
+                            description = "",
                         ),
                     isNullable = appFunctionTypeReference.isNullable,
+                    description = description,
                 )
             SERIALIZABLE_INTERFACE_SINGULAR,
             SERIALIZABLE_SINGULAR -> {
@@ -224,6 +246,7 @@ class AppFunctionMetadataCreatorHelper {
                 AppFunctionReferenceTypeMetadata(
                     referenceDataType = annotatedAppFunctionSerializable.jvmQualifiedName,
                     isNullable = appFunctionTypeReference.isNullable,
+                    description = description,
                 )
             }
             SERIALIZABLE_INTERFACE_LIST,
@@ -251,8 +274,10 @@ class AppFunctionMetadataCreatorHelper {
                             isNullable =
                                 AppFunctionTypeReference(appFunctionTypeReference.itemTypeReference)
                                     .isNullable,
+                            description = "",
                         ),
                     isNullable = appFunctionTypeReference.isNullable,
+                    description = description,
                 )
             }
             SERIALIZABLE_PROXY_SINGULAR -> {
@@ -278,6 +303,7 @@ class AppFunctionMetadataCreatorHelper {
                             .ignoreNullable()
                             .toString(),
                     isNullable = appFunctionTypeReference.isNullable,
+                    description = description,
                 )
             }
             SERIALIZABLE_PROXY_LIST -> {
@@ -307,8 +333,10 @@ class AppFunctionMetadataCreatorHelper {
                             isNullable =
                                 AppFunctionTypeReference(appFunctionTypeReference.itemTypeReference)
                                     .isNullable,
+                            description = "",
                         ),
                     isNullable = appFunctionTypeReference.isNullable,
+                    description = description,
                 )
             }
         }
@@ -355,6 +383,7 @@ class AppFunctionMetadataCreatorHelper {
         }
         seenDataTypeQualifiers.add(serializableTypeQualifiedName)
 
+        val serializableDescription = appFunctionSerializableType.description
         val superTypesWithSerializableAnnotation =
             appFunctionSerializableType.findSuperTypesWithSerializableAnnotation()
         val superTypesWithCapabilityAnnotation =
@@ -374,6 +403,7 @@ class AppFunctionMetadataCreatorHelper {
                     seenDataTypeQualifiers,
                     resolvedAnnotatedSerializableProxies,
                     allowSerializableInterfaceTypes,
+                    serializableDescription,
                 ),
             )
         } else {
@@ -397,6 +427,9 @@ class AppFunctionMetadataCreatorHelper {
                             // default. This is because the outer AllOfType to this shared type
                             // can add further constraint (i.e. non-null) if required.
                             isNullable = true,
+                            // Description is already covered in the superclass's corresponding
+                            // AppFunctionObjectTypeMetadata.
+                            description = "",
                         )
                     )
                 }
@@ -407,13 +440,23 @@ class AppFunctionMetadataCreatorHelper {
                             checkNotNull(capabilitySuperType.toClassName().canonicalName),
                             capabilitySuperType
                                 .getDeclaredProperties()
-                                .map { AppFunctionPropertyDeclaration(it) }
+                                .map {
+                                    AppFunctionPropertyDeclaration(
+                                        property = it,
+                                        isDescribedByKdoc = false,
+                                        // Property from interface is always required as there is
+                                        // no existing API to tell if the interface property has
+                                        // default value or not.
+                                        isRequired = true,
+                                    )
+                                }
                                 .toList(),
                             unvisitedSerializableProperties,
                             sharedDataTypeMap,
                             seenDataTypeQualifiers,
                             resolvedAnnotatedSerializableProxies,
                             allowSerializableInterfaceTypes,
+                            serializableDescription,
                         )
                     )
                 }
@@ -430,6 +473,7 @@ class AppFunctionMetadataCreatorHelper {
                             seenDataTypeQualifiers,
                             resolvedAnnotatedSerializableProxies,
                             allowSerializableInterfaceTypes,
+                            serializableDescription,
                         )
                     )
                 }
@@ -446,6 +490,7 @@ class AppFunctionMetadataCreatorHelper {
                     // default. This is because the outer ReferenceType to this shared type
                     // can add further constraint (i.e. non-null) if required.
                     isNullable = true,
+                    description = serializableDescription,
                 ),
             )
         }
@@ -484,6 +529,7 @@ class AppFunctionMetadataCreatorHelper {
         seenDataTypeQualifiers: MutableSet<String>,
         resolvedAnnotatedSerializableProxies: ResolvedAnnotatedSerializableProxies,
         allowSerializableInterfaceTypes: Boolean,
+        serializableDescription: String,
     ): AppFunctionObjectTypeMetadata {
         val currentSerializableProperties: List<AppFunctionPropertyDeclaration> = buildList {
             for (property in currentPropertiesList) {
@@ -503,6 +549,7 @@ class AppFunctionMetadataCreatorHelper {
             seenDataTypeQualifiers,
             resolvedAnnotatedSerializableProxies,
             allowSerializableInterfaceTypes,
+            serializableDescription,
         )
     }
 
@@ -513,6 +560,7 @@ class AppFunctionMetadataCreatorHelper {
         seenDataTypeQualifiers: MutableSet<String>,
         resolvedAnnotatedSerializableProxies: ResolvedAnnotatedSerializableProxies,
         allowSerializableInterfaceTypes: Boolean,
+        serializableDescription: String,
     ): AppFunctionObjectTypeMetadata {
         val requiredPropertiesList: MutableList<String> = mutableListOf()
         val appFunctionSerializablePropertiesMap: Map<String, AppFunctionDataTypeMetadata> =
@@ -524,10 +572,12 @@ class AppFunctionMetadataCreatorHelper {
                             seenDataTypeQualifiers,
                             resolvedAnnotatedSerializableProxies,
                             allowSerializableInterfaceTypes,
+                            property.description,
                         )
                     put(property.name, innerAppFunctionDataTypeMetadata)
-                    // TODO(b/394553462): Parse required state from annotation.
-                    requiredPropertiesList.add(property.name)
+                    if (property.isRequired) {
+                        requiredPropertiesList.add(property.name)
+                    }
                 }
             }
         return AppFunctionObjectTypeMetadata(
@@ -538,6 +588,7 @@ class AppFunctionMetadataCreatorHelper {
             // This is because the outer ReferenceType to this shared type can add further
             // constraint (i.e. non-null) if required.
             isNullable = true,
+            description = serializableDescription,
         )
     }
 
@@ -612,6 +663,7 @@ class AppFunctionMetadataCreatorHelper {
      */
     data class AppFunctionAnnotationProperties(
         val isEnabledByDefault: Boolean?,
+        val isDescribedByKdoc: Boolean?,
         val schemaName: String?,
         val schemaVersion: Long?,
         val schemaCategory: String?,

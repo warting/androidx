@@ -1,9 +1,9 @@
 // Signature format: 4.0
 package androidx.xr.scenecore {
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class ActivityPanelEntity extends androidx.xr.scenecore.PanelEntity {
-    method public static androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, android.graphics.Rect windowBoundsPx, String name);
-    method public static androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, android.graphics.Rect windowBoundsPx, String name, optional androidx.xr.runtime.math.Pose pose);
+  public final class ActivityPanelEntity extends androidx.xr.scenecore.PanelEntity {
+    method public static androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.IntSize2d pixelDimensions, String name);
+    method public static androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.IntSize2d pixelDimensions, String name, optional androidx.xr.runtime.math.Pose pose);
     method public void launchActivity(android.content.Intent intent);
     method public void launchActivity(android.content.Intent intent, optional android.os.Bundle? bundle);
     method public void moveActivity(android.app.Activity activity);
@@ -11,43 +11,41 @@ package androidx.xr.scenecore {
   }
 
   public static final class ActivityPanelEntity.Companion {
-    method public androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, android.graphics.Rect windowBoundsPx, String name);
-    method public androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, android.graphics.Rect windowBoundsPx, String name, optional androidx.xr.runtime.math.Pose pose);
+    method public androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.IntSize2d pixelDimensions, String name);
+    method public androidx.xr.scenecore.ActivityPanelEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.IntSize2d pixelDimensions, String name, optional androidx.xr.runtime.math.Pose pose);
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class ActivitySpace extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.ActivitySpace> {
-    method public void addBoundsChangedListener(java.util.concurrent.Executor callbackExecutor, java.util.function.Consumer<androidx.xr.runtime.math.FloatSize3d> listener);
-    method public void addBoundsChangedListener(java.util.function.Consumer<androidx.xr.runtime.math.FloatSize3d> listener);
+  public final class ActivitySpace extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.ActivitySpace> {
+    method public void addOnBoundsChangedListener(java.util.concurrent.Executor callbackExecutor, java.util.function.Consumer<androidx.xr.runtime.math.FloatSize3d> listener);
+    method public void addOnBoundsChangedListener(java.util.function.Consumer<androidx.xr.runtime.math.FloatSize3d> listener);
+    method public void addOnSpaceUpdatedListener(Runnable listener);
+    method public void addOnSpaceUpdatedListener(java.util.concurrent.Executor executor, Runnable listener);
     method public androidx.xr.runtime.math.FloatSize3d getBounds();
-    method @Deprecated public void registerOnBoundsChangedListener(androidx.xr.scenecore.OnBoundsChangeListener listener);
-    method public void removeBoundsChangedListener(java.util.function.Consumer<androidx.xr.runtime.math.FloatSize3d> listener);
-    method public void setOnSpaceUpdatedListener(Runnable? listener);
-    method public void setOnSpaceUpdatedListener(Runnable? listener, optional java.util.concurrent.Executor? executor);
-    method @Deprecated public void unregisterOnBoundsChangedListener();
+    method public androidx.xr.runtime.math.BoundingBox getRecommendedContentBoxInFullSpace();
+    method public void removeOnBoundsChangedListener(java.util.function.Consumer<androidx.xr.runtime.math.FloatSize3d> listener);
+    method public void removeOnSpaceUpdatedListener(Runnable listener);
+    property public androidx.xr.runtime.math.FloatSize3d bounds;
+    property public androidx.xr.runtime.math.BoundingBox recommendedContentBoxInFullSpace;
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class AnchorEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.AnchorEntity> {
+  public final class AnchorEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.AnchorEntity> {
     method public static androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.arcore.Anchor anchor);
-    method public static androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize3d bounds, int planeType, int planeSemantic);
-    method public static androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize3d bounds, int planeType, int planeSemantic, optional java.time.Duration timeout);
+    method public static androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize2d minimumPlaneExtents, int planeOrientation, int planeSemanticType);
+    method public static androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize2d minimumPlaneExtents, int planeOrientation, int planeSemanticType, optional java.time.Duration timeout);
     method public androidx.xr.arcore.Anchor getAnchor(androidx.xr.runtime.Session session);
     method public int getState();
     method public void setOnSpaceUpdatedListener(Runnable? listener);
-    method public void setOnSpaceUpdatedListener(Runnable? listener, optional java.util.concurrent.Executor? executor);
-    method public void setOnStateChangedListener(androidx.xr.scenecore.OnStateChangedListener? onStateChangedListener);
+    method public void setOnSpaceUpdatedListener(java.util.concurrent.Executor executor, Runnable? listener);
+    method public void setOnStateChangedListener(java.util.concurrent.Executor executor, java.util.function.Consumer<java.lang.Integer>? listener);
+    method public void setOnStateChangedListener(java.util.function.Consumer<java.lang.Integer>? listener);
+    property public int state;
     field public static final androidx.xr.scenecore.AnchorEntity.Companion Companion;
   }
 
   public static final class AnchorEntity.Companion {
     method public androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.arcore.Anchor anchor);
-    method public androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize3d bounds, int planeType, int planeSemantic);
-    method public androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize3d bounds, int planeType, int planeSemantic, optional java.time.Duration timeout);
-  }
-
-  public enum AnchorEntity.PersistState {
-    enum_constant public static final androidx.xr.scenecore.AnchorEntity.PersistState PERSISTED;
-    enum_constant public static final androidx.xr.scenecore.AnchorEntity.PersistState PERSIST_NOT_REQUESTED;
-    enum_constant public static final androidx.xr.scenecore.AnchorEntity.PersistState PERSIST_PENDING;
+    method public androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize2d minimumPlaneExtents, int planeOrientation, int planeSemanticType);
+    method public androidx.xr.scenecore.AnchorEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.math.FloatSize2d minimumPlaneExtents, int planeOrientation, int planeSemanticType, optional java.time.Duration timeout);
   }
 
   public static final class AnchorEntity.State {
@@ -62,18 +60,21 @@ package androidx.xr.scenecore {
     field public static final int UNANCHORED = 1; // 0x1
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class AnchorPlacement {
-    ctor public AnchorPlacement();
+  public final class AnchorPlacement {
     method public static androidx.xr.scenecore.AnchorPlacement createForPlanes();
-    method public static androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> planeTypeFilter);
-    method public static androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> planeTypeFilter, optional java.util.Set<java.lang.Integer> planeSemanticFilter);
+    method public static androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> anchorablePlaneOrientations);
+    method public static androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> anchorablePlaneOrientations, optional java.util.Set<java.lang.Integer> anchorablePlaneSemanticTypes);
+    method public java.util.Set<java.lang.Integer> getAnchorablePlaneOrientations();
+    method public java.util.Set<java.lang.Integer> getAnchorablePlaneSemanticTypes();
+    property public java.util.Set<java.lang.Integer> anchorablePlaneOrientations;
+    property public java.util.Set<java.lang.Integer> anchorablePlaneSemanticTypes;
     field public static final androidx.xr.scenecore.AnchorPlacement.Companion Companion;
   }
 
   public static final class AnchorPlacement.Companion {
     method public androidx.xr.scenecore.AnchorPlacement createForPlanes();
-    method public androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> planeTypeFilter);
-    method public androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> planeTypeFilter, optional java.util.Set<java.lang.Integer> planeSemanticFilter);
+    method public androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> anchorablePlaneOrientations);
+    method public androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> anchorablePlaneOrientations, optional java.util.Set<java.lang.Integer> anchorablePlaneSemanticTypes);
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public abstract class BaseEntity<RtEntityType extends androidx.xr.runtime.internal.Entity> extends androidx.xr.scenecore.BaseScenePose<androidx.xr.runtime.internal.ActivityPose> implements androidx.xr.scenecore.Entity {
@@ -105,8 +106,6 @@ package androidx.xr.scenecore {
     method public androidx.xr.runtime.math.Pose getActivitySpacePose();
     method public suspend Object? hitTest(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, int hitTestFilter, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.HitTestResult>);
     method public suspend Object? hitTest(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.HitTestResult>);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.HitTestResult> hitTestAsync(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.HitTestResult> hitTestAsync(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, int hitTestFilter);
     method public androidx.xr.runtime.math.Pose transformPoseTo(androidx.xr.runtime.math.Pose pose, androidx.xr.scenecore.ScenePose destination);
     property public androidx.xr.runtime.math.Pose activitySpacePose;
   }
@@ -127,17 +126,6 @@ package androidx.xr.scenecore {
   public interface Component {
     method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public boolean onAttach(androidx.xr.scenecore.Entity entity);
     method @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public void onDetach(androidx.xr.scenecore.Entity entity);
-  }
-
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class ContentlessEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.Entity> {
-    method public static androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name);
-    method public static androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
-    field public static final androidx.xr.scenecore.ContentlessEntity.Companion Companion;
-  }
-
-  public static final class ContentlessEntity.Companion {
-    method public androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name);
-    method public androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class CubeMapTexture extends androidx.xr.scenecore.Texture {
@@ -181,13 +169,16 @@ package androidx.xr.scenecore {
     property public abstract androidx.xr.scenecore.Entity? parent;
   }
 
+  public interface EntityMoveListener {
+    method public default void onMoveEnd(androidx.xr.scenecore.Entity entity, androidx.xr.runtime.math.Ray finalInputRay, androidx.xr.runtime.math.Pose finalPose, float finalScale, androidx.xr.scenecore.Entity? updatedParent);
+    method public default void onMoveStart(androidx.xr.scenecore.Entity entity, androidx.xr.runtime.math.Ray initialInputRay, androidx.xr.runtime.math.Pose initialPose, float initialScale, androidx.xr.scenecore.Entity initialParent);
+    method public default void onMoveUpdate(androidx.xr.scenecore.Entity entity, androidx.xr.runtime.math.Ray currentInputRay, androidx.xr.runtime.math.Pose currentPose, float currentScale);
+  }
+
   public final class ExrImage {
     method @MainThread public static suspend Object? createFromZip(androidx.xr.runtime.Session session, android.net.Uri uri, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.ExrImage>);
     method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public static suspend Object? createFromZip(androidx.xr.runtime.Session session, byte[] assetData, String assetKey, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.ExrImage>);
     method @MainThread public static suspend Object? createFromZip(androidx.xr.runtime.Session session, java.nio.file.Path path, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.ExrImage>);
-    method @MainThread public static com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.ExrImage> createFromZipAsync(androidx.xr.runtime.Session session, android.net.Uri uri);
-    method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public static com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.ExrImage> createFromZipAsync(androidx.xr.runtime.Session session, byte[] assetData, String assetKey);
-    method @MainThread public static com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.ExrImage> createFromZipAsync(androidx.xr.runtime.Session session, java.nio.file.Path path);
     method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public androidx.xr.scenecore.CubeMapTexture getReflectionTexture();
     field public static final androidx.xr.scenecore.ExrImage.Companion Companion;
   }
@@ -196,32 +187,31 @@ package androidx.xr.scenecore {
     method @MainThread public suspend Object? createFromZip(androidx.xr.runtime.Session session, android.net.Uri uri, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.ExrImage>);
     method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public suspend Object? createFromZip(androidx.xr.runtime.Session session, byte[] assetData, String assetKey, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.ExrImage>);
     method @MainThread public suspend Object? createFromZip(androidx.xr.runtime.Session session, java.nio.file.Path path, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.ExrImage>);
-    method @MainThread public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.ExrImage> createFromZipAsync(androidx.xr.runtime.Session session, android.net.Uri uri);
-    method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.ExrImage> createFromZipAsync(androidx.xr.runtime.Session session, byte[] assetData, String assetKey);
-    method @MainThread public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.ExrImage> createFromZipAsync(androidx.xr.runtime.Session session, java.nio.file.Path path);
   }
 
   public final class GltfModel {
-    method @MainThread public static com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.GltfModel> createAsync(androidx.xr.runtime.Session session, android.net.Uri uri);
-    method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public static com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.GltfModel> createAsync(androidx.xr.runtime.Session session, byte[] assetData, String assetKey);
-    method @MainThread public static com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.GltfModel> createAsync(androidx.xr.runtime.Session session, java.nio.file.Path path);
+    method @MainThread public static suspend Object? create(androidx.xr.runtime.Session session, android.net.Uri uri, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.GltfModel>);
+    method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public static suspend Object? create(androidx.xr.runtime.Session session, byte[] assetData, String assetKey, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.GltfModel>);
+    method @MainThread public static suspend Object? create(androidx.xr.runtime.Session session, java.nio.file.Path path, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.GltfModel>);
     field public static final androidx.xr.scenecore.GltfModel.Companion Companion;
   }
 
   public static final class GltfModel.Companion {
-    method @MainThread public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.GltfModel> createAsync(androidx.xr.runtime.Session session, android.net.Uri uri);
-    method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.GltfModel> createAsync(androidx.xr.runtime.Session session, byte[] assetData, String assetKey);
-    method @MainThread public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.GltfModel> createAsync(androidx.xr.runtime.Session session, java.nio.file.Path path);
+    method @MainThread public suspend Object? create(androidx.xr.runtime.Session session, android.net.Uri uri, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.GltfModel>);
+    method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public suspend Object? create(androidx.xr.runtime.Session session, byte[] assetData, String assetKey, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.GltfModel>);
+    method @MainThread public suspend Object? create(androidx.xr.runtime.Session session, java.nio.file.Path path, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.GltfModel>);
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class GltfModelEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.GltfEntity> {
+  public final class GltfModelEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.GltfEntity> {
     method @MainThread public static androidx.xr.scenecore.GltfModelEntity create(androidx.xr.runtime.Session session, androidx.xr.scenecore.GltfModel model);
     method @MainThread public static androidx.xr.scenecore.GltfModelEntity create(androidx.xr.runtime.Session session, androidx.xr.scenecore.GltfModel model, optional androidx.xr.runtime.math.Pose pose);
     method public int getAnimationState();
-    method @MainThread public void setMaterialOverride(androidx.xr.scenecore.Material material, String meshName);
-    method @MainThread public void startAnimation(boolean loop);
-    method @MainThread public void startAnimation(boolean loop, optional String? animationName);
+    method @MainThread @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public void setMaterialOverride(androidx.xr.scenecore.Material material, String meshName);
+    method @MainThread public void startAnimation();
+    method @MainThread public void startAnimation(optional boolean loop);
+    method @MainThread public void startAnimation(boolean loop, String animationName);
     method @MainThread public void stopAnimation();
+    property public int animationState;
     field public static final androidx.xr.scenecore.GltfModelEntity.Companion Companion;
   }
 
@@ -236,6 +226,17 @@ package androidx.xr.scenecore {
   public static final class GltfModelEntity.Companion {
     method @MainThread public androidx.xr.scenecore.GltfModelEntity create(androidx.xr.runtime.Session session, androidx.xr.scenecore.GltfModel model);
     method @MainThread public androidx.xr.scenecore.GltfModelEntity create(androidx.xr.runtime.Session session, androidx.xr.scenecore.GltfModel model, optional androidx.xr.runtime.math.Pose pose);
+  }
+
+  public final class GroupEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.Entity> {
+    method public static androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name);
+    method public static androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
+    field public static final androidx.xr.scenecore.GroupEntity.Companion Companion;
+  }
+
+  public static final class GroupEntity.Companion {
+    method public androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name);
+    method public androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
   }
 
   public final class Head extends androidx.xr.scenecore.BaseScenePose<androidx.xr.runtime.internal.HeadActivityPose> {
@@ -263,44 +264,25 @@ package androidx.xr.scenecore {
     field public static final int UNKNOWN = 0; // 0x0
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class InputEvent {
-    ctor public InputEvent(int source, int pointerType, long timestamp, androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, int action, optional androidx.xr.scenecore.InputEvent.HitInfo? hitInfo, optional androidx.xr.scenecore.InputEvent.HitInfo? secondaryHitInfo);
+  public final class InputEvent {
+    ctor public InputEvent(int source, int pointerType, long timestamp, androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, int action, optional java.util.List<androidx.xr.scenecore.InputEvent.HitInfo> hitInfoList);
     method public int getAction();
     method public androidx.xr.runtime.math.Vector3 getDirection();
-    method public androidx.xr.scenecore.InputEvent.HitInfo? getHitInfo();
+    method public java.util.List<androidx.xr.scenecore.InputEvent.HitInfo> getHitInfoList();
     method public androidx.xr.runtime.math.Vector3 getOrigin();
     method public int getPointerType();
-    method public androidx.xr.scenecore.InputEvent.HitInfo? getSecondaryHitInfo();
     method public int getSource();
     method public long getTimestamp();
     property public int action;
     property public androidx.xr.runtime.math.Vector3 direction;
-    property public androidx.xr.scenecore.InputEvent.HitInfo? hitInfo;
+    property public java.util.List<androidx.xr.scenecore.InputEvent.HitInfo> hitInfoList;
     property public androidx.xr.runtime.math.Vector3 origin;
     property public int pointerType;
-    property public androidx.xr.scenecore.InputEvent.HitInfo? secondaryHitInfo;
     property public int source;
     property public long timestamp;
-    field public static final int ACTION_CANCEL = 3; // 0x3
-    field public static final int ACTION_DOWN = 0; // 0x0
-    field public static final int ACTION_HOVER_ENTER = 5; // 0x5
-    field public static final int ACTION_HOVER_EXIT = 6; // 0x6
-    field public static final int ACTION_HOVER_MOVE = 4; // 0x4
-    field public static final int ACTION_MOVE = 2; // 0x2
-    field public static final int ACTION_UP = 1; // 0x1
-    field public static final androidx.xr.scenecore.InputEvent.Companion Companion;
-    field public static final int POINTER_TYPE_DEFAULT = 0; // 0x0
-    field public static final int POINTER_TYPE_LEFT = 1; // 0x1
-    field public static final int POINTER_TYPE_RIGHT = 2; // 0x2
-    field public static final int SOURCE_CONTROLLER = 2; // 0x2
-    field public static final int SOURCE_GAZE_AND_GESTURE = 5; // 0x5
-    field public static final int SOURCE_HANDS = 3; // 0x3
-    field public static final int SOURCE_HEAD = 1; // 0x1
-    field public static final int SOURCE_MOUSE = 4; // 0x4
-    field public static final int SOURCE_UNKNOWN = 0; // 0x0
   }
 
-  public static final class InputEvent.Companion {
+  public static final class InputEvent.Action {
     property public static int ACTION_CANCEL;
     property public static int ACTION_DOWN;
     property public static int ACTION_HOVER_ENTER;
@@ -308,15 +290,14 @@ package androidx.xr.scenecore {
     property public static int ACTION_HOVER_MOVE;
     property public static int ACTION_MOVE;
     property public static int ACTION_UP;
-    property public static int POINTER_TYPE_DEFAULT;
-    property public static int POINTER_TYPE_LEFT;
-    property public static int POINTER_TYPE_RIGHT;
-    property public static int SOURCE_CONTROLLER;
-    property public static int SOURCE_GAZE_AND_GESTURE;
-    property public static int SOURCE_HANDS;
-    property public static int SOURCE_HEAD;
-    property public static int SOURCE_MOUSE;
-    property public static int SOURCE_UNKNOWN;
+    field public static final int ACTION_CANCEL = 3; // 0x3
+    field public static final int ACTION_DOWN = 0; // 0x0
+    field public static final int ACTION_HOVER_ENTER = 5; // 0x5
+    field public static final int ACTION_HOVER_EXIT = 6; // 0x6
+    field public static final int ACTION_HOVER_MOVE = 4; // 0x4
+    field public static final int ACTION_MOVE = 2; // 0x2
+    field public static final int ACTION_UP = 1; // 0x1
+    field public static final androidx.xr.scenecore.InputEvent.Action INSTANCE;
   }
 
   public static final class InputEvent.HitInfo {
@@ -329,11 +310,38 @@ package androidx.xr.scenecore {
     property public androidx.xr.runtime.math.Matrix4 transform;
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public fun interface InputEventListener {
+  public static final class InputEvent.Pointer {
+    property public static int POINTER_TYPE_DEFAULT;
+    property public static int POINTER_TYPE_LEFT;
+    property public static int POINTER_TYPE_RIGHT;
+    field public static final androidx.xr.scenecore.InputEvent.Pointer INSTANCE;
+    field public static final int POINTER_TYPE_DEFAULT = 0; // 0x0
+    field public static final int POINTER_TYPE_LEFT = 1; // 0x1
+    field public static final int POINTER_TYPE_RIGHT = 2; // 0x2
+  }
+
+  public static final class InputEvent.Source {
+    property public static int SOURCE_CONTROLLER;
+    property public static int SOURCE_GAZE_AND_GESTURE;
+    property public static int SOURCE_HANDS;
+    property public static int SOURCE_HEAD;
+    property public static int SOURCE_MOUSE;
+    property public static int SOURCE_UNKNOWN;
+    field public static final androidx.xr.scenecore.InputEvent.Source INSTANCE;
+    field public static final int SOURCE_CONTROLLER = 2; // 0x2
+    field public static final int SOURCE_GAZE_AND_GESTURE = 5; // 0x5
+    field public static final int SOURCE_HANDS = 3; // 0x3
+    field public static final int SOURCE_HEAD = 1; // 0x1
+    field public static final int SOURCE_MOUSE = 4; // 0x4
+    field public static final int SOURCE_UNKNOWN = 0; // 0x0
+  }
+
+  public fun interface InputEventListener {
     method public void onInputEvent(androidx.xr.scenecore.InputEvent inputEvent);
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class InteractableComponent implements androidx.xr.scenecore.Component {
+  public final class InteractableComponent implements androidx.xr.scenecore.Component {
+    method public static androidx.xr.scenecore.InteractableComponent create(androidx.xr.runtime.Session session, androidx.xr.scenecore.InputEventListener inputEventListener);
     method public static androidx.xr.scenecore.InteractableComponent create(androidx.xr.runtime.Session session, java.util.concurrent.Executor executor, androidx.xr.scenecore.InputEventListener inputEventListener);
     method public boolean onAttach(androidx.xr.scenecore.Entity entity);
     method public void onDetach(androidx.xr.scenecore.Entity entity);
@@ -341,6 +349,7 @@ package androidx.xr.scenecore {
   }
 
   public static final class InteractableComponent.Companion {
+    method public androidx.xr.scenecore.InteractableComponent create(androidx.xr.runtime.Session session, androidx.xr.scenecore.InputEventListener inputEventListener);
     method public androidx.xr.scenecore.InteractableComponent create(androidx.xr.runtime.Session session, java.util.concurrent.Executor executor, androidx.xr.scenecore.InputEventListener inputEventListener);
   }
 
@@ -436,43 +445,31 @@ package androidx.xr.scenecore {
     ctor public Material(androidx.xr.runtime.internal.MaterialResource? material);
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class MovableComponent implements androidx.xr.scenecore.Component {
-    method public void addMoveListener(androidx.xr.scenecore.MoveListener moveListener);
-    method public void addMoveListener(java.util.concurrent.Executor executor, androidx.xr.scenecore.MoveListener moveListener);
-    method public static androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session);
-    method public static androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable);
-    method public static androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable, optional boolean scaleInZ);
-    method public static androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable, optional boolean scaleInZ, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement);
-    method public static androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable, optional boolean scaleInZ, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement, optional boolean shouldDisposeParentAnchor);
+  public final class MovableComponent implements androidx.xr.scenecore.Component {
+    method public void addMoveListener(androidx.xr.scenecore.EntityMoveListener entityMoveListener);
+    method public void addMoveListener(java.util.concurrent.Executor executor, androidx.xr.scenecore.EntityMoveListener entityMoveListener);
+    method public static androidx.xr.scenecore.MovableComponent createAnchorable(androidx.xr.runtime.Session session);
+    method public static androidx.xr.scenecore.MovableComponent createAnchorable(androidx.xr.runtime.Session session, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement);
+    method public static androidx.xr.scenecore.MovableComponent createAnchorable(androidx.xr.runtime.Session session, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement, optional boolean disposeParentOnReAnchor);
+    method public static androidx.xr.scenecore.MovableComponent createCustomMovable(androidx.xr.runtime.Session session, boolean scaleInZ, java.util.concurrent.Executor? executor, androidx.xr.scenecore.EntityMoveListener entityMoveListener);
+    method public static androidx.xr.scenecore.MovableComponent createSystemMovable(androidx.xr.runtime.Session session);
+    method public static androidx.xr.scenecore.MovableComponent createSystemMovable(androidx.xr.runtime.Session session, optional boolean scaleInZ);
     method public androidx.xr.runtime.math.FloatSize3d getSize();
     method public boolean onAttach(androidx.xr.scenecore.Entity entity);
     method public void onDetach(androidx.xr.scenecore.Entity entity);
-    method public void removeMoveListener(androidx.xr.scenecore.MoveListener moveListener);
+    method public void removeMoveListener(androidx.xr.scenecore.EntityMoveListener entityMoveListener);
     method public void setSize(androidx.xr.runtime.math.FloatSize3d);
     property public androidx.xr.runtime.math.FloatSize3d size;
     field public static final androidx.xr.scenecore.MovableComponent.Companion Companion;
   }
 
   public static final class MovableComponent.Companion {
-    method public androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session);
-    method public androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable);
-    method public androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable, optional boolean scaleInZ);
-    method public androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable, optional boolean scaleInZ, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement);
-    method public androidx.xr.scenecore.MovableComponent create(androidx.xr.runtime.Session session, optional boolean systemMovable, optional boolean scaleInZ, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement, optional boolean shouldDisposeParentAnchor);
-  }
-
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public interface MoveListener {
-    method public default void onMoveEnd(androidx.xr.scenecore.Entity entity, androidx.xr.runtime.math.Ray finalInputRay, androidx.xr.runtime.math.Pose finalPose, float finalScale, androidx.xr.scenecore.Entity? updatedParent);
-    method public default void onMoveStart(androidx.xr.scenecore.Entity entity, androidx.xr.runtime.math.Ray initialInputRay, androidx.xr.runtime.math.Pose initialPose, float initialScale, androidx.xr.scenecore.Entity initialParent);
-    method public default void onMoveUpdate(androidx.xr.scenecore.Entity entity, androidx.xr.runtime.math.Ray currentInputRay, androidx.xr.runtime.math.Pose currentPose, float currentScale);
-  }
-
-  @Deprecated @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public fun interface OnBoundsChangeListener {
-    method @Deprecated public void onBoundsChanged(androidx.xr.runtime.math.FloatSize3d bounds);
-  }
-
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public fun interface OnStateChangedListener {
-    method public void onStateChanged(int newState);
+    method public androidx.xr.scenecore.MovableComponent createAnchorable(androidx.xr.runtime.Session session);
+    method public androidx.xr.scenecore.MovableComponent createAnchorable(androidx.xr.runtime.Session session, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement);
+    method public androidx.xr.scenecore.MovableComponent createAnchorable(androidx.xr.runtime.Session session, optional java.util.Set<androidx.xr.scenecore.AnchorPlacement> anchorPlacement, optional boolean disposeParentOnReAnchor);
+    method public androidx.xr.scenecore.MovableComponent createCustomMovable(androidx.xr.runtime.Session session, boolean scaleInZ, java.util.concurrent.Executor? executor, androidx.xr.scenecore.EntityMoveListener entityMoveListener);
+    method public androidx.xr.scenecore.MovableComponent createSystemMovable(androidx.xr.runtime.Session session);
+    method public androidx.xr.scenecore.MovableComponent createSystemMovable(androidx.xr.runtime.Session session, optional boolean scaleInZ);
   }
 
   public class PanelEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.PanelEntity> {
@@ -662,8 +659,6 @@ package androidx.xr.scenecore {
     method public androidx.xr.runtime.math.Pose getActivitySpacePose();
     method public suspend Object? hitTest(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, int hitTestFilter, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.HitTestResult>);
     method public suspend Object? hitTest(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.HitTestResult>);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.HitTestResult> hitTestAsync(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.HitTestResult> hitTestAsync(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, int hitTestFilter);
     method public androidx.xr.runtime.math.Pose transformPoseTo(androidx.xr.runtime.math.Pose pose, androidx.xr.scenecore.ScenePose destination);
     property public abstract androidx.xr.runtime.math.Pose activitySpacePose;
   }
@@ -691,7 +686,7 @@ package androidx.xr.scenecore {
   public final class Space {
     property public static int ACTIVITY;
     property public static int PARENT;
-    property @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public static int REAL_WORLD;
+    property @RestrictTo({androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX}) public static int REAL_WORLD;
     field public static final int ACTIVITY = 1; // 0x1
     field public static final androidx.xr.scenecore.Space INSTANCE;
     field public static final int PARENT = 0; // 0x0
@@ -749,68 +744,37 @@ package androidx.xr.scenecore {
     property public static int SPATIAL_CAPABILITY_UI;
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class SpatialEnvironment {
+  public final class SpatialEnvironment {
     ctor public SpatialEnvironment(androidx.xr.runtime.internal.JxrPlatformAdapter runtime);
+    method public void addOnPassthroughOpacityChangedListener(java.util.concurrent.Executor executor, java.util.function.Consumer<java.lang.Float> listener);
     method public void addOnPassthroughOpacityChangedListener(java.util.function.Consumer<java.lang.Float> listener);
+    method public void addOnSpatialEnvironmentChangedListener(java.util.concurrent.Executor executor, java.util.function.Consumer<java.lang.Boolean> listener);
     method public void addOnSpatialEnvironmentChangedListener(java.util.function.Consumer<java.lang.Boolean> listener);
     method public float getCurrentPassthroughOpacity();
-    method @Deprecated public androidx.xr.scenecore.SpatialEnvironment.PassthroughMode getPassthroughMode();
-    method @Deprecated public float getPassthroughOpacity();
-    method public Float? getPassthroughOpacityPreference();
-    method public androidx.xr.scenecore.SpatialEnvironment.SpatialEnvironmentPreference? getSpatialEnvironmentPreference();
-    method public boolean isSpatialEnvironmentPreferenceActive();
+    method public float getPreferredPassthroughOpacity();
+    method public androidx.xr.scenecore.SpatialEnvironment.SpatialEnvironmentPreference? getPreferredSpatialEnvironment();
+    method public boolean isPreferredSpatialEnvironmentActive();
     method public void removeOnPassthroughOpacityChangedListener(java.util.function.Consumer<java.lang.Float> listener);
     method public void removeOnSpatialEnvironmentChangedListener(java.util.function.Consumer<java.lang.Boolean> listener);
-    method @Deprecated public void setGeometry(androidx.xr.scenecore.GltfModel? gltfModel);
-    method @Deprecated public void setPassthrough(androidx.xr.scenecore.SpatialEnvironment.PassthroughMode passthroughMode);
-    method @Deprecated public void setPassthroughOpacity(float passthroughOpacity);
-    method @com.google.errorprone.annotations.CanIgnoreReturnValue public androidx.xr.scenecore.SpatialEnvironment.SetPassthroughOpacityPreferenceResult setPassthroughOpacityPreference(Float? passthroughOpacityPreference);
-    method @Deprecated public void setSkybox(androidx.xr.scenecore.ExrImage? exrImage);
-    method @com.google.errorprone.annotations.CanIgnoreReturnValue public androidx.xr.scenecore.SpatialEnvironment.SetSpatialEnvironmentPreferenceResult setSpatialEnvironmentPreference(androidx.xr.scenecore.SpatialEnvironment.SpatialEnvironmentPreference? environmentPreference);
+    method public void setPreferredPassthroughOpacity(float);
+    method public void setPreferredSpatialEnvironment(androidx.xr.scenecore.SpatialEnvironment.SpatialEnvironmentPreference?);
+    property public float currentPassthroughOpacity;
+    property public boolean isPreferredSpatialEnvironmentActive;
+    property public float preferredPassthroughOpacity;
+    property public androidx.xr.scenecore.SpatialEnvironment.SpatialEnvironmentPreference? preferredSpatialEnvironment;
+    field public static final androidx.xr.scenecore.SpatialEnvironment.Companion Companion;
+    field public static final float NO_PASSTHROUGH_OPACITY_PREFERENCE = (-1.0f/0.0f);
   }
 
-  @Deprecated public static final class SpatialEnvironment.PassthroughMode {
-    method @Deprecated public int getValue();
-    property @Deprecated public int value;
-    field @Deprecated public static final androidx.xr.scenecore.SpatialEnvironment.PassthroughMode.Companion Companion;
-    field @Deprecated public static final androidx.xr.scenecore.SpatialEnvironment.PassthroughMode DISABLED;
-    field @Deprecated public static final androidx.xr.scenecore.SpatialEnvironment.PassthroughMode ENABLED;
-    field @Deprecated public static final androidx.xr.scenecore.SpatialEnvironment.PassthroughMode UNINITIALIZED;
-  }
-
-  @Deprecated public static final class SpatialEnvironment.PassthroughMode.Companion {
-    property @Deprecated public androidx.xr.scenecore.SpatialEnvironment.PassthroughMode DISABLED;
-    property @Deprecated public androidx.xr.scenecore.SpatialEnvironment.PassthroughMode ENABLED;
-    property @Deprecated public androidx.xr.scenecore.SpatialEnvironment.PassthroughMode UNINITIALIZED;
-  }
-
-  public static final class SpatialEnvironment.SetPassthroughOpacityPreferenceChangeApplied extends androidx.xr.scenecore.SpatialEnvironment.SetPassthroughOpacityPreferenceResult {
-    ctor public SpatialEnvironment.SetPassthroughOpacityPreferenceChangeApplied();
-  }
-
-  public static final class SpatialEnvironment.SetPassthroughOpacityPreferenceChangePending extends androidx.xr.scenecore.SpatialEnvironment.SetPassthroughOpacityPreferenceResult {
-    ctor public SpatialEnvironment.SetPassthroughOpacityPreferenceChangePending();
-  }
-
-  public abstract static sealed class SpatialEnvironment.SetPassthroughOpacityPreferenceResult {
-  }
-
-  public static final class SpatialEnvironment.SetSpatialEnvironmentPreferenceChangeApplied extends androidx.xr.scenecore.SpatialEnvironment.SetSpatialEnvironmentPreferenceResult {
-    ctor public SpatialEnvironment.SetSpatialEnvironmentPreferenceChangeApplied();
-  }
-
-  public static final class SpatialEnvironment.SetSpatialEnvironmentPreferenceChangePending extends androidx.xr.scenecore.SpatialEnvironment.SetSpatialEnvironmentPreferenceResult {
-    ctor public SpatialEnvironment.SetSpatialEnvironmentPreferenceChangePending();
-  }
-
-  public abstract static sealed class SpatialEnvironment.SetSpatialEnvironmentPreferenceResult {
+  public static final class SpatialEnvironment.Companion {
+    property public static float NO_PASSTHROUGH_OPACITY_PREFERENCE;
   }
 
   public static final class SpatialEnvironment.SpatialEnvironmentPreference {
     ctor public SpatialEnvironment.SpatialEnvironmentPreference(androidx.xr.scenecore.ExrImage? skybox, androidx.xr.scenecore.GltfModel? geometry);
-    ctor public SpatialEnvironment.SpatialEnvironmentPreference(androidx.xr.scenecore.ExrImage? skybox, androidx.xr.scenecore.GltfModel? geometry, optional androidx.xr.scenecore.Material? geometryMaterial);
-    ctor public SpatialEnvironment.SpatialEnvironmentPreference(androidx.xr.scenecore.ExrImage? skybox, androidx.xr.scenecore.GltfModel? geometry, optional androidx.xr.scenecore.Material? geometryMaterial, optional String? geometryMeshName);
-    ctor public SpatialEnvironment.SpatialEnvironmentPreference(androidx.xr.scenecore.ExrImage? skybox, androidx.xr.scenecore.GltfModel? geometry, optional androidx.xr.scenecore.Material? geometryMaterial, optional String? geometryMeshName, optional String? geometryAnimationName);
+    ctor @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public SpatialEnvironment.SpatialEnvironmentPreference(androidx.xr.scenecore.ExrImage? skybox, androidx.xr.scenecore.GltfModel? geometry, androidx.xr.scenecore.Material? geometryMaterial);
+    ctor @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public SpatialEnvironment.SpatialEnvironmentPreference(androidx.xr.scenecore.ExrImage? skybox, androidx.xr.scenecore.GltfModel? geometry, androidx.xr.scenecore.Material? geometryMaterial, optional String? geometryMeshName);
+    ctor @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public SpatialEnvironment.SpatialEnvironmentPreference(androidx.xr.scenecore.ExrImage? skybox, androidx.xr.scenecore.GltfModel? geometry, androidx.xr.scenecore.Material? geometryMaterial, optional String? geometryMeshName, optional String? geometryAnimationName);
     method public androidx.xr.scenecore.GltfModel? getGeometry();
     method public androidx.xr.scenecore.ExrImage? getSkybox();
     property public androidx.xr.scenecore.GltfModel? geometry;
@@ -833,13 +797,13 @@ package androidx.xr.scenecore {
     method public void onSpatialModeChanged(androidx.xr.runtime.math.Pose recommendedPose, float recommendedScale);
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class SpatialPointerComponent implements androidx.xr.scenecore.Component {
+  public final class SpatialPointerComponent implements androidx.xr.scenecore.Component {
     method public static androidx.xr.scenecore.SpatialPointerComponent create(androidx.xr.runtime.Session session);
-    method public androidx.xr.scenecore.SpatialPointerIcon? getSpatialPointerIcon();
+    method public androidx.xr.scenecore.SpatialPointerIcon getSpatialPointerIcon();
     method public boolean onAttach(androidx.xr.scenecore.Entity entity);
     method public void onDetach(androidx.xr.scenecore.Entity entity);
-    method public void setSpatialPointerIcon(androidx.xr.scenecore.SpatialPointerIcon?);
-    property public androidx.xr.scenecore.SpatialPointerIcon? spatialPointerIcon;
+    method public void setSpatialPointerIcon(androidx.xr.scenecore.SpatialPointerIcon);
+    property public androidx.xr.scenecore.SpatialPointerIcon spatialPointerIcon;
     field public static final androidx.xr.scenecore.SpatialPointerComponent.Companion Companion;
   }
 
@@ -847,15 +811,17 @@ package androidx.xr.scenecore {
     method public androidx.xr.scenecore.SpatialPointerComponent create(androidx.xr.runtime.Session session);
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public abstract sealed class SpatialPointerIcon {
+  public final class SpatialPointerIcon {
+    field public static final androidx.xr.scenecore.SpatialPointerIcon CIRCLE;
+    field public static final androidx.xr.scenecore.SpatialPointerIcon.Companion Companion;
+    field public static final androidx.xr.scenecore.SpatialPointerIcon DEFAULT;
+    field public static final androidx.xr.scenecore.SpatialPointerIcon NONE;
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class SpatialPointerIconCircle extends androidx.xr.scenecore.SpatialPointerIcon {
-    field public static final androidx.xr.scenecore.SpatialPointerIconCircle INSTANCE;
-  }
-
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class SpatialPointerIconNone extends androidx.xr.scenecore.SpatialPointerIcon {
-    field public static final androidx.xr.scenecore.SpatialPointerIconNone INSTANCE;
+  public static final class SpatialPointerIcon.Companion {
+    property public androidx.xr.scenecore.SpatialPointerIcon CIRCLE;
+    property public androidx.xr.scenecore.SpatialPointerIcon DEFAULT;
+    property public androidx.xr.scenecore.SpatialPointerIcon NONE;
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class SpatialSoundPool {
@@ -923,6 +889,7 @@ package androidx.xr.scenecore {
   }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class SubspaceNodeEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.SubspaceNodeEntity> {
+    method public static androidx.xr.scenecore.SubspaceNodeEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.SubspaceNodeHolder<? extends java.lang.Object?> subspaceNodeHolder, androidx.xr.runtime.math.FloatSize3d size);
     method public static androidx.xr.scenecore.SubspaceNodeEntity create(androidx.xr.runtime.Session session, com.google.androidxr.splitengine.SubspaceNode subspaceNode, androidx.xr.runtime.math.FloatSize3d size);
     method public androidx.xr.runtime.math.FloatSize3d getSize();
     method public void setSize(androidx.xr.runtime.math.FloatSize3d);
@@ -931,6 +898,7 @@ package androidx.xr.scenecore {
   }
 
   public static final class SubspaceNodeEntity.Companion {
+    method public androidx.xr.scenecore.SubspaceNodeEntity create(androidx.xr.runtime.Session session, androidx.xr.runtime.SubspaceNodeHolder<? extends java.lang.Object?> subspaceNodeHolder, androidx.xr.runtime.math.FloatSize3d size);
     method public androidx.xr.scenecore.SubspaceNodeEntity create(androidx.xr.runtime.Session session, com.google.androidxr.splitengine.SubspaceNode subspaceNode, androidx.xr.runtime.math.FloatSize3d size);
   }
 
@@ -946,8 +914,7 @@ package androidx.xr.scenecore {
     method public androidx.xr.scenecore.SurfaceEntity.CanvasShape getCanvasShape();
     method public androidx.xr.scenecore.SurfaceEntity.ContentColorMetadata? getContentColorMetadata();
     method public androidx.xr.runtime.math.FloatSize3d getDimensions();
-    method public float getFeatherRadiusX();
-    method public float getFeatherRadiusY();
+    method public androidx.xr.scenecore.SurfaceEntity.EdgeFeatheringParams getEdgeFeather();
     method public androidx.xr.scenecore.PerceivedResolutionResult getPerceivedResolution();
     method public androidx.xr.scenecore.Texture? getPrimaryAlphaMaskTexture();
     method public int getStereoMode();
@@ -955,16 +922,14 @@ package androidx.xr.scenecore {
     method @MainThread public void setAuxiliaryAlphaMaskTexture(androidx.xr.scenecore.Texture?);
     method @MainThread public void setCanvasShape(androidx.xr.scenecore.SurfaceEntity.CanvasShape);
     method @MainThread public void setContentColorMetadata(androidx.xr.scenecore.SurfaceEntity.ContentColorMetadata?);
-    method @MainThread public void setFeatherRadiusX(float);
-    method @MainThread public void setFeatherRadiusY(float);
+    method @MainThread public void setEdgeFeather(androidx.xr.scenecore.SurfaceEntity.EdgeFeatheringParams);
     method @MainThread public void setPrimaryAlphaMaskTexture(androidx.xr.scenecore.Texture?);
     method @MainThread public void setStereoMode(int);
     property public androidx.xr.scenecore.Texture? auxiliaryAlphaMaskTexture;
     property public androidx.xr.scenecore.SurfaceEntity.CanvasShape canvasShape;
     property public androidx.xr.scenecore.SurfaceEntity.ContentColorMetadata? contentColorMetadata;
     property public androidx.xr.runtime.math.FloatSize3d dimensions;
-    property public float featherRadiusX;
-    property public float featherRadiusY;
+    property public androidx.xr.scenecore.SurfaceEntity.EdgeFeatheringParams edgeFeather;
     property public androidx.xr.scenecore.Texture? primaryAlphaMaskTexture;
     property public int stereoMode;
     field public static final androidx.xr.scenecore.SurfaceEntity.Companion Companion;
@@ -1075,6 +1040,22 @@ package androidx.xr.scenecore {
     field public static final androidx.xr.scenecore.SurfaceEntity.ContentSecurityLevel INSTANCE;
     field public static final int NONE = 0; // 0x0
     field public static final int PROTECTED = 1; // 0x1
+  }
+
+  public abstract static class SurfaceEntity.EdgeFeatheringParams {
+  }
+
+  public static final class SurfaceEntity.EdgeFeatheringParams.SmoothFeather extends androidx.xr.scenecore.SurfaceEntity.EdgeFeatheringParams {
+    ctor public SurfaceEntity.EdgeFeatheringParams.SmoothFeather();
+    ctor public SurfaceEntity.EdgeFeatheringParams.SmoothFeather(optional @FloatRange(from=0.0, to=0.5) float leftRight, optional @FloatRange(from=0.0, to=0.5) float topBottom);
+    method public float getLeftRight();
+    method public float getTopBottom();
+    property @FloatRange(from=0.0, to=0.5) public float leftRight;
+    property @FloatRange(from=0.0, to=0.5) public float topBottom;
+  }
+
+  public static final class SurfaceEntity.EdgeFeatheringParams.SolidEdge extends androidx.xr.scenecore.SurfaceEntity.EdgeFeatheringParams {
+    ctor public SurfaceEntity.EdgeFeatheringParams.SolidEdge();
   }
 
   public static final class SurfaceEntity.StereoMode {
@@ -1247,8 +1228,8 @@ package androidx.xr.scenecore.impl {
     method public androidx.xr.runtime.internal.AnchorEntity createAnchorEntity(androidx.xr.runtime.internal.Anchor);
     method public androidx.xr.runtime.internal.AnchorEntity createAnchorEntity(androidx.xr.runtime.internal.Dimensions, androidx.xr.runtime.internal.PlaneType, androidx.xr.runtime.internal.PlaneSemantic, java.time.Duration);
     method public androidx.xr.runtime.internal.AnchorPlacement createAnchorPlacementForPlanes(java.util.Set<androidx.xr.runtime.internal.PlaneType!>, java.util.Set<androidx.xr.runtime.internal.PlaneSemantic!>);
-    method public androidx.xr.runtime.internal.Entity createEntity(androidx.xr.runtime.math.Pose, String, androidx.xr.runtime.internal.Entity);
     method public androidx.xr.runtime.internal.GltfEntity createGltfEntity(androidx.xr.runtime.math.Pose, androidx.xr.runtime.internal.GltfModelResource, androidx.xr.runtime.internal.Entity?);
+    method public androidx.xr.runtime.internal.Entity createGroupEntity(androidx.xr.runtime.math.Pose, String, androidx.xr.runtime.internal.Entity);
     method public androidx.xr.runtime.internal.InteractableComponent createInteractableComponent(java.util.concurrent.Executor, androidx.xr.runtime.internal.InputEventListener);
     method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource!>? createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec);
     method public androidx.xr.runtime.internal.LoggingEntity createLoggingEntity(androidx.xr.runtime.math.Pose);
@@ -1259,7 +1240,7 @@ package androidx.xr.scenecore.impl {
     method public androidx.xr.runtime.internal.PointerCaptureComponent createPointerCaptureComponent(java.util.concurrent.Executor, androidx.xr.runtime.internal.PointerCaptureComponent.StateListener, androidx.xr.runtime.internal.InputEventListener);
     method public androidx.xr.runtime.internal.ResizableComponent createResizableComponent(androidx.xr.runtime.internal.Dimensions, androidx.xr.runtime.internal.Dimensions);
     method public androidx.xr.runtime.internal.SpatialPointerComponent createSpatialPointerComponent();
-    method public androidx.xr.scenecore.impl.SubspaceNodeEntityImpl createSubspaceNodeEntity(com.google.androidxr.splitengine.SubspaceNode, androidx.xr.runtime.internal.Dimensions);
+    method public androidx.xr.runtime.internal.SubspaceNodeEntity createSubspaceNodeEntity(androidx.xr.runtime.SubspaceNodeHolder<? extends java.lang.Object!>, androidx.xr.runtime.internal.Dimensions);
     method public androidx.xr.runtime.internal.SurfaceEntity createSurfaceEntity(@androidx.xr.runtime.internal.SurfaceEntity.StereoMode int, androidx.xr.runtime.math.Pose, androidx.xr.runtime.internal.SurfaceEntity.CanvasShape, @androidx.xr.runtime.internal.SurfaceEntity.ContentSecurityLevel int, @androidx.xr.runtime.internal.SurfaceEntity.SuperSampling int, androidx.xr.runtime.internal.Entity);
     method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource!>? createWaterMaterial(boolean);
     method public void destroyKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource);
@@ -1272,7 +1253,6 @@ package androidx.xr.scenecore.impl {
     method public androidx.xr.runtime.internal.AudioTrackExtensionsWrapper getAudioTrackExtensionsWrapper();
     method public androidx.xr.runtime.internal.CameraViewActivityPose? getCameraViewActivityPose(@androidx.xr.runtime.internal.CameraViewActivityPose.CameraType int);
     method public androidx.xr.runtime.internal.HeadActivityPose? getHeadActivityPose();
-    method public androidx.xr.runtime.math.Pose? getHeadPoseInOpenXrUnboundedSpace();
     method public androidx.xr.runtime.internal.PanelEntity getMainPanelEntity();
     method public androidx.xr.runtime.internal.MediaPlayerExtensionsWrapper getMediaPlayerExtensionsWrapper();
     method public long getNativeInstance();
@@ -1401,6 +1381,508 @@ package androidx.xr.scenecore.impl.extensions {
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class XrExtensionsProvider {
     method public static com.android.extensions.xr.XrExtensions? getXrExtensions();
+  }
+
+}
+
+package androidx.xr.scenecore.impl.impress {
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public interface AssetAnimator {
+    method public void onComplete();
+    method public void onFailure(String message);
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public interface AssetLoader {
+    method public void onFailure(String message);
+    method public void onSuccess(long value);
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class FakeImpressApiImpl implements androidx.xr.scenecore.impl.impress.ImpressApi {
+    ctor public FakeImpressApiImpl();
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Void!> animateGltfModel(int, String?, boolean);
+    method public androidx.xr.scenecore.impl.impress.Texture borrowReflectionTexture();
+    method public void clearPreferredEnvironmentIblAsset();
+    method public int createImpressNode();
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.KhronosPbrMaterial!> createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int, @androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel int);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int, @androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel int, boolean);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.WaterMaterial!> createWaterMaterial(boolean);
+    method public void destroyImpressNode(int);
+    method public void destroyNativeObject(long);
+    method public void disposeAllResources();
+    method public long getCurrentEnvironmentLight();
+    method public java.util.Map<java.lang.Long!,java.util.List<java.lang.Integer!>!> getGltfModels();
+    method public java.util.List<java.lang.Long!> getImageBasedLightingAssets();
+    method public int getImpressNodeParent(int);
+    method public java.util.Map<androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.GltfNodeData!,androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.GltfNodeData!> getImpressNodes();
+    method public java.util.List<java.lang.Integer!> getImpressNodesForToken(long);
+    method public java.util.Map<java.lang.Long!,androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData!> getMaterials();
+    method public androidx.xr.scenecore.impl.impress.Texture getReflectionTextureFromIbl(long);
+    method public java.util.Map<java.lang.Integer!,androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.StereoSurfaceEntityData!> getStereoSurfaceEntities();
+    method public android.view.Surface getSurfaceFromStereoSurface(int);
+    method public java.util.Map<java.lang.Long!,androidx.xr.scenecore.impl.impress.Texture!> getTextureImages();
+    method public int impressNodeAnimatingSize();
+    method public boolean impressNodeHasParent(int);
+    method public int impressNodeLoopAnimatingSize();
+    method public int instanceGltfModel(long);
+    method public int instanceGltfModel(long, boolean);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadGltfAsset(byte[], String);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadGltfAsset(String);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadImageBasedLightingAsset(byte[], String);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadImageBasedLightingAsset(String);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.Texture!> loadTexture(String, androidx.xr.runtime.internal.TextureSampler);
+    method public void onPause();
+    method public void onResume();
+    method public void releaseGltfAsset(long);
+    method public void releaseImageBasedLightingAsset(long);
+    method public void resetContentColorMetadataForStereoSurface(int);
+    method public void setAlphaCutoffOnKhronosPbrMaterial(long, float);
+    method public void setAlphaMapOnWaterMaterial(long, long);
+    method public void setAlphaStepMultiplierOnWaterMaterial(long, float);
+    method public void setAlphaStepUOnWaterMaterial(long, float, float, float, float);
+    method public void setAlphaStepVOnWaterMaterial(long, float, float, float, float);
+    method public void setAmbientOcclusionFactorOnKhronosPbrMaterial(long, float);
+    method public void setAmbientOcclusionTextureOnKhronosPbrMaterial(long, long);
+    method public void setAmbientOcclusionUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setAuxiliaryAlphaMaskForStereoSurface(int, long);
+    method public void setBaseColorFactorsOnKhronosPbrMaterial(long, float, float, float, float);
+    method public void setBaseColorTextureOnKhronosPbrMaterial(long, long);
+    method public void setBaseColorUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setClearcoatFactorsOnKhronosPbrMaterial(long, float, float, float);
+    method public void setClearcoatNormalTextureOnKhronosPbrMaterial(long, long);
+    method public void setClearcoatRoughnessTextureOnKhronosPbrMaterial(long, long);
+    method public void setClearcoatTextureOnKhronosPbrMaterial(long, long);
+    method public void setContentColorMetadataForStereoSurface(int, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace int, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer int, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorRange int, int);
+    method public void setEmissiveFactorsOnKhronosPbrMaterial(long, float, float, float);
+    method public void setEmissiveTextureOnKhronosPbrMaterial(long, long);
+    method public void setEmissiveUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setFeatherRadiusForStereoSurface(int, float, float);
+    method public void setGltfModelColliderEnabled(int, boolean);
+    method public void setImpressNodeParent(int, int);
+    method public void setIndexOfRefractionOnKhronosPbrMaterial(long, float);
+    method public void setMaterialOverride(int, long, String);
+    method public void setMetallicFactorOnKhronosPbrMaterial(long, float);
+    method public void setMetallicRoughnessTextureOnKhronosPbrMaterial(long, long);
+    method public void setMetallicRoughnessUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setNormalBoundaryOnWaterMaterial(long, float);
+    method public void setNormalFactorOnKhronosPbrMaterial(long, float);
+    method public void setNormalMapOnWaterMaterial(long, long);
+    method public void setNormalSpeedOnWaterMaterial(long, float);
+    method public void setNormalTextureOnKhronosPbrMaterial(long, long);
+    method public void setNormalTilingOnWaterMaterial(long, float);
+    method public void setNormalUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setNormalZOnWaterMaterial(long, float);
+    method public void setPreferredEnvironmentLight(long);
+    method public void setPrimaryAlphaMaskForStereoSurface(int, long);
+    method public void setReflectionMapOnWaterMaterial(long, long);
+    method public void setRoughnessFactorOnKhronosPbrMaterial(long, float);
+    method public void setSheenColorFactorsOnKhronosPbrMaterial(long, float, float, float);
+    method public void setSheenColorTextureOnKhronosPbrMaterial(long, long);
+    method public void setSheenRoughnessFactorOnKhronosPbrMaterial(long, float);
+    method public void setSheenRoughnessTextureOnKhronosPbrMaterial(long, long);
+    method public void setStereoModeForStereoSurface(int, @androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int);
+    method public void setStereoSurfaceEntityCanvasShapeHemisphere(int, float);
+    method public void setStereoSurfaceEntityCanvasShapeQuad(int, float, float);
+    method public void setStereoSurfaceEntityCanvasShapeSphere(int, float);
+    method public void setTransmissionFactorOnKhronosPbrMaterial(long, float);
+    method public void setTransmissionTextureOnKhronosPbrMaterial(long, long);
+    method public void setTransmissionUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setup(com.google.ar.imp.view.View);
+    method public void stopGltfModelAnimation(int);
+  }
+
+  public static class FakeImpressApiImpl.GltfNodeData {
+    ctor public FakeImpressApiImpl.GltfNodeData();
+    method public int getEntityId();
+    method public androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData? getMaterialOverride();
+    method public void setEntityId(int);
+    method public void setMaterialOverride(androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData?);
+  }
+
+  public static class FakeImpressApiImpl.MaterialData {
+    ctor public FakeImpressApiImpl.MaterialData(androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData.Type, long);
+    method public long getMaterialHandle();
+    method public androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData.Type getType();
+  }
+
+  public enum FakeImpressApiImpl.MaterialData.Type {
+    enum_constant public static final androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData.Type GENERIC;
+    enum_constant public static final androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData.Type KHRONOS_PBR;
+    enum_constant public static final androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData.Type WATER;
+    enum_constant public static final androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.MaterialData.Type WATER_ALPHA;
+  }
+
+  public static class FakeImpressApiImpl.StereoSurfaceEntityData {
+    ctor public FakeImpressApiImpl.StereoSurfaceEntityData();
+    method public androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.StereoSurfaceEntityData.CanvasShape? getCanvasShape();
+    method public float getFeatherRadiusX();
+    method public float getFeatherRadiusY();
+    method public float getHeight();
+    method public float getRadius();
+    method @androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode public int getStereoMode();
+    method public android.view.Surface? getSurface();
+    method public float getWidth();
+  }
+
+  public enum FakeImpressApiImpl.StereoSurfaceEntityData.CanvasShape {
+    enum_constant public static final androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.StereoSurfaceEntityData.CanvasShape QUAD;
+    enum_constant public static final androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.StereoSurfaceEntityData.CanvasShape VR_180_HEMISPHERE;
+    enum_constant public static final androidx.xr.scenecore.impl.impress.FakeImpressApiImpl.StereoSurfaceEntityData.CanvasShape VR_360_SPHERE;
+  }
+
+  public static class FakeImpressApiImpl.TestSurface extends android.view.Surface {
+    ctor public FakeImpressApiImpl.TestSurface(int);
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public interface ImpressApi {
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Void?> animateGltfModel(int impressNode, String? animationName, boolean looping);
+    method public androidx.xr.scenecore.impl.impress.Texture borrowReflectionTexture();
+    method public void clearPreferredEnvironmentIblAsset();
+    method public int createImpressNode();
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.KhronosPbrMaterial> createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec spec);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int stereoMode);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int stereoMode, @androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel int contentSecurityLevel);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int stereoMode, @androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel int contentSecurityLevel, boolean useSuperSampling);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.WaterMaterial> createWaterMaterial(boolean isAlphaMapVersion);
+    method public void destroyImpressNode(int impressNode);
+    method public void destroyNativeObject(long nativeHandle);
+    method public void disposeAllResources();
+    method public androidx.xr.scenecore.impl.impress.Texture getReflectionTextureFromIbl(long iblToken);
+    method public android.view.Surface getSurfaceFromStereoSurface(int panelImpressNode);
+    method public int instanceGltfModel(long gltfToken);
+    method public int instanceGltfModel(long gltfToken, boolean enableCollider);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long> loadGltfAsset(byte[] data, String key);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long> loadGltfAsset(String path);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long> loadImageBasedLightingAsset(byte[] data, String key);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long> loadImageBasedLightingAsset(String path);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.Texture> loadTexture(String path, androidx.xr.runtime.internal.TextureSampler sampler);
+    method public void onPause();
+    method public void onResume();
+    method public void releaseGltfAsset(long gltfToken);
+    method public void releaseImageBasedLightingAsset(long iblToken);
+    method public void resetContentColorMetadataForStereoSurface(int stereoSurfaceNode);
+    method public void setAlphaCutoffOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float alphaCutoff);
+    method public void setAlphaMapOnWaterMaterial(long nativeWaterMaterial, long alphaMap);
+    method public void setAlphaStepMultiplierOnWaterMaterial(long nativeWaterMaterial, float alphaStepMultiplier);
+    method public void setAlphaStepUOnWaterMaterial(long nativeWaterMaterial, float x, float y, float z, float w);
+    method public void setAlphaStepVOnWaterMaterial(long nativeWaterMaterial, float x, float y, float z, float w);
+    method public void setAmbientOcclusionFactorOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float factor);
+    method public void setAmbientOcclusionTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long ambientOcclusionTexture);
+    method public void setAmbientOcclusionUvTransformOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float ux, float uy, float uz, float vx, float vy, float vz, float wx, float wy, float wz);
+    method public void setAuxiliaryAlphaMaskForStereoSurface(int panelImpressNode, long alphaMask);
+    method public void setBaseColorFactorsOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float x, float y, float z, float w);
+    method public void setBaseColorTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long baseColorTexture);
+    method public void setBaseColorUvTransformOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float ux, float uy, float uz, float vx, float vy, float vz, float wx, float wy, float wz);
+    method public void setClearcoatFactorsOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float intensity, float roughness, float normal);
+    method public void setClearcoatNormalTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long clearcoatNormalTexture);
+    method public void setClearcoatRoughnessTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long clearcoatRoughnessTexture);
+    method public void setClearcoatTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long clearcoatTexture);
+    method public void setContentColorMetadataForStereoSurface(int stereoSurfaceNode, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace int colorSpace, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer int colorTransfer, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorRange int colorRange, int maxLuminance);
+    method public void setEmissiveFactorsOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float x, float y, float z);
+    method public void setEmissiveTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long emissiveTexture);
+    method public void setEmissiveUvTransformOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float ux, float uy, float uz, float vx, float vy, float vz, float wx, float wy, float wz);
+    method public void setFeatherRadiusForStereoSurface(int panelImpressNode, float radiusX, float radiusY);
+    method public void setGltfModelColliderEnabled(int impressNode, boolean enableCollider);
+    method public void setImpressNodeParent(int impressNodeChild, int impressNodeParent);
+    method public void setIndexOfRefractionOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float indexOfRefraction);
+    method public void setMaterialOverride(int impressNode, long nativeMaterial, String meshName);
+    method public void setMetallicFactorOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float factor);
+    method public void setMetallicRoughnessTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long metallicRoughnessTexture);
+    method public void setMetallicRoughnessUvTransformOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float ux, float uy, float uz, float vx, float vy, float vz, float wx, float wy, float wz);
+    method public void setNormalBoundaryOnWaterMaterial(long nativeWaterMaterial, float boundary);
+    method public void setNormalFactorOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float factor);
+    method public void setNormalMapOnWaterMaterial(long nativeWaterMaterial, long normalMap);
+    method public void setNormalSpeedOnWaterMaterial(long nativeWaterMaterial, float normalSpeed);
+    method public void setNormalTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long normalTexture);
+    method public void setNormalTilingOnWaterMaterial(long nativeWaterMaterial, float normalTiling);
+    method public void setNormalUvTransformOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float ux, float uy, float uz, float vx, float vy, float vz, float wx, float wy, float wz);
+    method public void setNormalZOnWaterMaterial(long nativeWaterMaterial, float normalZ);
+    method public void setPreferredEnvironmentLight(long iblToken);
+    method public void setPrimaryAlphaMaskForStereoSurface(int panelImpressNode, long alphaMask);
+    method public void setReflectionMapOnWaterMaterial(long nativeWaterMaterial, long reflectionMap);
+    method public void setRoughnessFactorOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float factor);
+    method public void setSheenColorFactorsOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float x, float y, float z);
+    method public void setSheenColorTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long sheenColorTexture);
+    method public void setSheenRoughnessFactorOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float factor);
+    method public void setSheenRoughnessTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long sheenRoughnessTexture);
+    method public void setStereoModeForStereoSurface(int panelImpressNode, @androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int stereoMode);
+    method public void setStereoSurfaceEntityCanvasShapeHemisphere(int impressNode, float radius);
+    method public void setStereoSurfaceEntityCanvasShapeQuad(int impressNode, float width, float height);
+    method public void setStereoSurfaceEntityCanvasShapeSphere(int impressNode, float radius);
+    method public void setTransmissionFactorOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float factor);
+    method public void setTransmissionTextureOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, long transmissionTexture);
+    method public void setTransmissionUvTransformOnKhronosPbrMaterial(long nativeKhronosPbrMaterial, float ux, float uy, float uz, float vx, float vy, float vz, float wx, float wy, float wz);
+    method public void setup(com.google.ar.imp.view.View view);
+    method public void stopGltfModelAnimation(int impressNode);
+    field public static final androidx.xr.scenecore.impl.impress.ImpressApi.Companion Companion;
+    field public static final int MAX_CONTENT_LIGHT_LEVEL_UNKNOWN = 0; // 0x0
+  }
+
+  @IntDef({androidx.xr.scenecore.impl.impress.ImpressApi.ColorRange.Companion.FULL, androidx.xr.scenecore.impl.impress.ImpressApi.ColorRange.Companion.LIMITED}) @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.SOURCE) public static @interface ImpressApi.ColorRange {
+    field public static final androidx.xr.scenecore.impl.impress.ImpressApi.ColorRange.Companion Companion;
+    field public static final int FULL = 1; // 0x1
+    field public static final int LIMITED = 2; // 0x2
+  }
+
+  public static final class ImpressApi.ColorRange.Companion {
+    property public static int FULL;
+    property public static int LIMITED;
+    field public static final int FULL = 1; // 0x1
+    field public static final int LIMITED = 2; // 0x2
+  }
+
+  @IntDef({androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion.BT709, androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion.BT601_PAL, androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion.BT2020, androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion.BT601_525, androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion.DISPLAY_P3, androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion.DCI_P3, androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion.ADOBE_RGB}) @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.SOURCE) public static @interface ImpressApi.ColorSpace {
+    field public static final int ADOBE_RGB = 243; // 0xf3
+    field public static final int BT2020 = 6; // 0x6
+    field public static final int BT601_525 = 240; // 0xf0
+    field public static final int BT601_PAL = 2; // 0x2
+    field public static final int BT709 = 1; // 0x1
+    field public static final androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace.Companion Companion;
+    field public static final int DCI_P3 = 242; // 0xf2
+    field public static final int DISPLAY_P3 = 241; // 0xf1
+  }
+
+  public static final class ImpressApi.ColorSpace.Companion {
+    property public static int ADOBE_RGB;
+    property public static int BT2020;
+    property public static int BT601_525;
+    property public static int BT601_PAL;
+    property public static int BT709;
+    property public static int DCI_P3;
+    property public static int DISPLAY_P3;
+    field public static final int ADOBE_RGB = 243; // 0xf3
+    field public static final int BT2020 = 6; // 0x6
+    field public static final int BT601_525 = 240; // 0xf0
+    field public static final int BT601_PAL = 2; // 0x2
+    field public static final int BT709 = 1; // 0x1
+    field public static final int DCI_P3 = 242; // 0xf2
+    field public static final int DISPLAY_P3 = 241; // 0xf1
+  }
+
+  @IntDef({androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer.Companion.LINEAR, androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer.Companion.SRGB, androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer.Companion.SDR, androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer.Companion.GAMMA_2_2, androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer.Companion.ST2084, androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer.Companion.HLG}) @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.SOURCE) public static @interface ImpressApi.ColorTransfer {
+    field public static final androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer.Companion Companion;
+    field public static final int GAMMA_2_2 = 10; // 0xa
+    field public static final int HLG = 7; // 0x7
+    field public static final int LINEAR = 1; // 0x1
+    field public static final int SDR = 3; // 0x3
+    field public static final int SRGB = 2; // 0x2
+    field public static final int ST2084 = 6; // 0x6
+  }
+
+  public static final class ImpressApi.ColorTransfer.Companion {
+    property public static int GAMMA_2_2;
+    property public static int HLG;
+    property public static int LINEAR;
+    property public static int SDR;
+    property public static int SRGB;
+    property public static int ST2084;
+    field public static final int GAMMA_2_2 = 10; // 0xa
+    field public static final int HLG = 7; // 0x7
+    field public static final int LINEAR = 1; // 0x1
+    field public static final int SDR = 3; // 0x3
+    field public static final int SRGB = 2; // 0x2
+    field public static final int ST2084 = 6; // 0x6
+  }
+
+  public static final class ImpressApi.Companion {
+    property public static int MAX_CONTENT_LIGHT_LEVEL_UNKNOWN;
+    field public static final int MAX_CONTENT_LIGHT_LEVEL_UNKNOWN = 0; // 0x0
+  }
+
+  @IntDef({androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel.Companion.NONE, androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel.Companion.PROTECTED}) @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.SOURCE) public static @interface ImpressApi.ContentSecurityLevel {
+    field public static final androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel.Companion Companion;
+    field public static final int NONE = 0; // 0x0
+    field public static final int PROTECTED = 1; // 0x1
+  }
+
+  public static final class ImpressApi.ContentSecurityLevel.Companion {
+    property public static int NONE;
+    property public static int PROTECTED;
+    field public static final int NONE = 0; // 0x0
+    field public static final int PROTECTED = 1; // 0x1
+  }
+
+  @IntDef({androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode.Companion.MONO, androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode.Companion.TOP_BOTTOM, androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode.Companion.SIDE_BY_SIDE, androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode.Companion.MULTIVIEW_LEFT_PRIMARY, androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode.Companion.MULTIVIEW_RIGHT_PRIMARY}) @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.SOURCE) public static @interface ImpressApi.StereoMode {
+    field public static final androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode.Companion Companion;
+    field public static final int MONO = 0; // 0x0
+    field public static final int MULTIVIEW_LEFT_PRIMARY = 4; // 0x4
+    field public static final int MULTIVIEW_RIGHT_PRIMARY = 5; // 0x5
+    field public static final int SIDE_BY_SIDE = 2; // 0x2
+    field public static final int TOP_BOTTOM = 1; // 0x1
+  }
+
+  public static final class ImpressApi.StereoMode.Companion {
+    property public static int MONO;
+    property public static int MULTIVIEW_LEFT_PRIMARY;
+    property public static int MULTIVIEW_RIGHT_PRIMARY;
+    property public static int SIDE_BY_SIDE;
+    property public static int TOP_BOTTOM;
+    field public static final int MONO = 0; // 0x0
+    field public static final int MULTIVIEW_LEFT_PRIMARY = 4; // 0x4
+    field public static final int MULTIVIEW_RIGHT_PRIMARY = 5; // 0x5
+    field public static final int SIDE_BY_SIDE = 2; // 0x2
+    field public static final int TOP_BOTTOM = 1; // 0x1
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class ImpressApiImpl implements androidx.xr.scenecore.impl.impress.ImpressApi {
+    ctor public ImpressApiImpl();
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Void!> animateGltfModel(int, String?, boolean);
+    method public androidx.xr.scenecore.impl.impress.Texture borrowReflectionTexture();
+    method public void clearPreferredEnvironmentIblAsset();
+    method public int createImpressNode();
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.KhronosPbrMaterial!> createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int, @androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel int);
+    method public int createStereoSurface(@androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int, @androidx.xr.scenecore.impl.impress.ImpressApi.ContentSecurityLevel int, boolean);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.WaterMaterial!> createWaterMaterial(boolean);
+    method public void destroyImpressNode(int);
+    method public void destroyNativeObject(long);
+    method public void disposeAllResources();
+    method public androidx.xr.scenecore.impl.impress.Texture getReflectionTextureFromIbl(long);
+    method public android.view.Surface getSurfaceFromStereoSurface(int);
+    method public int instanceGltfModel(long);
+    method public int instanceGltfModel(long, boolean);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadGltfAsset(byte[], String);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadGltfAsset(String);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadImageBasedLightingAsset(byte[], String);
+    method public com.google.common.util.concurrent.ListenableFuture<java.lang.Long!> loadImageBasedLightingAsset(String);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.scenecore.impl.impress.Texture!> loadTexture(String, androidx.xr.runtime.internal.TextureSampler);
+    method public void onPause();
+    method public void onResume();
+    method public void releaseGltfAsset(long);
+    method public void releaseImageBasedLightingAsset(long);
+    method public void resetContentColorMetadataForStereoSurface(int);
+    method public void setAlphaCutoffOnKhronosPbrMaterial(long, float);
+    method public void setAlphaMapOnWaterMaterial(long, long);
+    method public void setAlphaStepMultiplierOnWaterMaterial(long, float);
+    method public void setAlphaStepUOnWaterMaterial(long, float, float, float, float);
+    method public void setAlphaStepVOnWaterMaterial(long, float, float, float, float);
+    method public void setAmbientOcclusionFactorOnKhronosPbrMaterial(long, float);
+    method public void setAmbientOcclusionTextureOnKhronosPbrMaterial(long, long);
+    method public void setAmbientOcclusionUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setAuxiliaryAlphaMaskForStereoSurface(int, long);
+    method public void setBaseColorFactorsOnKhronosPbrMaterial(long, float, float, float, float);
+    method public void setBaseColorTextureOnKhronosPbrMaterial(long, long);
+    method public void setBaseColorUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setClearcoatFactorsOnKhronosPbrMaterial(long, float, float, float);
+    method public void setClearcoatNormalTextureOnKhronosPbrMaterial(long, long);
+    method public void setClearcoatRoughnessTextureOnKhronosPbrMaterial(long, long);
+    method public void setClearcoatTextureOnKhronosPbrMaterial(long, long);
+    method public void setContentColorMetadataForStereoSurface(int, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorSpace int, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorTransfer int, @androidx.xr.scenecore.impl.impress.ImpressApi.ColorRange int, int);
+    method public void setEmissiveFactorsOnKhronosPbrMaterial(long, float, float, float);
+    method public void setEmissiveTextureOnKhronosPbrMaterial(long, long);
+    method public void setEmissiveUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setFeatherRadiusForStereoSurface(int, float, float);
+    method public void setGltfModelColliderEnabled(int, boolean);
+    method public void setImpressNodeParent(int, int);
+    method public void setIndexOfRefractionOnKhronosPbrMaterial(long, float);
+    method public void setMaterialOverride(int, long, String);
+    method public void setMetallicFactorOnKhronosPbrMaterial(long, float);
+    method public void setMetallicRoughnessTextureOnKhronosPbrMaterial(long, long);
+    method public void setMetallicRoughnessUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setNormalBoundaryOnWaterMaterial(long, float);
+    method public void setNormalFactorOnKhronosPbrMaterial(long, float);
+    method public void setNormalMapOnWaterMaterial(long, long);
+    method public void setNormalSpeedOnWaterMaterial(long, float);
+    method public void setNormalTextureOnKhronosPbrMaterial(long, long);
+    method public void setNormalTilingOnWaterMaterial(long, float);
+    method public void setNormalUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setNormalZOnWaterMaterial(long, float);
+    method public void setPreferredEnvironmentLight(long);
+    method public void setPrimaryAlphaMaskForStereoSurface(int, long);
+    method public void setReflectionMapOnWaterMaterial(long, long);
+    method public void setRoughnessFactorOnKhronosPbrMaterial(long, float);
+    method public void setSheenColorFactorsOnKhronosPbrMaterial(long, float, float, float);
+    method public void setSheenColorTextureOnKhronosPbrMaterial(long, long);
+    method public void setSheenRoughnessFactorOnKhronosPbrMaterial(long, float);
+    method public void setSheenRoughnessTextureOnKhronosPbrMaterial(long, long);
+    method public void setStereoModeForStereoSurface(int, @androidx.xr.scenecore.impl.impress.ImpressApi.StereoMode int);
+    method public void setStereoSurfaceEntityCanvasShapeHemisphere(int, float);
+    method public void setStereoSurfaceEntityCanvasShapeQuad(int, float, float);
+    method public void setStereoSurfaceEntityCanvasShapeSphere(int, float);
+    method public void setTransmissionFactorOnKhronosPbrMaterial(long, float);
+    method public void setTransmissionTextureOnKhronosPbrMaterial(long, long);
+    method public void setTransmissionUvTransformOnKhronosPbrMaterial(long, float, float, float, float, float, float, float, float, float);
+    method public void setup(com.google.ar.imp.view.View);
+    method public void stopGltfModelAnimation(int);
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class KhronosPbrMaterial extends androidx.xr.scenecore.impl.impress.Material {
+    method public void setAlphaCutoff(float);
+    method public void setAmbientOcclusionFactor(float);
+    method public void setAmbientOcclusionTexture(long);
+    method public void setAmbientOcclusionUvTransform(float, float, float, float, float, float, float, float, float);
+    method public void setBaseColorFactors(float, float, float, float);
+    method public void setBaseColorTexture(long);
+    method public void setBaseColorUvTransform(float, float, float, float, float, float, float, float, float);
+    method public void setClearcoatFactors(float, float, float);
+    method public void setClearcoatNormalTexture(long);
+    method public void setClearcoatRoughnessTexture(long);
+    method public void setClearcoatTexture(long);
+    method public void setEmissiveFactors(float, float, float);
+    method public void setEmissiveTexture(long);
+    method public void setEmissiveUvTransform(float, float, float, float, float, float, float, float, float);
+    method public void setIndexOfRefraction(float);
+    method public void setMetallicFactor(float);
+    method public void setMetallicRoughnessTexture(long);
+    method public void setMetallicRoughnessUvTransform(float, float, float, float, float, float, float, float, float);
+    method public void setNormalFactor(float);
+    method public void setNormalTexture(long);
+    method public void setNormalUvTransform(float, float, float, float, float, float, float, float, float);
+    method public void setRoughnessFactor(float);
+    method public void setSheenColorFactors(float, float, float);
+    method public void setSheenColorTexture(long);
+    method public void setSheenRoughnessFactor(float);
+    method public void setSheenRoughnessTexture(long);
+    method public void setTransmissionFactor(float);
+    method public void setTransmissionTexture(long);
+    method public void setTransmissionUvTransform(float, float, float, float, float, float, float, float, float);
+  }
+
+  public static class KhronosPbrMaterial.Builder {
+    ctor public KhronosPbrMaterial.Builder();
+    method public androidx.xr.scenecore.impl.impress.KhronosPbrMaterial build();
+    method public androidx.xr.scenecore.impl.impress.KhronosPbrMaterial.Builder setImpressApi(androidx.xr.scenecore.impl.impress.ImpressApi);
+    method public androidx.xr.scenecore.impl.impress.KhronosPbrMaterial.Builder setNativeMaterial(long);
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class Material {
+    ctor public Material(androidx.xr.scenecore.impl.impress.ImpressApi, long);
+    method public void destroyNativeObject();
+    method public long getNativeHandle();
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class Texture {
+    method public void destroyNativeObject();
+    method public long getNativeHandle();
+    method public androidx.xr.runtime.internal.TextureSampler? getTextureSampler();
+  }
+
+  public static class Texture.Builder {
+    ctor public Texture.Builder();
+    method public androidx.xr.scenecore.impl.impress.Texture build();
+    method public androidx.xr.scenecore.impl.impress.Texture.Builder setImpressApi(androidx.xr.scenecore.impl.impress.ImpressApi);
+    method public androidx.xr.scenecore.impl.impress.Texture.Builder setNativeTexture(long);
+    method public androidx.xr.scenecore.impl.impress.Texture.Builder setTextureSampler(androidx.xr.runtime.internal.TextureSampler);
+  }
+
+  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class WaterMaterial extends androidx.xr.scenecore.impl.impress.Material {
+    method public void setAlphaMap(long);
+    method public void setAlphaStepMultiplier(float);
+    method public void setNormalBoundary(float);
+    method public void setNormalMap(long);
+    method public void setNormalSpeed(float);
+    method public void setNormalTiling(float);
+    method public void setNormalZ(float);
+    method public void setReflectionMap(long);
+  }
+
+  public static class WaterMaterial.Builder {
+    ctor public WaterMaterial.Builder();
+    method public androidx.xr.scenecore.impl.impress.WaterMaterial build();
+    method public androidx.xr.scenecore.impl.impress.WaterMaterial.Builder setImpressApi(androidx.xr.scenecore.impl.impress.ImpressApi);
+    method public androidx.xr.scenecore.impl.impress.WaterMaterial.Builder setNativeMaterial(long);
   }
 
 }

@@ -18,7 +18,6 @@ package androidx.xr.scenecore
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
@@ -32,7 +31,7 @@ import androidx.xr.runtime.internal.PanelEntity as RtPanelEntity
 import androidx.xr.runtime.internal.PixelDimensions as RtPixelDimensions
 import androidx.xr.runtime.internal.SpatialCapabilities as RtSpatialCapabilities
 import androidx.xr.runtime.internal.SpatialVisibility as RtSpatialVisibility
-import androidx.xr.runtime.math.FloatSize3d
+import androidx.xr.runtime.math.FloatSize2d
 import androidx.xr.runtime.math.IntSize2d
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Vector3
@@ -184,7 +183,7 @@ class SceneTest {
             .thenReturn(mockActivityPanelEntity)
         val panelEntity =
             PanelEntity.create(session, TextView(activity), IntSize2d(720, 480), "test1")
-        val activityPanelEntity = ActivityPanelEntity.create(session, Rect(0, 0, 640, 480), "test2")
+        val activityPanelEntity = ActivityPanelEntity.create(session, IntSize2d(640, 480), "test2")
 
         assertThat(session.scene.getEntitiesOfType(PanelEntity::class.java))
             .containsAtLeast(panelEntity, activityPanelEntity)
@@ -209,7 +208,7 @@ class SceneTest {
         val panelEntity =
             PanelEntity.create(session, TextView(activity), IntSize2d(720, 480), "test1")
         val anchorEntity =
-            AnchorEntity.create(session, FloatSize3d(), PlaneOrientation.ANY, PlaneSemanticType.ANY)
+            AnchorEntity.create(session, FloatSize2d(), PlaneOrientation.ANY, PlaneSemanticType.ANY)
 
         assertThat(session.scene.getEntitiesOfType(Entity::class.java))
             .containsAtLeast(panelEntity, anchorEntity)

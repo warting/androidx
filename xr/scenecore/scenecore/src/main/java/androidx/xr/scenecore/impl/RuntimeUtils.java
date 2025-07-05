@@ -18,8 +18,6 @@ package androidx.xr.scenecore.impl;
 
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.xr.runtime.internal.ActivityPose.HitTestFilter;
 import androidx.xr.runtime.internal.ActivityPose.HitTestFilterValue;
@@ -27,7 +25,7 @@ import androidx.xr.runtime.internal.CameraViewActivityPose.Fov;
 import androidx.xr.runtime.internal.Entity;
 import androidx.xr.runtime.internal.HitTestResult;
 import androidx.xr.runtime.internal.InputEvent;
-import androidx.xr.runtime.internal.InputEvent.Companion.HitInfo;
+import androidx.xr.runtime.internal.InputEvent.HitInfo;
 import androidx.xr.runtime.internal.KhronosPbrMaterialSpec;
 import androidx.xr.runtime.internal.PixelDimensions;
 import androidx.xr.runtime.internal.PlaneSemantic;
@@ -53,6 +51,12 @@ import com.android.extensions.xr.node.Quatf;
 import com.android.extensions.xr.node.ReformEvent;
 import com.android.extensions.xr.node.Vec3;
 import com.android.extensions.xr.space.VisibilityState;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 final class RuntimeUtils {
     private RuntimeUtils() {}
@@ -119,9 +123,8 @@ final class RuntimeUtils {
         }
     }
 
-    @Nullable
     @VisibleForTesting
-    static HitInfo getHitInfo(
+    static @Nullable HitInfo getHitInfo(
             com.android.extensions.xr.node.InputEvent.HitInfo xrHitInfo,
             EntityManager entityManager) {
         if (xrHitInfo == null
@@ -148,22 +151,26 @@ final class RuntimeUtils {
      * @param xrInputEvent an {@link com.android.extensions.xr.node.InputEvent} instance to be
      *     converted.
      * @param entityManager an {@link EntityManager} instance to look up entities.
-     * @return a {@link androidx.xr.scenecore.JXRCoreRuntime.InputEvent} instance representing the
-     *     input event.
+     * @return a {@link androidx.xr.runtime.internal.InputEvent} instance representing the input
+     *     event.
      */
     static InputEvent getInputEvent(
-            @NonNull com.android.extensions.xr.node.InputEvent xrInputEvent,
+            com.android.extensions.xr.node.@NonNull InputEvent xrInputEvent,
             @NonNull EntityManager entityManager) {
         Vector3 origin = getVector3(xrInputEvent.getOrigin());
         Vector3 direction = getVector3(xrInputEvent.getDirection());
         HitInfo hitInfo = null;
         HitInfo secondaryHitInfo = null;
+        List<HitInfo> hitInfos = new ArrayList<>();
         if (xrInputEvent.getHitInfo() != null) {
             hitInfo = getHitInfo(xrInputEvent.getHitInfo(), entityManager);
+            hitInfos.add(hitInfo);
         }
         if (xrInputEvent.getSecondaryHitInfo() != null) {
             secondaryHitInfo = getHitInfo(xrInputEvent.getSecondaryHitInfo(), entityManager);
+            hitInfos.add(secondaryHitInfo);
         }
+
         return new InputEvent(
                 getInputEventSource(xrInputEvent.getSource()),
                 getInputEventPointerType(xrInputEvent.getPointerType()),
@@ -171,25 +178,24 @@ final class RuntimeUtils {
                 origin,
                 direction,
                 getInputEventAction(xrInputEvent.getAction()),
-                hitInfo,
-                secondaryHitInfo);
+                hitInfos);
     }
 
-    @InputEvent.Source
+    @InputEvent.SourceValue
     static int getInputEventSource(int xrInputEventSource) {
         switch (xrInputEventSource) {
             case com.android.extensions.xr.node.InputEvent.SOURCE_UNKNOWN:
-                return InputEvent.SOURCE_UNKNOWN;
+                return InputEvent.Source.UNKNOWN;
             case com.android.extensions.xr.node.InputEvent.SOURCE_HEAD:
-                return InputEvent.SOURCE_HEAD;
+                return InputEvent.Source.HEAD;
             case com.android.extensions.xr.node.InputEvent.SOURCE_CONTROLLER:
-                return InputEvent.SOURCE_CONTROLLER;
+                return InputEvent.Source.CONTROLLER;
             case com.android.extensions.xr.node.InputEvent.SOURCE_HANDS:
-                return InputEvent.SOURCE_HANDS;
+                return InputEvent.Source.HANDS;
             case com.android.extensions.xr.node.InputEvent.SOURCE_MOUSE:
-                return InputEvent.SOURCE_MOUSE;
+                return InputEvent.Source.MOUSE;
             case com.android.extensions.xr.node.InputEvent.SOURCE_GAZE_AND_GESTURE:
-                return InputEvent.SOURCE_GAZE_AND_GESTURE;
+                return InputEvent.Source.GAZE_AND_GESTURE;
             default:
                 throw new IllegalArgumentException(
                         "Unknown Input Event Source: " + xrInputEventSource);
@@ -200,34 +206,34 @@ final class RuntimeUtils {
     static int getInputEventPointerType(int xrInputEventPointerType) {
         switch (xrInputEventPointerType) {
             case com.android.extensions.xr.node.InputEvent.POINTER_TYPE_DEFAULT:
-                return InputEvent.POINTER_TYPE_DEFAULT;
+                return InputEvent.Pointer.DEFAULT;
             case com.android.extensions.xr.node.InputEvent.POINTER_TYPE_LEFT:
-                return InputEvent.POINTER_TYPE_LEFT;
+                return InputEvent.Pointer.LEFT;
             case com.android.extensions.xr.node.InputEvent.POINTER_TYPE_RIGHT:
-                return InputEvent.POINTER_TYPE_RIGHT;
+                return InputEvent.Pointer.RIGHT;
             default:
                 throw new IllegalArgumentException(
                         "Unknown Input Event Pointer Type: " + xrInputEventPointerType);
         }
     }
 
-    @InputEvent.Action
+    @InputEvent.ActionValue
     static int getInputEventAction(int xrInputEventAction) {
         switch (xrInputEventAction) {
             case com.android.extensions.xr.node.InputEvent.ACTION_DOWN:
-                return InputEvent.ACTION_DOWN;
+                return InputEvent.Action.DOWN;
             case com.android.extensions.xr.node.InputEvent.ACTION_UP:
-                return InputEvent.ACTION_UP;
+                return InputEvent.Action.UP;
             case com.android.extensions.xr.node.InputEvent.ACTION_MOVE:
-                return InputEvent.ACTION_MOVE;
+                return InputEvent.Action.MOVE;
             case com.android.extensions.xr.node.InputEvent.ACTION_CANCEL:
-                return InputEvent.ACTION_CANCEL;
+                return InputEvent.Action.CANCEL;
             case com.android.extensions.xr.node.InputEvent.ACTION_HOVER_MOVE:
-                return InputEvent.ACTION_HOVER_MOVE;
+                return InputEvent.Action.HOVER_MOVE;
             case com.android.extensions.xr.node.InputEvent.ACTION_HOVER_ENTER:
-                return InputEvent.ACTION_HOVER_ENTER;
+                return InputEvent.Action.HOVER_ENTER;
             case com.android.extensions.xr.node.InputEvent.ACTION_HOVER_EXIT:
-                return InputEvent.ACTION_HOVER_EXIT;
+                return InputEvent.Action.HOVER_EXIT;
             default:
                 throw new IllegalArgumentException(
                         "Unknown Input Event Action: " + xrInputEventAction);
@@ -412,7 +418,7 @@ final class RuntimeUtils {
      *     com.android.extensions.xr.environment.EnvironmentVisibilityState} instance to be
      *     converted.
      */
-    static boolean getIsSpatialEnvironmentPreferenceActive(int environmentState) {
+    static boolean getIsPreferredSpatialEnvironmentActive(int environmentState) {
         return environmentState == EnvironmentVisibilityState.APP_VISIBLE;
     }
 

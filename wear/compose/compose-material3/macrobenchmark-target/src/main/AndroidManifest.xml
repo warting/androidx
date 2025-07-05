@@ -76,16 +76,6 @@
         </activity>
 
         <activity
-            android:name=".BlankScreenActivity"
-            android:theme="@style/AppTheme"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="androidx.wear.compose.material3.macrobenchmark.target.BLANK_SCREEN_ACTIVITY" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
-
-        <activity
             android:name=".ButtonActivity"
             android:theme="@style/AppTheme"
             android:exported="true">
@@ -258,6 +248,18 @@
         </activity>
 
         <activity
+            android:name=".PickerGroupActivity"
+            android:theme="@style/AppTheme"
+            android:exported="true">
+            <intent-filter>
+                <action android:name=
+                    "androidx.wear.compose.material3.macrobenchmark.target.PICKER_GROUP_ACTIVITY" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+
+        <activity
             android:name=".ScrollIndicatorActivity"
             android:theme="@style/AppTheme"
             android:exported="true">
@@ -329,6 +331,16 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.wear.compose.material3.macrobenchmark.target.SWIPE_TO_REVEAL_ACTIVITY" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".SwipeToRevealInListActivity"
+            android:theme="@style/AppTheme"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.wear.compose.material3.macrobenchmark.target.SWIPE_TO_REVEAL_IN_LIST_ACTIVITY" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

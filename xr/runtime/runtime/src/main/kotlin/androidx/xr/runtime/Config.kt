@@ -38,11 +38,15 @@ public class Config
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
 constructor(
     public val planeTracking: PlaneTrackingMode = PlaneTrackingMode.DISABLED,
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    public val augmentedObjectCategories: List<AugmentedObjectCategory> = listOf(),
     public val handTracking: HandTrackingMode = HandTrackingMode.DISABLED,
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
     public val deviceTracking: DeviceTrackingMode = DeviceTrackingMode.DISABLED,
     public val depthEstimation: DepthEstimationMode = DepthEstimationMode.DISABLED,
     public val anchorPersistence: AnchorPersistenceMode = AnchorPersistenceMode.DISABLED,
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    public val faceTracking: FaceTrackingMode = FaceTrackingMode.DISABLED,
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
     public val geospatial: GeospatialMode = GeospatialMode.DISABLED,
 ) {
@@ -74,11 +78,13 @@ constructor(
         anchorPersistence: AnchorPersistenceMode = AnchorPersistenceMode.DISABLED,
     ) : this(
         planeTracking,
+        /* augmentedObjectCategories= */ listOf(),
         handTracking,
         headTracking.toDeviceTrackingMode(),
         depthEstimation,
         anchorPersistence,
-        GeospatialMode.DISABLED,
+        faceTracking = FaceTrackingMode.DISABLED,
+        geospatial = GeospatialMode.DISABLED,
     )
 
     /** Feature that allows tracking of the user's head position. See [Config.HeadTrackingMode]. */
@@ -93,7 +99,9 @@ constructor(
         if (deviceTracking != other.deviceTracking) return false
         if (depthEstimation != other.depthEstimation) return false
         if (anchorPersistence != other.anchorPersistence) return false
+        if (faceTracking != other.faceTracking) return false
         if (geospatial != other.geospatial) return false
+        if (augmentedObjectCategories != other.augmentedObjectCategories) return false
 
         return true
     }
@@ -104,7 +112,9 @@ constructor(
         result = 31 * result + deviceTracking.hashCode()
         result = 31 * result + depthEstimation.hashCode()
         result = 31 * result + anchorPersistence.hashCode()
+        result = 31 * result + faceTracking.hashCode()
         result = 31 * result + geospatial.hashCode()
+        result = 31 * result + augmentedObjectCategories.hashCode()
         return result
     }
 
@@ -118,10 +128,12 @@ constructor(
     ): Config {
         return Config(
             planeTracking = planeTracking,
+            augmentedObjectCategories = this.augmentedObjectCategories,
             handTracking = handTracking,
             deviceTracking = headTracking.toDeviceTrackingMode(),
             depthEstimation = depthEstimation,
             anchorPersistence = anchorPersistence,
+            faceTracking = this.faceTracking,
             geospatial = this.geospatial,
         )
     }
@@ -134,14 +146,18 @@ constructor(
         deviceTracking: DeviceTrackingMode = this.deviceTracking,
         depthEstimation: DepthEstimationMode = this.depthEstimation,
         anchorPersistence: AnchorPersistenceMode = this.anchorPersistence,
+        faceTracking: FaceTrackingMode = this.faceTracking,
         geospatial: GeospatialMode = this.geospatial,
+        augmentedObjectCategories: List<AugmentedObjectCategory> = this.augmentedObjectCategories,
     ): Config {
         return Config(
             planeTracking = planeTracking,
+            augmentedObjectCategories = augmentedObjectCategories,
             handTracking = handTracking,
             deviceTracking = deviceTracking,
             depthEstimation = depthEstimation,
             anchorPersistence = anchorPersistence,
+            faceTracking = faceTracking,
             geospatial = geospatial,
         )
     }
@@ -207,11 +223,14 @@ constructor(
         @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public val mode: Int
     ) {
         public companion object {
-            /** Device pose will not be tracked. */
+            /**
+             * The device pose will not be tracked. In this mode, [androidx.xr.arcore.ViewCamera]
+             * will not emit updates to [androidx.xr.arcore.ViewCamera.State.pose].
+             */
             @JvmField public val DISABLED: DeviceTrackingMode = DeviceTrackingMode(0)
             /**
-             * Device pose will be tracked and the last known pose from the system at the time of
-             * runtime update will be provided. Note that there is generally a delay between the
+             * The device pose will be tracked and the last known pose from the system at the time
+             * of runtime update will be provided. Note that there is generally a delay between the
              * actual device pose and the pose provided by the system by the time of the update.
              */
             @JvmField public val LAST_KNOWN: DeviceTrackingMode = DeviceTrackingMode(1)
@@ -237,7 +256,7 @@ constructor(
         @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public val mode: Int
     ) {
         public companion object {
-            /** Head pose will not be tracked. */
+            /** The head pose is not updated. It remains at the origin (an identity pose). */
             @JvmField public val DISABLED: HeadTrackingMode = HeadTrackingMode(0)
             /**
              * Head pose will be tracked and the last known pose from the system at the time of
@@ -260,7 +279,8 @@ constructor(
     /**
      * Feature that allows more accurate information about scene depth and meshes.
      *
-     * Setting this feature to [DepthEstimationMode.SMOOTH_AND_RAW] requires that the
+     * Setting this feature to any of [DepthEstimationMode.RAW_ONLY],
+     * [DepthEstimationMode.SMOOTH_ONLY] or [DepthEstimationMode.SMOOTH_AND_RAW] requires that the
      * `SCENE_UNDERSTANDING_FINE` Android permission is granted by the calling application.
      */
     public class DepthEstimationMode
@@ -274,11 +294,14 @@ constructor(
             /** Depth estimation will be enabled with raw depth and confidence. */
             @JvmField public val RAW_ONLY: DepthEstimationMode = DepthEstimationMode(1)
 
+            /** Depth estimation will be enabled with smooth depth and confidence. */
+            @JvmField public val SMOOTH_ONLY: DepthEstimationMode = DepthEstimationMode(2)
+
             /**
              * Depth estimation will be enabled with both raw and smooth depth and confidence. Note
              * that setting this mode will consume additional runtime resources.
              */
-            @JvmField public val SMOOTH_AND_RAW: DepthEstimationMode = DepthEstimationMode(2)
+            @JvmField public val SMOOTH_AND_RAW: DepthEstimationMode = DepthEstimationMode(3)
         }
 
         override fun toString(): String {
@@ -286,7 +309,8 @@ constructor(
                 when (mode) {
                     0 -> "DISABLED"
                     1 -> "RAW_ONLY"
-                    2 -> "SMOOTH_AND_RAW"
+                    2 -> "SMOOTH_ONLY"
+                    3 -> "SMOOTH_AND_RAW"
                     else -> "UNKNOWN"
                 }
         }
@@ -310,6 +334,22 @@ constructor(
 
         override fun toString(): String {
             return "AnchorPersistence_" + if (mode == 0) "DISABLED" else "LOCAL"
+        }
+    }
+
+    /**
+     * Feature that allows tracking of human faces.
+     *
+     * Setting this feature to [FaceTrackingMode.USER] requires that the `FACE_TRACKING` Android
+     * permission is granted by the calling application.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    public class FaceTrackingMode private constructor(public val mode: Int) {
+        public companion object {
+            /** Faces will not be tracked. */
+            @JvmField public val DISABLED: FaceTrackingMode = FaceTrackingMode(0)
+            /** The user's face will be tracked. */
+            @JvmField public val USER: FaceTrackingMode = FaceTrackingMode(1)
         }
     }
 

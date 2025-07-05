@@ -35,8 +35,8 @@ internal constructor(
         if (!isTrackingAvailable) {
             throw AnchorNotTrackingException()
         }
-        ++anchorsCreated
-        if (anchorsCreated > ANCHOR_RESOURCE_LIMIT) {
+        ++anchorsCreatedCount
+        if (anchorsCreatedCount > ANCHOR_RESOURCE_LIMIT) {
             throw AnchorResourcesExhaustedException()
         }
     }
@@ -52,10 +52,17 @@ internal constructor(
     public var isAttached: Boolean = anchorHolder != null
         private set
 
+    /**
+     * Generates a random UUID for the anchor and adds it to [FakePerceptionManager.anchorUuids].
+     *
+     * This function will only be added to the list of anchors returned by
+     * [FakePerceptionManager.getPersistedAnchorUuids] if the [anchorHolder] is a
+     * [FakePerceptionManager].
+     */
     override fun persist() {
         uuid = UUID.randomUUID()
         persistenceState = RuntimeAnchor.PersistenceState.PERSISTED
-        anchorHolder?.persistAnchor(this)
+        anchorHolder?.onAnchorPersisted(this)
     }
 
     override fun detach() {
@@ -69,6 +76,6 @@ internal constructor(
         /** Limit for the number of anchors that can be created. */
         public const val ANCHOR_RESOURCE_LIMIT: Int = 5
         /** The current number of anchors created. */
-        @JvmStatic public var anchorsCreated: Int = 0
+        @JvmStatic public var anchorsCreatedCount: Int = 0
     }
 }

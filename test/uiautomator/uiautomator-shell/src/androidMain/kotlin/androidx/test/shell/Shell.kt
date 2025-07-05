@@ -29,40 +29,75 @@ import java.io.InputStream
 /**
  * Allows to execute commands. This class builds on top of [ShellProcess] and abstracts the shell
  * streams to focus on the output of a single command execution. A [ShellProcess] is created for
- * each executed command, using the given factory [shellProcessFactoryBlock].
+ * each executed command, using a [ShellServer] that can be reset by [Shell.setShellServer].
  */
 public object Shell {
 
-    private var shellProcessFactoryBlock: () -> (ShellProcess) = { ShellProcess.create() }
+    private val DEFAULT_SHELL_SERVER by lazy { ShellServer.start() }
+    private var shellServer: ShellServer? = null
 
-    /** Allows configuring the underlying [ShellProcess] utilized to execute the commands. */
-    public fun setShellProcessFactory(factory: () -> (ShellProcess)) {
-        this.shellProcessFactoryBlock = factory
+    /**
+     * Allows configuring the underlying [ShellProcess] utilized to execute the commands. The
+     * current [ShellServer] backing [Shell] is always closed when setting a new one.
+     *
+     * @param shellServer The new shell server to produce [ShellProcess] to launch commands.
+     */
+    public fun setShellServer(shellServer: ShellServer) {
+        this.shellServer?.close()
+        this.shellServer = shellServer
     }
 
-    /** Commands for wifi. */
+    /**
+     * Commands for wifi.
+     *
+     * @return an instance of [WifiCommands].
+     */
     public fun wifi(): WifiCommands = WifiCommands(shell = this)
 
     /** Commands for screen. */
     public fun screen(): ScreenCommands = ScreenCommands(shell = this)
 
-    /** Commands for application. */
+    /**
+     * Commands for application.
+     *
+     * @param packageName the application package name
+     * @return an instance of [ApplicationCommands].
+     */
     public fun application(packageName: String): ApplicationCommands =
         ApplicationCommands(shell = this, packageName = packageName)
 
-    /** Commands for screen recorder. */
+    /**
+     * Commands for screen recorder.
+     *
+     * @return an instance of [RecorderCommands].
+     */
     public fun recorder(): RecorderCommands = RecorderCommands(shell = this)
 
-    /** Commands for processes. */
+    /**
+     * Commands for processes.
+     *
+     * @return an instance of [ProcessCommands].
+     */
     public fun process(): ProcessCommands = ProcessCommands(shell = this)
 
-    /** Commands for permissions. */
+    /**
+     * Commands for permissions.
+     *
+     * @param packageName the application package name
+     * @return an instance of [PermissionCommands].
+     */
     public fun permission(packageName: String): PermissionCommands =
         PermissionCommands(shell = this, packageName = packageName)
 
-    /** Executes a given command and returns the ongoing [CommandOutput]. */
+    /**
+     * Executes a given command and returns the ongoing [CommandOutput].
+     *
+     * @param command a string containing the command to launch.
+     * @return a [CommandOutput] that allows to access the stream of the command output.
+     */
     public fun command(command: String): CommandOutput {
-        val shellProcess = shellProcessFactoryBlock()
+        val server = shellServer ?: DEFAULT_SHELL_SERVER
+        val shellProcess = server.newProcess()
         shellProcess.writeLine(command)
         shellProcess.close()
         return CommandOutput(command = command, shellProcess = shellProcess)
@@ -80,31 +115,22 @@ public object Shell {
 
         /** Awaits the process termination and returns the full stdout of the launched command. */
         public val stdOut: String by lazy {
-            shellProcess.stdOut.use { it.bufferedReader().readText().trim() }
+            shellProcess.stdOut.use { it.bufferedReader().readText() }
         }
 
         /** Awaits the process termination and returns the full stderr of the launched command. */
         public val stdErr: String by lazy {
-            shellProcess.stdErr.use { it.bufferedReader().readText().trim() }
+            shellProcess.stdErr.use { it.bufferedReader().readText() }
         }
 
         /** Allows incrementally consuming the stdout of a single command as an [InputStream]. */
-        public fun <T> stdOutStream(block: InputStream.() -> (T)): T =
-            shellProcess.stdOut.use(block)
+        public val stdOutStream: InputStream = shellProcess.stdOut
 
         /** Allows incrementally consuming the stderr of a single command as an [InputStream]. */
-        public fun <T> stdErrStream(block: InputStream.() -> (T)): T =
-            shellProcess.stdErr.use(block)
+        public val stdErrStream: InputStream = shellProcess.stdErr
 
-        /** Allows incrementally consuming the stdout of the launched command as lines. */
-        public fun stdOutLines(): Sequence<String> = stdOutStream {
-            bufferedReader().lineSequence()
-        }
-
-        /** Allows incrementally consuming the stderr of the launched command as lines. */
-        public fun stdErrLines(): Sequence<String> = stdErrStream {
-            bufferedReader().lineSequence()
-        }
+        /** Returns whether the launched shell command is still running. */
+        public fun isRunning(): Boolean = !shellProcess.isClosed()
 
         internal fun String.assertEmpty() {
             if (isNotBlank()) throwWithCommandOutput()
@@ -126,8 +152,8 @@ public object Shell {
             val errorMsgLines =
                 listOfNotNull(
                     "Fatal exception, command failed: `$command`",
-                    *(if (stdOut.isNotBlank()) arrayOf("Stdout:", stdOut) else emptyArray()),
-                    *(if (stdErr.isNotBlank()) arrayOf("StdErr:", stdErr) else emptyArray()),
+                    *(if (stdOut.isNotBlank()) arrayOf("Stdout:", stdOut.trim()) else emptyArray()),
+                    *(if (stdErr.isNotBlank()) arrayOf("StdErr:", stdErr.trim()) else emptyArray()),
                 )
             return errorMsgLines.joinToString(separator = System.lineSeparator())
         }

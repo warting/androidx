@@ -421,10 +421,6 @@ internal class ResponsiveTransformationSpecImpl(
         border: BorderStroke?,
     ): Painter =
         BackgroundPainter(
-            scale = {
-                val progress = TransitionAreaProgress(scrollProgress)
-                progress.compute(scale, easing)
-            },
             height = { itemHeight },
             shape = shape,
             border = border,

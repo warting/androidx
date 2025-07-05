@@ -26,7 +26,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.xr.runtime.Config
 import androidx.xr.runtime.Session
-import androidx.xr.runtime.math.FloatSize3d
+import androidx.xr.runtime.math.FloatSize2d
 import androidx.xr.runtime.math.Pose
 import androidx.xr.scenecore.AnchorEntity
 import androidx.xr.scenecore.GltfModel
@@ -38,7 +38,6 @@ import androidx.xr.scenecore.testapp.common.createSession
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.nio.file.Path
 import java.nio.file.Paths
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
 class AnchorEntityActivity : AppCompatActivity() {
@@ -89,13 +88,13 @@ class AnchorEntityActivity : AppCompatActivity() {
                 Config(planeTracking = Config.PlaneTrackingMode.HORIZONTAL_AND_VERTICAL)
             )
 
-            xyzModel = GltfModel.createAsync(session!!, XYZ_ARROWS_MODEL).await()
+            xyzModel = GltfModel.create(session!!, XYZ_ARROWS_MODEL)
 
             // Create anchored gltf entity
             anchorEntity =
                 AnchorEntity.create(
                     session!!,
-                    FloatSize3d(0.1f, 0.1f),
+                    FloatSize2d(0.1f, 0.1f),
                     PlaneOrientation.ANY,
                     PlaneSemanticType.ANY,
                 )

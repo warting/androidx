@@ -16,10 +16,9 @@
 
 package androidx.xr.scenecore.impl;
 
+import android.content.Context;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.xr.runtime.internal.Entity;
 import androidx.xr.runtime.internal.GltfEntity;
 import androidx.xr.runtime.internal.MaterialResource;
@@ -31,6 +30,9 @@ import com.google.androidxr.splitengine.SplitEngineSubspaceManager;
 import com.google.androidxr.splitengine.SubspaceNode;
 import com.google.ar.imp.apibindings.ImpressApi;
 import com.google.common.util.concurrent.ListenableFuture;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -46,9 +48,10 @@ class GltfEntityImpl extends AndroidXrEntity implements GltfEntity {
     private final SubspaceNode mSubspace;
     private final int mModelImpressNode;
     private final int mSubspaceImpressNode;
-    @AnimationState private int mAnimationState = AnimationState.STOPPED;
+    @AnimationStateValue private int mAnimationState = AnimationState.STOPPED;
 
     GltfEntityImpl(
+            Context context,
             GltfModelResourceImpl gltfModelResource,
             Entity parentEntity,
             ImpressApi impressApi,
@@ -56,7 +59,7 @@ class GltfEntityImpl extends AndroidXrEntity implements GltfEntity {
             XrExtensions extensions,
             EntityManager entityManager,
             ScheduledExecutorService executor) {
-        super(extensions.createNode(), extensions, entityManager, executor);
+        super(context, extensions.createNode(), extensions, entityManager, executor);
         mImpressApi = impressApi;
         mSplitEngineSubspaceManager = splitEngineSubspaceManager;
         setParent(parentEntity);
@@ -127,7 +130,7 @@ class GltfEntityImpl extends AndroidXrEntity implements GltfEntity {
     }
 
     @Override
-    @AnimationState
+    @AnimationStateValue
     public int getAnimationState() {
         return mAnimationState;
     }

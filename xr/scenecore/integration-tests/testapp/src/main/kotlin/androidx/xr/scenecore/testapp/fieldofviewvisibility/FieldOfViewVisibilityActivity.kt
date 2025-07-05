@@ -144,10 +144,8 @@ class FieldOfViewVisibilityActivity : AppCompatActivity() {
             it.setOnClickListener { session!!.scene.requestHomeSpaceMode() }
         }
 
-        // Set the main panel size and make the main panel movable.
-        session!!.scene.mainPanelEntity.sizeInPixels = IntSize2d(width = 1500, height = 2000)
-        val movableComponent =
-            MovableComponent.create(session!!, systemMovable = true, scaleInZ = false)
+        // Make the main panel movable.
+        val movableComponent = MovableComponent.createSystemMovable(session!!, scaleInZ = false)
         session!!.scene.mainPanelEntity.addComponent(movableComponent)
 
         // Create the UI component managers.

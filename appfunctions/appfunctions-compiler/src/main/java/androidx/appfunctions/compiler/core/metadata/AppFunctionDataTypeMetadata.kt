@@ -68,12 +68,14 @@ abstract class AppFunctionDataTypeMetadata {
 data class AppFunctionArrayTypeMetadata(
     val itemType: AppFunctionDataTypeMetadata,
     val isNullable: Boolean,
+    val description: String,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
         return AppFunctionDataTypeMetadataDocument(
             itemType = itemType.toAppFunctionDataTypeMetadataDocument(),
             type = TYPE,
             isNullable = isNullable,
+            description = description,
         )
     }
 
@@ -86,6 +88,7 @@ data class AppFunctionAllOfTypeMetadata(
     val matchAll: List<AppFunctionDataTypeMetadata>,
     val qualifiedName: String?,
     val isNullable: Boolean,
+    val description: String,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
         val allOfDocuments = matchAll.map { it.toAppFunctionDataTypeMetadataDocument() }
@@ -94,6 +97,7 @@ data class AppFunctionAllOfTypeMetadata(
             allOf = allOfDocuments,
             isNullable = isNullable,
             objectQualifiedName = qualifiedName,
+            description = description,
         )
     }
 
@@ -107,6 +111,7 @@ data class AppFunctionObjectTypeMetadata(
     val required: List<String>,
     val qualifiedName: String?,
     val isNullable: Boolean,
+    val description: String,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
         val properties =
@@ -122,6 +127,7 @@ data class AppFunctionObjectTypeMetadata(
             required = required,
             objectQualifiedName = qualifiedName,
             isNullable = isNullable,
+            description = description,
         )
     }
 
@@ -133,12 +139,14 @@ data class AppFunctionObjectTypeMetadata(
 data class AppFunctionReferenceTypeMetadata(
     val referenceDataType: String,
     val isNullable: Boolean,
+    val description: String,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
         return AppFunctionDataTypeMetadataDocument(
             type = TYPE,
             dataTypeReference = referenceDataType,
             isNullable = isNullable,
+            description = description,
         )
     }
 
@@ -150,9 +158,14 @@ data class AppFunctionReferenceTypeMetadata(
 data class AppFunctionPrimitiveTypeMetadata(
     @AppFunctionPrimitiveType val type: Int,
     val isNullable: Boolean,
+    val description: String,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
-        return AppFunctionDataTypeMetadataDocument(type = type, isNullable = isNullable)
+        return AppFunctionDataTypeMetadataDocument(
+            type = type,
+            isNullable = isNullable,
+            description = description,
+        )
     }
 
     companion object {
@@ -186,6 +199,7 @@ data class AppFunctionDataTypeMetadataDocument(
     val dataTypeReference: String? = null,
     val isNullable: Boolean = false,
     val objectQualifiedName: String? = null,
+    val description: String = "",
 ) {
     fun toAppFunctionDataTypeMetadata(): AppFunctionDataTypeMetadata =
         when (type) {
@@ -194,6 +208,7 @@ data class AppFunctionDataTypeMetadataDocument(
                 AppFunctionArrayTypeMetadata(
                     itemType = itemType.toAppFunctionDataTypeMetadata(),
                     isNullable = isNullable,
+                    description = description,
                 )
             }
             AppFunctionDataTypeMetadata.TYPE_OBJECT -> {
@@ -209,6 +224,7 @@ data class AppFunctionDataTypeMetadataDocument(
                     required = required,
                     qualifiedName = objectQualifiedName,
                     isNullable = isNullable,
+                    description = description,
                 )
             }
             AppFunctionDataTypeMetadata.TYPE_REFERENCE ->
@@ -218,15 +234,21 @@ data class AppFunctionDataTypeMetadataDocument(
                             "Data type reference must be present for reference type"
                         },
                     isNullable = isNullable,
+                    description = description,
                 )
             AppFunctionDataTypeMetadata.TYPE_ALL_OF ->
                 AppFunctionAllOfTypeMetadata(
                     matchAll = allOf.map { it.toAppFunctionDataTypeMetadata() },
                     qualifiedName = objectQualifiedName,
                     isNullable = isNullable,
+                    description = description,
                 )
             in AppFunctionDataTypeMetadata.PRIMITIVE_TYPES ->
-                AppFunctionPrimitiveTypeMetadata(type = type, isNullable = isNullable)
+                AppFunctionPrimitiveTypeMetadata(
+                    type = type,
+                    isNullable = isNullable,
+                    description = description,
+                )
             else -> throw IllegalArgumentException("Unknown type: $type")
         }
 }

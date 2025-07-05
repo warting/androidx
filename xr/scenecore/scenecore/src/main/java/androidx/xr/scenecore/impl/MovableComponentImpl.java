@@ -18,12 +18,11 @@ package androidx.xr.scenecore.impl;
 
 import static java.lang.Math.max;
 
+import android.content.Context;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Pair;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.xr.runtime.internal.AnchorEntity;
 import androidx.xr.runtime.internal.AnchorPlacement;
 import androidx.xr.runtime.internal.Dimensions;
@@ -50,6 +49,9 @@ import com.android.extensions.xr.node.ReformOptions;
 import com.android.extensions.xr.node.Vec3;
 
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -260,7 +262,8 @@ class MovableComponentImpl implements MovableComponent {
                                         reformEvent.getProposedPosition(),
                                         reformEvent.getProposedOrientation());
                     }
-                    Vector3 newScale = RuntimeUtils.getVector3(reformEvent.getProposedScale());
+                    Vector3 newScale = mScaleInZ
+                            ? RuntimeUtils.getVector3(reformEvent.getProposedScale()) : mLastScale;
                     Entity disposeEntity = null;
 
                     Entity parent = updatedParent;
@@ -450,8 +453,7 @@ class MovableComponentImpl implements MovableComponent {
 
     // Gets the anchor placement settings for the given plane data, if it is null the entity should
     // not be anchored to this plane.
-    @Nullable
-    private AnchorPlacementImpl getAnchorPlacementIfAnchorable(PlaneData planeData) {
+    private @Nullable AnchorPlacementImpl getAnchorPlacementIfAnchorable(PlaneData planeData) {
         if (!mUserAnchorable || !mSystemMovable) {
             return null;
         }
@@ -483,8 +485,13 @@ class MovableComponentImpl implements MovableComponent {
             PlaneData anchorablePlaneData,
             AnchorPlacementImpl anchorPlacement,
             Long dataTimeNs) {
+        Context entityContext = null;
+        if (mEntity instanceof AndroidXrEntity) {
+            entityContext = ((AndroidXrEntity) mEntity).getContext();
+        }
         AnchorEntityImpl anchorEntity =
                 AnchorEntityImpl.createAnchorFromPlane(
+                        entityContext,
                         mExtensions.createNode(),
                         plane,
                         new Pose(),
@@ -532,8 +539,7 @@ class MovableComponentImpl implements MovableComponent {
         return Pair.create(poseToAnchor, anchorEntity);
     }
 
-    @Nullable
-    private Pose updatePoseForPlane(PlaneData planeData, Pose proposedPoseInOpenXr) {
+    private @Nullable Pose updatePoseForPlane(PlaneData planeData, Pose proposedPoseInOpenXr) {
         // Get the pose as related to the center of the plane.
 
         Pose centerPose = RuntimeUtils.fromPerceptionPose(planeData.centerPose);
@@ -571,11 +577,11 @@ class MovableComponentImpl implements MovableComponent {
         if (!shouldRenderPlaneShadow()) {
             return;
         }
-        mPanelShadowRenderer.updatePanelPose(proposedPose, planePose, (PanelEntityImpl) mEntity);
+        mPanelShadowRenderer.updatePanelPose(proposedPose, planePose, (BasePanelEntity) mEntity);
     }
 
     private boolean shouldRenderPlaneShadow() {
-        return mEntity instanceof PanelEntityImpl && mSystemMovable;
+        return mEntity instanceof BasePanelEntity && mSystemMovable;
     }
 
     // Checks if there is a created anchor entity and if it should be disposed. If so, disposes of

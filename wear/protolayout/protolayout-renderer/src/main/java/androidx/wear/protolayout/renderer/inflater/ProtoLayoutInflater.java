@@ -4705,7 +4705,8 @@ public final class ProtoLayoutInflater {
         }
         if (groupMutation.isNoOp()) {
             // Nothing to do.
-            return immediateFuture(RenderingArtifact.create(mInflaterStatsLogger));
+            return immediateFuture(
+                    RenderingArtifact.create(mInflaterStatsLogger, prevInflatedParent));
         }
 
         if (groupMutation.mPipelineMaker.isPresent()) {
@@ -4719,7 +4720,9 @@ public final class ProtoLayoutInflater {
                             () -> {
                                 try {
                                     applyMutationInternal(prevInflatedParent, groupMutation);
-                                    result.set(RenderingArtifact.create(mInflaterStatsLogger));
+                                    result.set(
+                                            RenderingArtifact.create(
+                                                    mInflaterStatsLogger, prevInflatedParent));
                                 } catch (ViewMutationException ex) {
                                     result.setException(ex);
                                 }
@@ -4728,7 +4731,8 @@ public final class ProtoLayoutInflater {
         } else {
             try {
                 applyMutationInternal(prevInflatedParent, groupMutation);
-                return immediateFuture(RenderingArtifact.create(mInflaterStatsLogger));
+                return immediateFuture(
+                        RenderingArtifact.create(mInflaterStatsLogger, prevInflatedParent));
             } catch (ViewMutationException ex) {
                 return immediateFailedFuture(ex);
             }
@@ -4987,6 +4991,9 @@ public final class ProtoLayoutInflater {
                                     mLoadActionListener.onClick(
                                             buildState(
                                                     action.getLoadAction(), mClickable.getId())));
+                    break;
+                case PENDING_INTENT_ACTION:
+                    // TODO: b/427644099 - get the pending intent and launch associated operation.
                     break;
                 case VALUE_NOT_SET:
                     break;

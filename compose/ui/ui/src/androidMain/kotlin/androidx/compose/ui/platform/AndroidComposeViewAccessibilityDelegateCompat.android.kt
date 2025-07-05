@@ -56,7 +56,6 @@ import androidx.collection.mutableIntListOf
 import androidx.collection.mutableIntObjectMapOf
 import androidx.collection.mutableIntSetOf
 import androidx.collection.mutableObjectIntMapOf
-import androidx.compose.ui.ComposeUiFlags.isFocusActionExitsTouchModeEnabled
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.R
 import androidx.compose.ui.contentcapture.ContentCaptureManager
@@ -1582,12 +1581,7 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
                 // We considered calling super.performAccessibilityAction() which would put the
                 // system in keyboard mode, but it only works when AndroidComposeView did not have
                 // focus.
-                if (
-                    @OptIn(ExperimentalComposeUiApi::class) isFocusActionExitsTouchModeEnabled &&
-                        view.isInTouchMode
-                ) {
-                    view.requestFocusFromTouch()
-                }
+                if (view.isInTouchMode) view.requestFocusFromTouch()
 
                 return node.unmergedConfig.getOrNull(RequestFocus)?.action?.invoke() ?: false
             }
@@ -2773,11 +2767,10 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         }
 
         newNode.replacedChildren.fastForEach { child ->
-            if (currentSemanticsNodes.contains(child.id)) {
-                sendAccessibilitySemanticsStructureChangeEvents(
-                    child,
-                    previousSemanticsNodes[child.id]!!,
-                )
+            previousSemanticsNodes[child.id]?.let { previousNode ->
+                if (currentSemanticsNodes.contains(child.id)) {
+                    sendAccessibilitySemanticsStructureChangeEvents(child, previousNode)
+                }
             }
         }
     }

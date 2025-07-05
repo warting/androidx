@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistryOwner
@@ -71,6 +72,7 @@ import androidx.xr.scenecore.scene
 import com.google.common.util.concurrent.ListenableFuture
 import java.nio.file.Paths
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class SplitEngineTestActivity : ComponentActivity() {
 
@@ -86,26 +88,23 @@ class SplitEngineTestActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+        session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
 
         setContent { ComposeEntry(session, activity) }
     }
 
     private fun togglePassthrough(session: Session) {
-        val passthroughOpacity: Float =
-            session.scene.spatialEnvironment.getCurrentPassthroughOpacity()
+        val passthroughOpacity: Float = session.scene.spatialEnvironment.currentPassthroughOpacity
         Log.i("TogglePassthrough", "TogglePassthrough!")
         when (passthroughOpacity) {
-            0.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(1.0f)
-            1.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+            0.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 1.0f
+            1.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
         }
     }
 
     private fun setSkyboxAndGeometry(skybox: ExrImage?, geometry: GltfModel?) {
         spatialEnvironmentPreference = SpatialEnvironmentPreference(skybox, geometry)
-        session.scene.spatialEnvironment.setSpatialEnvironmentPreference(
-            spatialEnvironmentPreference
-        )
+        session.scene.spatialEnvironment.preferredSpatialEnvironment = spatialEnvironmentPreference
     }
 
     // TODO: b/324947709 - Refactor common @Composable code into a utility library for common usage
@@ -173,7 +172,7 @@ class SplitEngineTestActivity : ComponentActivity() {
         LaunchedEffect(Unit) {
             while (true) {
                 if (dragonEntity.value != null) {
-                    dragonAnimationState.intValue = dragonEntity.value!!.getAnimationState()
+                    dragonAnimationState.intValue = dragonEntity.value!!.animationState
                 }
                 delay(16)
             }
@@ -193,7 +192,7 @@ class SplitEngineTestActivity : ComponentActivity() {
                     // move the
                     // main panel around.
                     if (movableComponentMP.value == null) {
-                        movableComponentMP.value = MovableComponent.create(session)
+                        movableComponentMP.value = MovableComponent.createSystemMovable(session)
                         val unused =
                             session.scene.mainPanelEntity.addComponent(movableComponentMP.value!!)
                     }
@@ -213,24 +212,21 @@ class SplitEngineTestActivity : ComponentActivity() {
                 Text(text = "Split Engine APIs", fontSize = 50.sp)
                 Button(
                     onClick = {
-                        val skyboxTokenFuture: ListenableFuture<ExrImage> =
-                            ExrImage.createFromZipAsync(
-                                session,
-                                Paths.get("skyboxes", "BlueSkybox.zip"),
-                            )
-                        skyboxTokenFuture.addListener(
-                            {
-                                try {
-                                    blueSkybox.value = skyboxTokenFuture.get()
-                                } catch (e: Exception) {
-                                    Log.e(
-                                        "SplitEngineTestActivity",
-                                        "Failed to load BlueSkybox: " + e.message,
-                                    )
-                                }
-                            },
-                            Runnable::run,
-                        )
+                        lifecycleScope.launch {
+                            val skyboxToken: ExrImage =
+                                ExrImage.createFromZip(
+                                    session,
+                                    Paths.get("skyboxes", "BlueSkybox.zip"),
+                                )
+                            try {
+                                blueSkybox.value = skyboxToken
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "SplitEngineTestActivity",
+                                    "Failed to load BlueSkybox: " + e.message,
+                                )
+                            }
+                        }
                     }
                 ) {
                     Text(text = "Load Skybox Blue", fontSize = 20.sp)
@@ -252,24 +248,20 @@ class SplitEngineTestActivity : ComponentActivity() {
                 }
                 Button(
                     onClick = {
-                        val gltfTokenFuture: ListenableFuture<GltfModel> =
-                            GltfModel.createAsync(
-                                session,
-                                Paths.get("models", "GroundGeometry.glb"),
-                            )
-                        gltfTokenFuture.addListener(
-                            {
-                                try {
-                                    groundGeometry.value = gltfTokenFuture.get()
-                                } catch (e: Exception) {
-                                    Log.e(
-                                        "SplitEngineTestActivity",
-                                        "Failed to load GroundGeometry: " + e.message,
+                        lifecycleScope.launch {
+                            try {
+                                groundGeometry.value =
+                                    GltfModel.create(
+                                        session,
+                                        Paths.get("models", "GroundGeometry.glb"),
                                     )
-                                }
-                            },
-                            Runnable::run,
-                        )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "SplitEngineTestActivity",
+                                    "Failed to load GroundGeometry: " + e.message,
+                                )
+                            }
+                        }
                     }
                 ) {
                     Text(text = "Load Ground Geometry", fontSize = 20.sp)
@@ -291,45 +283,37 @@ class SplitEngineTestActivity : ComponentActivity() {
                 }
                 Button(
                     onClick = {
-                        val gltfToken: ListenableFuture<GltfModel> =
-                            GltfModel.createAsync(session, Paths.get("models", "l2a_pulse.glb"))
-                        gltfToken.addListener(
-                            {
-                                try {
-                                    glimmerModel.value = gltfToken.get()
-                                } catch (e: Exception) {
-                                    Log.e(
-                                        "SplitEngineTestActivity",
-                                        "Failed to load Glimmer Model: " + e.message,
-                                    )
-                                }
-                            },
-                            Runnable::run,
-                        )
+                        lifecycleScope.launch {
+                            try {
+                                glimmerModel.value =
+                                    GltfModel.create(session, Paths.get("models", "l2a_pulse.glb"))
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "SplitEngineTestActivity",
+                                    "Failed to load Glimmer Model: " + e.message,
+                                )
+                            }
+                        }
                     }
                 ) {
                     Text(text = "Load Glimmer Model", fontSize = 20.sp)
                 }
                 Button(
                     onClick = {
-                        val gltfTokenFuture: ListenableFuture<GltfModel> =
-                            GltfModel.createAsync(
-                                session,
-                                Paths.get("models", "Dragon_Evolved.gltf"),
-                            )
-                        gltfTokenFuture.addListener(
-                            {
-                                try {
-                                    dragonModel.value = gltfTokenFuture.get()
-                                } catch (e: Exception) {
-                                    Log.e(
-                                        "SplitEngineTestActivity",
-                                        "Failed to load Dragon Model: " + e.message,
+                        lifecycleScope.launch {
+                            try {
+                                dragonModel.value =
+                                    GltfModel.create(
+                                        session,
+                                        Paths.get("models", "Dragon_Evolved.gltf"),
                                     )
-                                }
-                            },
-                            Runnable::run,
-                        )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "SplitEngineTestActivity",
+                                    "Failed to load Dragon Model: " + e.message,
+                                )
+                            }
+                        }
                     }
                 ) {
                     Text(text = "Load Dragon Model Split Engine", fontSize = 20.sp)
@@ -354,7 +338,7 @@ class SplitEngineTestActivity : ComponentActivity() {
                 if (dragonEntity.value != null) {
                     val interactableComponent =
                         InteractableComponent.create(session, mainExecutor) {
-                            if (it.action == InputEvent.ACTION_DOWN) {
+                            if (it.action == InputEvent.Action.ACTION_DOWN) {
                                 dragonEntity.value!!.setScale(
                                     dragonEntity.value!!.getScale() * 1.1f
                                 )
@@ -398,7 +382,7 @@ class SplitEngineTestActivity : ComponentActivity() {
                     Button(
                         onClick = {
                             dragonEntity.value!!.startAnimation(false, "Fast_Flying")
-                            dragonAnimationState.intValue = dragonEntity.value!!.getAnimationState()
+                            dragonAnimationState.intValue = dragonEntity.value!!.animationState
                         }
                     ) {
                         Text(text = "Animate Dragon Entity", fontSize = 20.sp)
@@ -406,7 +390,7 @@ class SplitEngineTestActivity : ComponentActivity() {
                     Button(
                         onClick = {
                             dragonEntity.value!!.startAnimation(true, "Fast_Flying")
-                            dragonAnimationState.intValue = dragonEntity.value!!.getAnimationState()
+                            dragonAnimationState.intValue = dragonEntity.value!!.animationState
                         }
                     ) {
                         Text(text = "Loop Animate Dragon Entity", fontSize = 20.sp)
@@ -414,7 +398,7 @@ class SplitEngineTestActivity : ComponentActivity() {
                     Button(
                         onClick = {
                             dragonEntity.value!!.stopAnimation()
-                            dragonAnimationState.intValue = dragonEntity.value!!.getAnimationState()
+                            dragonAnimationState.intValue = dragonEntity.value!!.animationState
                         }
                     ) {
                         Text(text = "Stop Animate Dragon Entity", fontSize = 20.sp)

@@ -50,7 +50,7 @@ Note: \$SUPPORT/samples/SupportSliceDemos/src/main/java/com/example/androidx/sli
 See the complete report at file://.*/build/reports/configuration\-cache/[^ ]*/[^ ]*/configuration\-cache\-report\.html
 # > Task :compose:ui:ui:processDebugAndroidTestManifest
 \$OUT_DIR/androidx/compose/runtime/runtime\-saveable/build/intermediates/tmp/manifest/androidTest/tempFile[0-9]+ProcessTestManifest[0-9]+\.xml:[0-9]+:[0-9]+\-[0-9]+:[0-9]+ Warning:
-\$OUT_DIR/androidx/compose/ui/ui\-tooling/build/intermediates/tmp/manifest/androidTest/release/tempFile[0-9]+ProcessTestManifest[0-9]+\.xml:[0-9]+:[0-9]+\-[0-9]+:[0-9]+ Warning:
+\$OUT_DIR/androidx/compose/ui/ui\-tooling/build/intermediates/tmp/manifest/androidTest/tempFile[0-9]+ProcessTestManifest[0-9]+\.xml:[0-9]+:[0-9]+\-[0-9]+:[0-9]+ Warning:
 # > Task :buildSrc:build UP-TO-DATE
 A fine\-grained performance profile is available\: use the \-\-scan option\.
 # > Task :docs
@@ -278,7 +278,7 @@ import androidx\.slice\.widget\.SliceView;
 .*Downloading dependency[:]? file:.*/prebuilts/androidx/konan/.*
 Please wait while Kotlin/Native compiler .* is being installed\.
 Unpack Kotlin/Native compiler to .*
-Download file:\.\./\.\./.*
+Download file:\$CHECKOUT/prebuilts/androidx/konan/nativeCompilerPrebuilts/.*
 Download kotlin\-native\-prebuilt\-.*.gz finished\, took .*
 Downloading native dependencies \(LLVM, sysroot etc\)\. This is a one\-time action performed only on the first run of the compiler\.
 Extracting dependency: .*\.konan/dependencies/cache.*
@@ -367,11 +367,13 @@ For more details, see: https://kotl\.in/gradle/internal\-compiler\-symbols
 \[log\].*
 # b/382336155 Capture more logging for Kotlin JS Tests
 .*STANDARD_OUT
+Completed
 # Warning emitted on empty Java files generated from AIDL:
 # https://github.com/kythe/kythe/issues/6145
 .*com.google\.devtools\.kythe\.extractors\.java\.JavaCompilationUnitExtractor.*
 ^WARNING: Empty java source file.*
 # b/359449191
+> Transform sdk\-interface\-descriptors\.jar \(project :privacysandbox:databridge:integration\-tests:testsdk\-asb\) with ExtractCompileSdkShimTransform
 > Transform sdk\-interface\-descriptors\.jar \(project :privacysandbox:ui:integration\-tests:testsdkproviderwrapper\) with ExtractCompileSdkShimTransform
 > Transform sdk\-interface\-descriptors\.jar \(project :privacysandbox:ui:integration\-tests:mediateesdkproviderwrapper\) with ExtractCompileSdkShimTransform
 > Transform sdk\-interface\-descriptors\.jar \(project :privacysandbox:ui:macrobenchmark:testapp:testsdkproviderwrapper\) with ExtractCompileSdkShimTransform
@@ -399,7 +401,3 @@ Calculating task graph as configuration cache cannot be reused because the set o
 # b/414775532
 # > Task :compose-hero-benchmarks:poxedex-compose:app:kspReleaseKotlin
 w: \[ksp\] LibraryGlideModules \[\] are included more than once, keeping only one\!
-# > Task :core:core:compileReleaseAndroidTestKotlin
-w: file://\$SUPPORT/core/core/src/androidTest/java/androidx/core/view/WindowCompatTest\.kt:[0-9]+:[0-9]+ 'var statusBarColor: Int' is deprecated\. Deprecated in Java\.
-w: file://\$SUPPORT/core/core/src/androidTest/java/androidx/core/view/WindowCompatTest\.kt:[0-9]+:[0-9]+ 'var navigationBarColor: Int' is deprecated\. Deprecated in Java\.
-w: file://\$SUPPORT/core/core/src/androidTest/java/androidx/core/view/WindowCompatTest\.kt:[0-9]+:[0-9]+ 'var isStatusBarContrastEnforced: Boolean' is deprecated\. Deprecated in Java\.

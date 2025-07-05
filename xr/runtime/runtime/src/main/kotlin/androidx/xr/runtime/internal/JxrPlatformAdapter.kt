@@ -21,11 +21,11 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import androidx.annotation.RestrictTo
+import androidx.xr.runtime.SubspaceNodeHolder
 import androidx.xr.runtime.math.Matrix3
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Vector3
 import androidx.xr.runtime.math.Vector4
-import com.google.androidxr.splitengine.SubspaceNode
 import com.google.common.util.concurrent.ListenableFuture
 import java.time.Duration
 import java.util.UUID
@@ -457,7 +457,7 @@ public interface JxrPlatformAdapter {
         stereoMode: Int,
         pose: Pose,
         canvasShape: SurfaceEntity.CanvasShape,
-        contentSecurityLevel: Int,
+        @SurfaceEntity.ContentSecurityLevel contentSecurityLevel: Int,
         superSampling: Int,
         parentEntity: Entity,
     ): SurfaceEntity
@@ -670,23 +670,23 @@ public interface JxrPlatformAdapter {
     public fun createAnchorEntity(anchor: Anchor): AnchorEntity
 
     /**
-     * A factory function to create a content-less entity. This entity is used as a connection point
-     * for attaching children entities and managing them (i.e. setPose()) as a group.
+     * A factory function to create a group entity. This entity is used as a connection point for
+     * attaching children entities and managing them (i.e. setPose()) as a group.
      *
      * @param pose Initial pose of the entity.
      * @param name Name of the entity.
      * @param parent Parent entity.
      */
-    public fun createEntity(pose: Pose, name: String, parent: Entity): Entity
+    public fun createGroupEntity(pose: Pose, name: String, parent: Entity): Entity
 
     /**
      * A factory function to create a SubspaceNodeEntity.
      *
-     * @param subspaceNode The SubspaceNode to create the SubspaceNodeEntity from.
+     * @param subspaceNodeHolder Hold the SubspaceNode to create the SubspaceNodeEntity from.
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
     public fun createSubspaceNodeEntity(
-        subspaceNode: SubspaceNode,
+        subspaceNodeHolder: SubspaceNodeHolder<*>,
         size: Dimensions,
     ): SubspaceNodeEntity
 
