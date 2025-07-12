@@ -17,9 +17,13 @@
 package androidx.xr.runtime.testing
 
 import androidx.annotation.RestrictTo
+import androidx.xr.runtime.VpsAvailabilityAvailable
+import androidx.xr.runtime.VpsAvailabilityResult
 import androidx.xr.runtime.internal.Anchor
 import androidx.xr.runtime.internal.AnchorInvalidUuidException
+import androidx.xr.runtime.internal.DepthMap
 import androidx.xr.runtime.internal.Earth
+import androidx.xr.runtime.internal.Face
 import androidx.xr.runtime.internal.Hand
 import androidx.xr.runtime.internal.HitResult
 import androidx.xr.runtime.internal.PerceptionManager
@@ -44,7 +48,13 @@ public class FakePerceptionManager : PerceptionManager, AnchorHolder {
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
     override val viewCameras: List<FakeRuntimeViewCamera> = listOf(FakeRuntimeViewCamera())
 
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    override val userFace: Face? = FakeRuntimeFace()
+
     override val earth: Earth = FakeRuntimeEarth()
+
+    @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    override val depthMaps: MutableList<DepthMap> = mutableListOf(FakeRuntimeDepthMap())
 
     private val hitResults = mutableListOf<HitResult>()
     private val anchorUuids = mutableListOf<UUID>()
@@ -77,7 +87,8 @@ public class FakePerceptionManager : PerceptionManager, AnchorHolder {
         anchorUuids.remove(uuid)
     }
 
-    override fun persistAnchor(anchor: Anchor) {
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    override fun onAnchorPersisted(anchor: Anchor) {
         anchorUuids.add(anchor.uuid!!)
     }
 
@@ -88,6 +99,13 @@ public class FakePerceptionManager : PerceptionManager, AnchorHolder {
     override fun detachAnchor(anchor: Anchor) {
         anchors.remove(anchor)
         anchor.uuid?.let { anchorUuids.remove(it) }
+    }
+
+    override suspend fun checkVpsAvailability(
+        latitude: Double,
+        longitude: Double,
+    ): VpsAvailabilityResult {
+        return VpsAvailabilityAvailable()
     }
 
     /** Adds a [HitResult] to the list that is returned when calling [hitTest] with any pose. */

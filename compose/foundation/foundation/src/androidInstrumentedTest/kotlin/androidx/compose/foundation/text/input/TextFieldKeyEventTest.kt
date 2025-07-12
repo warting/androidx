@@ -192,6 +192,38 @@ class TextFieldKeyEventTest {
     }
 
     @Test
+    fun textField_linesNavigation_cache_resets_at_start() {
+        keysSequenceTest("hello\n\nworld") {
+            pressKey(Key.DirectionRight)
+            pressKey(Key.DirectionRight) // he|llo
+            pressKey(Key.DirectionDown) // |
+            pressKey(Key.DirectionUp) // he|llo
+            pressKey(Key.DirectionUp) // |hello
+            // now the cache should be reset
+            pressKey(Key.DirectionDown) // |
+            pressKey(Key.DirectionDown) // |world
+            pressKey(Key.Zero)
+            expectedText("hello\n\n0world")
+        }
+    }
+
+    @Test
+    fun textField_linesNavigation_cache_resets_at_end() {
+        keysSequenceTest("hello\n\nworld") {
+            pressKey(Key.DirectionRight)
+            pressKey(Key.DirectionRight) // he|llo
+            pressKey(Key.DirectionDown) // |
+            pressKey(Key.DirectionDown) // wo|rld
+            pressKey(Key.DirectionDown) // world|
+            // now the cache should be reset
+            pressKey(Key.DirectionUp) // |
+            pressKey(Key.DirectionUp) // hello|
+            pressKey(Key.Zero)
+            expectedText("hello0\n\nworld")
+        }
+    }
+
+    @Test
     fun textField_newLine() {
         keysSequenceTest("hello") {
             pressKey(Key.Enter)
@@ -892,7 +924,7 @@ class TextFieldKeyEventTest {
         var handled = -1
         val focusRequester = FocusRequester()
         rule.setContent {
-            val stateValue = state.value
+            val stateValue = state.intValue
 
             @Suppress("UNUSED_PARAMETER")
             fun handle(key: KeyEvent): Boolean {
@@ -911,7 +943,7 @@ class TextFieldKeyEventTest {
         rule.onNodeWithTag(tag).performKeyInput { pressKey(Key.A) }
         rule.runOnIdle {
             assertThat(handled).isEqualTo(0)
-            state.value += 1
+            state.intValue += 1
         }
 
         rule.onNodeWithTag(tag).performKeyInput { pressKey(Key.A) }

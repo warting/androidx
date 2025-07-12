@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:Suppress("UnstableApiUsage") // b/393137152
-
 package androidx.build
 
 import androidx.build.clang.AndroidXClang
@@ -288,7 +286,7 @@ abstract class AndroidXMultiplatformExtension(val project: Project) {
      */
     @JvmOverloads
     fun addNativeLibrariesToVariantAssets(
-        androidTarget: KotlinAndroidTarget,
+        androidTarget: KotlinMultiplatformAndroidLibraryTarget,
         nativeCompilation: MultiTargetNativeCompilation,
         forTest: Boolean = false,
     ) =
@@ -307,7 +305,7 @@ abstract class AndroidXMultiplatformExtension(val project: Project) {
      */
     @JvmOverloads
     fun addNativeLibrariesToJniLibs(
-        androidTarget: KotlinAndroidTarget,
+        androidTarget: KotlinMultiplatformAndroidLibraryTarget,
         nativeCompilation: MultiTargetNativeCompilation,
         forTest: Boolean = false,
     ) =
@@ -394,6 +392,7 @@ abstract class AndroidXMultiplatformExtension(val project: Project) {
         supportedPlatforms.add(PlatformIdentifier.ANDROID)
         return if (project.enableJvm()) {
             kotlinExtension.androidTarget {
+                publishLibraryVariants(Release.DEFAULT_PUBLISH_CONFIG)
                 // we need to allow instrumented test to depend on commonTest/jvmTest, which is not
                 // default.
                 // see https://youtrack.jetbrains.com/issue/KT-62594

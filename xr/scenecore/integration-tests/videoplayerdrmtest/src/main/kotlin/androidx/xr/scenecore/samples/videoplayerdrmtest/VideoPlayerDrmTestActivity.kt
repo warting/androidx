@@ -111,10 +111,10 @@ class VideoPlayerDrmTestActivity : ComponentActivity() {
 
         val session = (Session.create(this) as SessionCreateSuccess).session
         session.configure(Config(headTracking = HeadTrackingMode.LAST_KNOWN))
-        session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+        session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
 
         if (movableComponentMp == null) {
-            movableComponentMp = MovableComponent.create(session)
+            movableComponentMp = MovableComponent.createSystemMovable(session)
             val unused = session.scene.mainPanelEntity.addComponent(movableComponentMp!!)
         }
 
@@ -140,12 +140,11 @@ class VideoPlayerDrmTestActivity : ComponentActivity() {
     }
 
     private fun togglePassthrough(session: Session) {
-        val passthroughOpacity: Float =
-            session.scene.spatialEnvironment.getCurrentPassthroughOpacity()
+        val passthroughOpacity: Float = session.scene.spatialEnvironment.currentPassthroughOpacity
         Log.i(TAG, "TogglePassthrough!")
         when (passthroughOpacity) {
-            0.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(1.0f)
-            1.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+            0.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 1.0f
+            1.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
         }
     }
 
@@ -264,7 +263,7 @@ class VideoPlayerDrmTestActivity : ComponentActivity() {
                 SurfaceEntity.create(session, stereoMode, pose, canvasShape, surfaceContentLevel)
             // Make the video player movable (to make it easier to look at it from different
             // angles and distances) (only on quad canvas)
-            movableComponent = MovableComponent.create(session)
+            movableComponent = MovableComponent.createSystemMovable(session)
             // The quad has a radius of 1.0 meters
             movableComponent!!.size = FloatSize3d(1.0f, 1.0f, 1.0f)
 

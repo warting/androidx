@@ -58,7 +58,6 @@ import androidx.xr.scenecore.SpatialEnvironment.SpatialEnvironmentPreference
 import androidx.xr.scenecore.scene
 import java.nio.file.Paths
 import kotlin.math.roundToInt
-import kotlinx.coroutines.guava.await
 
 class EnvironmentTestActivity : ComponentActivity() {
 
@@ -80,12 +79,12 @@ class EnvironmentTestActivity : ComponentActivity() {
 
         session.scene.mainPanelEntity.sizeInPixels = IntSize2d(width = 1500, height = 2000)
 
-        session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+        session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
         session.scene.spatialEnvironment.addOnPassthroughOpacityChangedListener { newOpacity ->
             currentPassthroughOpacity.floatValue = newOpacity
         }
         currentPassthroughOpacity.floatValue =
-            session.scene.spatialEnvironment.getCurrentPassthroughOpacity()
+            session.scene.spatialEnvironment.currentPassthroughOpacity
 
         session.scene.spatialEnvironment.addOnSpatialEnvironmentChangedListener {
             onSpatialEnvironmentChangedCount++
@@ -104,30 +103,10 @@ class EnvironmentTestActivity : ComponentActivity() {
         setContent { HelloWorld(session, mActivity) }
     }
 
-    @Suppress("DEPRECATION")
-    private fun togglePassthrough(session: Session) {
-        lastApiCall = "togglePassthrough"
-        val passthroughMode: SpatialEnvironment.PassthroughMode =
-            session.scene.spatialEnvironment.getPassthroughMode()
-        Log.i(TAG, lastApiCall)
-        when (passthroughMode) {
-            SpatialEnvironment.PassthroughMode.UNINITIALIZED -> return
-            //  Do Nothing. We're still waiting
-            SpatialEnvironment.PassthroughMode.DISABLED ->
-                session.scene.spatialEnvironment.setPassthrough(
-                    SpatialEnvironment.PassthroughMode.ENABLED
-                )
-            SpatialEnvironment.PassthroughMode.ENABLED ->
-                session.scene.spatialEnvironment.setPassthrough(
-                    SpatialEnvironment.PassthroughMode.DISABLED
-                )
-        }
-    }
-
-    private fun setPassthroughOpacity(opacity: Float?) {
-        val returnObj = session.scene.spatialEnvironment.setPassthroughOpacityPreference(opacity)
+    private fun setPassthroughOpacity(opacity: Float) {
+        session.scene.spatialEnvironment.preferredPassthroughOpacity = opacity
         lastApiCall =
-            "set opacity preference to ${session.scene.spatialEnvironment.getPassthroughOpacityPreference()} returned with value ${returnObj}, but current actual opacity is ${session.scene.spatialEnvironment.getCurrentPassthroughOpacity()}"
+            "set opacity preference to ${session.scene.spatialEnvironment.preferredPassthroughOpacity}, but current actual opacity is ${session.scene.spatialEnvironment.currentPassthroughOpacity}"
         Log.i(TAG, lastApiCall)
     }
 
@@ -139,12 +118,9 @@ class EnvironmentTestActivity : ComponentActivity() {
      */
     private fun setGeoAndSkybox(skybox: ExrImage?, geometry: GltfModel?) {
         spatialEnvironmentPreference = SpatialEnvironmentPreference(skybox, geometry)
-        val returnObj =
-            session.scene.spatialEnvironment.setSpatialEnvironmentPreference(
-                spatialEnvironmentPreference
-            )
+        session.scene.spatialEnvironment.preferredSpatialEnvironment = spatialEnvironmentPreference
         lastApiCall =
-            "set spatial environment preference to ${session.scene.spatialEnvironment.getSpatialEnvironmentPreference()?.info()} returned with value ${returnObj}, but current actual mode shown is ${session.scene.spatialEnvironment.isSpatialEnvironmentPreferenceActive()}"
+            "set spatial environment preference to ${session.scene.spatialEnvironment.preferredSpatialEnvironment?.info()}, but current actual mode shown is ${session.scene.spatialEnvironment.isPreferredSpatialEnvironmentActive}"
 
         Log.i(TAG, lastApiCall)
     }
@@ -204,12 +180,9 @@ class EnvironmentTestActivity : ComponentActivity() {
 
             SkyboxAndGeoControls(session)
 
-            Button(onClick = { togglePassthrough(session) }) {
-                Text(text = "Toggle Passthrough (Deprecated)", fontSize = 30.sp)
-            }
             Text(
                 text =
-                    "Is Spatial Environment Preference Active? ${session.scene.spatialEnvironment.isSpatialEnvironmentPreferenceActive()}",
+                    "Is Spatial Environment Preference Active? ${session.scene.spatialEnvironment.isPreferredSpatialEnvironmentActive}",
                 fontSize = 30.sp,
             )
             Text(text = "Last API Call: ${lastApiCall}", fontSize = 20.sp)
@@ -234,7 +207,7 @@ class EnvironmentTestActivity : ComponentActivity() {
             mutableFloatStateOf(currentPassthroughOpacity.floatValue * 100.0f)
         }
         val opacityPreferenceStr =
-            session.scene.spatialEnvironment.getPassthroughOpacityPreference() ?: "null"
+            session.scene.spatialEnvironment.preferredPassthroughOpacity ?: "null"
 
         Text(text = "Passthrough Opacity Preference: $opacityPreferenceStr", fontSize = 30.sp)
         Row {
@@ -248,7 +221,11 @@ class EnvironmentTestActivity : ComponentActivity() {
                 },
                 modifier = Modifier.fillMaxWidth(0.5f),
             )
-            Button(onClick = { setPassthroughOpacity(null) }) {
+            Button(
+                onClick = {
+                    setPassthroughOpacity(SpatialEnvironment.NO_PASSTHROUGH_OPACITY_PREFERENCE)
+                }
+            ) {
                 Text(text = "Unset passthrough preference", fontSize = 30.sp)
             }
         }
@@ -267,22 +244,16 @@ class EnvironmentTestActivity : ComponentActivity() {
         var blueSkybox by remember { mutableStateOf<ExrImage?>(null) }
 
         LaunchedEffect(Unit) {
-            groundGeo =
-                GltfModel.createAsync(session, Paths.get("models", "GroundGeometry.glb")).await()
+            groundGeo = GltfModel.create(session, Paths.get("models", "GroundGeometry.glb"))
         }
         LaunchedEffect(Unit) {
-            rocksGeo =
-                GltfModel.createAsync(session, Paths.get("models", "RocksGeometry.glb")).await()
+            rocksGeo = GltfModel.create(session, Paths.get("models", "RocksGeometry.glb"))
         }
         LaunchedEffect(Unit) {
-            greySkybox =
-                ExrImage.createFromZipAsync(session, Paths.get("skyboxes", "GreySkybox.zip"))
-                    .await()
+            greySkybox = ExrImage.createFromZip(session, Paths.get("skyboxes", "GreySkybox.zip"))
         }
         LaunchedEffect(Unit) {
-            blueSkybox =
-                ExrImage.createFromZipAsync(session, Paths.get("skyboxes", "BlueSkybox.zip"))
-                    .await()
+            blueSkybox = ExrImage.createFromZip(session, Paths.get("skyboxes", "BlueSkybox.zip"))
         }
 
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -309,9 +280,8 @@ class EnvironmentTestActivity : ComponentActivity() {
             onClick = {
                 spatialEnvironmentPreference = SpatialEnvironmentPreference(blueSkybox, groundGeo)
                 lastApiCall = "setBothGeometryAndSkybox"
-                session.scene.spatialEnvironment.setSpatialEnvironmentPreference(
+                session.scene.spatialEnvironment.preferredSpatialEnvironment =
                     spatialEnvironmentPreference
-                )
             }
         ) {
             Text(text = "Set both Geometry and Skybox (Ground, Blue)", fontSize = 30.sp)
@@ -326,60 +296,10 @@ class EnvironmentTestActivity : ComponentActivity() {
             onClick = {
                 spatialEnvironmentPreference = null
                 lastApiCall = "revertToSystemDefaultGeometryAndSkybox"
-                session.scene.spatialEnvironment.setSpatialEnvironmentPreference(null)
+                session.scene.spatialEnvironment.preferredSpatialEnvironment = null
             }
         ) {
             Text(text = "Unset both Geometry and Skybox preference", fontSize = 30.sp)
-        }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = {
-                    spatialEnvironmentPreference =
-                        SpatialEnvironmentPreference(
-                            spatialEnvironmentPreference?.skybox,
-                            groundGeo,
-                        )
-                    lastApiCall = "setGeometryDeprecated"
-                    session.scene.spatialEnvironment.setGeometry(groundGeo)
-                }
-            ) {
-                Text(text = "Set Geometry Ground (Deprecated)", fontSize = 30.sp)
-            }
-            Button(
-                onClick = {
-                    spatialEnvironmentPreference =
-                        SpatialEnvironmentPreference(spatialEnvironmentPreference?.skybox, null)
-                    lastApiCall = "unsetGeometryDeprecated"
-                    session.scene.spatialEnvironment.setGeometry(null)
-                }
-            ) {
-                Text(text = "Unset Geometry (Deprecated)", fontSize = 30.sp)
-            }
-        }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = {
-                    spatialEnvironmentPreference =
-                        SpatialEnvironmentPreference(
-                            blueSkybox,
-                            spatialEnvironmentPreference?.geometry,
-                        )
-                    lastApiCall = "setSkyboxDeprecated"
-                    session.scene.spatialEnvironment.setSkybox(blueSkybox)
-                }
-            ) {
-                Text(text = "Set Skybox Blue (Deprecated)", fontSize = 30.sp)
-            }
-            Button(
-                onClick = {
-                    spatialEnvironmentPreference =
-                        SpatialEnvironmentPreference(null, spatialEnvironmentPreference?.geometry)
-                    lastApiCall = "unsetSkyboxDeprecated"
-                    session.scene.spatialEnvironment.setSkybox(null)
-                }
-            ) {
-                Text(text = "Unset Skybox (Deprecated)", fontSize = 30.sp)
-            }
         }
     }
 }

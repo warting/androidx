@@ -18,13 +18,13 @@
 
 package androidx.compose.foundation.lazy.list
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
@@ -39,6 +39,8 @@ import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LocalPinnableContainer
+import androidx.compose.ui.layout.PinnableContainer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -46,6 +48,9 @@ import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
 import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
@@ -56,7 +61,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-@OptIn(ExperimentalFoundationApi::class)
 @LargeTest
 @RunWith(AndroidJUnit4::class)
 class LazyListHeadersTest {
@@ -92,6 +96,48 @@ class LazyListHeadersTest {
         rule.onNodeWithTag("2").assertIsDisplayed()
 
         rule.onNodeWithTag(secondHeaderTag).assertDoesNotExist()
+    }
+
+    @Test
+    fun lazyColumnShowsHeader_withPinnedItem() {
+        val items = (1..2).map { it.toString() }
+        val firstHeaderTag = "firstHeaderTag"
+        val secondHeaderTag = "secondHeaderTag"
+        var pinnableItem: PinnableContainer? = null
+        rule.setContent {
+            LazyColumn(Modifier.height(300.dp), beyondBoundsItemCount = 0) {
+                stickyHeader {
+                    Spacer(Modifier.height(101.dp).fillParentMaxWidth().testTag(firstHeaderTag))
+                }
+
+                items(items) {
+                    if (it == "1") {
+                        pinnableItem = LocalPinnableContainer.current
+                    }
+                    Spacer(Modifier.height(101.dp).fillParentMaxWidth().testTag(it))
+                }
+
+                stickyHeader {
+                    Spacer(Modifier.height(101.dp).fillParentMaxWidth().testTag(secondHeaderTag))
+                }
+
+                items(items) { Spacer(Modifier.height(101.dp).fillParentMaxWidth().testTag(it)) }
+
+                items(items) { Spacer(Modifier.height(101.dp).fillParentMaxWidth().testTag(it)) }
+            }
+        }
+
+        rule.runOnIdle { pinnableItem?.pin() }
+
+        rule.onNodeWithTag(firstHeaderTag).assertIsDisplayed()
+        rule.onNodeWithTag("1").assertIsDisplayed()
+        rule.onNodeWithTag("2").assertIsDisplayed()
+        rule.onNodeWithTag(secondHeaderTag).assertDoesNotExist()
+
+        rule.onRoot().performTouchInput { swipeUp() }
+
+        rule.onNodeWithTag(firstHeaderTag).assertIsNotDisplayed()
+        rule.onNodeWithTag(secondHeaderTag).assertIsDisplayed()
     }
 
     @Test
@@ -410,6 +456,37 @@ class LazyListHeadersTest {
         }
 
         assertTrue { error.isSuccess }
+    }
+
+    @Test
+    fun lazyColumn_withEmptyHeader_showsHeadersOnScroll() {
+        val headerTag = "headerTag"
+        lateinit var state: LazyListState
+
+        rule.setContentWithTestViewConfiguration {
+            LazyColumn(
+                Modifier.height(300.dp).testTag(LazyListTag),
+                rememberLazyListState().also { state = it },
+            ) {
+                stickyHeader { Spacer(Modifier.height(101.dp).fillMaxWidth().testTag(headerTag)) }
+
+                repeat(10) {
+                    item { Spacer(Modifier.height(101.dp).fillMaxWidth()) }
+
+                    // this empty header shouldn't be affecting the real header
+                    stickyHeader {}
+                }
+            }
+        }
+
+        rule.onNodeWithTag(LazyListTag).scrollBy(y = 10.dp, density = rule.density)
+
+        rule.onNodeWithTag(headerTag).assertIsDisplayed().assertTopPositionInRootIsEqualTo(0.dp)
+
+        rule.runOnIdle {
+            assertEquals(0, state.layoutInfo.visibleItemsInfo.first().index)
+            assertEquals(0, state.layoutInfo.visibleItemsInfo.first().offset)
+        }
     }
 }
 

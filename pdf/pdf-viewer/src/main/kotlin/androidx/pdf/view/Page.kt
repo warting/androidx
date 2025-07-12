@@ -32,7 +32,6 @@ import androidx.pdf.PdfDocument
 import androidx.pdf.exceptions.RequestFailedException
 import androidx.pdf.exceptions.RequestMetadata
 import androidx.pdf.models.FormWidgetInfo
-import androidx.pdf.util.FORM_WIDGET_INFO_REQUEST_NAME
 import androidx.pdf.util.PAGE_CONTENTS_REQUEST_NAME
 import androidx.pdf.util.PAGE_LINKS_REQUEST_NAME
 import kotlinx.coroutines.CoroutineScope
@@ -108,6 +107,13 @@ internal class Page(
         }
 
     internal var formWidgetInfos: List<FormWidgetInfo>? = formWidgetInfos
+        private set(value) {
+            field = value
+            formWidgetIndexToInfoMap = value?.associateBy { it.widgetIndex }
+        }
+
+    internal var formWidgetIndexToInfoMap: Map<Int, FormWidgetInfo>? =
+        formWidgetInfos?.associateBy { it.widgetIndex }
         private set
 
     //  Checks if the content of this page within the specified visible area is fully rendered.
@@ -213,7 +219,7 @@ internal class Page(
     }
 
     /** Updates the [formWidgetInfos] associated with the page. */
-    internal fun maybeUpdateFormWidgetInfos() {
+    internal fun maybeUpdateFormWidgetInfos(formWidgetMetadataLoader: FormWidgetMetadataLoader) {
         val previousJob = fetchFormWidgetInfoJob
 
         fetchFormWidgetInfoJob =
@@ -221,20 +227,7 @@ internal class Page(
                 // Cancel the previous job, since we want to fetch the latest set of widgets
                 previousJob?.cancelAndJoin()
                 ensureActive()
-                try {
-                    formWidgetInfos = pdfDocument.getFormWidgetInfos(pageNum)
-                } catch (e: DeadObjectException) {
-                    val exception =
-                        RequestFailedException(
-                            requestMetadata =
-                                RequestMetadata(
-                                    requestName = FORM_WIDGET_INFO_REQUEST_NAME,
-                                    pageRange = pageNum..pageNum,
-                                ),
-                            throwable = e,
-                        )
-                    errorFlow.emit(exception)
-                }
+                formWidgetInfos = formWidgetMetadataLoader.loadFormWidgetInfos(pageNum)
             }
     }
 
@@ -251,22 +244,23 @@ internal class Page(
         for (highlight in highlights) {
             // Highlight locations are defined in content coordinates, compute their location
             // in View coordinates using locationInView
-            highlightRect.set(highlight.area.pageRect)
-            highlightRect.offset(locationInView.left.toFloat(), locationInView.top.toFloat())
+            highlightRect.set(
+                highlight.area.left,
+                highlight.area.top,
+                highlight.area.right,
+                highlight.area.bottom,
+            )
+            highlightRect.offset(locationInView.left, locationInView.top)
             highlightPaint.color = highlight.color
             canvas.drawRect(highlightRect, highlightPaint)
         }
 
         if (pdfFormFillingConfig.isFormFillingEnabled()) {
-            // TODO (b/420905226): Add handling for other widget types as well
             formWidgetInfos
-                ?.filter { it.widgetType == FormWidgetInfo.WIDGET_TYPE_TEXTFIELD }
+                ?.filter { !it.readOnly }
                 ?.forEach {
                     formWidgetHighlightRect.set(it.widgetRect)
-                    formWidgetHighlightRect.offset(
-                        locationInView.left.toFloat(),
-                        locationInView.top.toFloat(),
-                    )
+                    formWidgetHighlightRect.offset(locationInView.left, locationInView.top)
                     highlightPaint.color = pdfFormFillingConfig.formFieldsHighlightColor
                     canvas.drawRect(formWidgetHighlightRect, highlightPaint)
                 }

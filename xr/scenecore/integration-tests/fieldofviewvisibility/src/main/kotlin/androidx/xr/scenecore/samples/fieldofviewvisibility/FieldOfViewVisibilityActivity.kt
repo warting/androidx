@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistryOwner
@@ -71,7 +73,8 @@ class FieldOfViewVisibilityActivity : AppCompatActivity() {
     private lateinit var mPanelEntityManager: PanelEntityManager
     private lateinit var mPerceivedResolutionManager: PerceivedResolutionManager
     private lateinit var mHeadLockedPanelView: DebugTextLinearView
-    private var mSpatialVisibility by mutableStateOf(SpatialVisibility(SpatialVisibility.UNKNOWN))
+    private var mSpatialVisibility by
+        mutableIntStateOf(SpatialVisibility.SPATIAL_VISIBILITY_UNKNOWN)
     private var mPerceivedResolution by mutableStateOf(IntSize2d(0, 0))
     private val mPerceivedResolutionListener: Consumer<IntSize2d> = Consumer {
         mPerceivedResolution = it
@@ -85,14 +88,13 @@ class FieldOfViewVisibilityActivity : AppCompatActivity() {
 
         // Set the main panel size and make the main panel movable.
         mSession.scene.mainPanelEntity.sizeInPixels = IntSize2d(width = 1500, height = 1400)
-        val movableComponent =
-            MovableComponent.create(mSession, systemMovable = true, scaleInZ = false)
+        val movableComponent = MovableComponent.createSystemMovable(mSession, scaleInZ = false)
         val unused = mSession.scene.mainPanelEntity.addComponent(movableComponent)
 
         // Create the UI component managers.
         mSpatialEnvironmentManager = SpatialEnvironmentManager(mSession)
         mSurfaceEntityManager = SurfaceEntityManager(mSession)
-        mGltfManager = GltfManager(mSession)
+        mGltfManager = GltfManager(mSession, this.lifecycleScope)
         mPanelEntityManager = PanelEntityManager(mSession)
         mPerceivedResolutionManager =
             PerceivedResolutionManager(mSession, mSurfaceEntityManager, mPanelEntityManager)
@@ -103,12 +105,17 @@ class FieldOfViewVisibilityActivity : AppCompatActivity() {
         mHeadLockedPanelView.setLine("State", "UNKNOWN")
         this.mHeadLockedUIManager = HeadLockedUIManager(mSession, mHeadLockedPanelView)
 
-        mSession.scene.setSpatialVisibilityChangedListener { visibility: SpatialVisibility ->
+        mSession.scene.setSpatialVisibilityChangedListener { visibility: Int ->
             mSpatialVisibility = visibility
-            Log.i(TAG, "Spatial visibility changed listener called $visibility")
-            mHeadLockedPanelView.setLine("State", "$visibility")
+            Log.i(
+                TAG,
+                "Spatial visibility changed listener called ${visibility.toSpatialVisibilityString()}",
+            )
+            mHeadLockedPanelView.setLine("State", visibility.toSpatialVisibilityString())
         }
-        mSession.scene.addPerceivedResolutionChangedListener(mPerceivedResolutionListener)
+        mSession.scene.mainPanelEntity.addPerceivedResolutionChangedListener(
+            mPerceivedResolutionListener
+        )
 
         setContent { MainPanelContent(mSession, mActivity) }
     }
@@ -116,7 +123,9 @@ class FieldOfViewVisibilityActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         mSession.scene.clearSpatialVisibilityChangedListener()
-        mSession.scene.removePerceivedResolutionChangedListener(mPerceivedResolutionListener)
+        mSession.scene.mainPanelEntity.removePerceivedResolutionChangedListener(
+            mPerceivedResolutionListener
+        )
     }
 
     @Composable
@@ -147,7 +156,7 @@ class FieldOfViewVisibilityActivity : AppCompatActivity() {
         Column(verticalArrangement = Arrangement.Top) {
             Text(
                 modifier = Modifier.padding(15.dp),
-                text = "SpatialVisibility: $mSpatialVisibility",
+                text = "SpatialVisibility: ${mSpatialVisibility.toSpatialVisibilityString()}",
             )
             Text(
                 modifier = Modifier.padding(15.dp),
@@ -191,5 +200,19 @@ class FieldOfViewVisibilityActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    fun Int.toSpatialVisibilityString(): String {
+        val visibilityString =
+            when (this) {
+                SpatialVisibility.SPATIAL_VISIBILITY_UNKNOWN -> "UNKNOWN"
+                SpatialVisibility.SPATIAL_VISIBILITY_OUTSIDE_FIELD_OF_VIEW ->
+                    "OUTSIDE_FIELD_OF_VIEW"
+                SpatialVisibility.SPATIAL_VISIBILITY_PARTIALLY_WITHIN_FIELD_OF_VIEW ->
+                    "PARTIALLY_WITHIN_FIELD_OF_VIEW"
+                SpatialVisibility.SPATIAL_VISIBILITY_WITHIN_FIELD_OF_VIEW -> "WITHIN_FIELD_OF_VIEW"
+                else -> "UNKNOWN"
+            }
+        return "SpatialVisibility($visibilityString)"
     }
 }

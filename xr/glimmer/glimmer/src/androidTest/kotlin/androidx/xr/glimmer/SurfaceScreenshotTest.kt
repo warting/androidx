@@ -16,16 +16,11 @@
 package androidx.xr.glimmer
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.FocusInteraction
-import androidx.compose.foundation.interaction.Interaction
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -39,16 +34,16 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
+import androidx.test.filters.SdkSuppress
 import androidx.test.screenshot.AndroidXScreenshotTestRule
 import androidx.xr.glimmer.samples.SurfaceSample
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @MediumTest
 @RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = 35, maxSdkVersion = 35)
 class SurfaceScreenshotTest() {
 
     @get:Rule val rule = createComposeRule()
@@ -66,12 +61,14 @@ class SurfaceScreenshotTest() {
         rule.mainClock.autoAdvance = false
         rule.setGlimmerThemeContent {
             Box(
-                Modifier.surface(interactionSource = alwaysFocusedInteractionSource)
+                Modifier.surface(interactionSource = AlwaysFocusedInteractionSource)
                     .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
                 Text("This is a surface")
             }
         }
+        // Advance past the animation
+        rule.mainClock.advanceTimeBy(10000)
         rule.assertRootAgainstGolden("surface_focused_defaultBorder", screenshotRule)
     }
 
@@ -80,7 +77,7 @@ class SurfaceScreenshotTest() {
         rule.mainClock.autoAdvance = false
         rule.setGlimmerThemeContent {
             Box(
-                Modifier.surface(interactionSource = alwaysFocusedInteractionSource)
+                Modifier.surface(interactionSource = AlwaysFocusedInteractionSource)
                     .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
                 Text("This is a surface")
@@ -97,13 +94,15 @@ class SurfaceScreenshotTest() {
             Box(
                 Modifier.surface(
                         shape = RectangleShape,
-                        interactionSource = alwaysFocusedInteractionSource,
+                        interactionSource = AlwaysFocusedInteractionSource,
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
                 Text("This is a surface")
             }
         }
+        // Advance past the animation
+        rule.mainClock.advanceTimeBy(10000)
         rule.assertRootAgainstGolden("surface_focused_rectBorder", screenshotRule)
     }
 
@@ -114,7 +113,7 @@ class SurfaceScreenshotTest() {
             Box(
                 Modifier.surface(
                         shape = RectangleShape,
-                        interactionSource = alwaysFocusedInteractionSource,
+                        interactionSource = AlwaysFocusedInteractionSource,
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
@@ -133,12 +132,14 @@ class SurfaceScreenshotTest() {
                 Modifier.size(100.dp)
                     .surface(
                         shape = DoubleTriangleShape,
-                        interactionSource = alwaysFocusedInteractionSource,
+                        interactionSource = AlwaysFocusedInteractionSource,
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp),
                 contentAlignment = Alignment.Center,
             ) {}
         }
+        // Advance past the animation
+        rule.mainClock.advanceTimeBy(10000)
         rule.assertRootAgainstGolden("surface_focused_genericBorder", screenshotRule)
     }
 
@@ -150,7 +151,7 @@ class SurfaceScreenshotTest() {
                 Modifier.size(100.dp)
                     .surface(
                         shape = DoubleTriangleShape,
-                        interactionSource = alwaysFocusedInteractionSource,
+                        interactionSource = AlwaysFocusedInteractionSource,
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp),
                 contentAlignment = Alignment.Center,
@@ -170,7 +171,7 @@ class SurfaceScreenshotTest() {
         rule.mainClock.autoAdvance = false
         rule.setGlimmerThemeContent {
             Box(
-                Modifier.surface(interactionSource = alwaysPressedInteractionSource, onClick = {})
+                Modifier.surface(interactionSource = AlwaysPressedInteractionSource, onClick = {})
                     .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
                 Text("This is a surface")
@@ -191,7 +192,7 @@ class SurfaceScreenshotTest() {
         rule.mainClock.autoAdvance = false
         rule.setGlimmerThemeContent {
             Box(
-                Modifier.surface(interactionSource = alwaysPressedInteractionSource, onClick = {})
+                Modifier.surface(interactionSource = AlwaysPressedInteractionSource, onClick = {})
                     .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
                 Text("This is a surface")
@@ -208,7 +209,7 @@ class SurfaceScreenshotTest() {
         rule.setGlimmerThemeContent {
             Box(
                 Modifier.surface(
-                        interactionSource = alwaysFocusedAndPressedInteractionSource,
+                        interactionSource = AlwaysFocusedAndPressedInteractionSource,
                         onClick = {},
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp)
@@ -216,8 +217,8 @@ class SurfaceScreenshotTest() {
                 Text("This is a surface")
             }
         }
-        // Skip until after the animation has finished
-        rule.mainClock.advanceTimeBy(5000)
+        // Advance past the animation
+        rule.mainClock.advanceTimeBy(10000)
         rule.assertRootAgainstGolden("surface_focused_and_pressed", screenshotRule)
     }
 
@@ -256,26 +257,5 @@ class SurfaceScreenshotTest() {
                     close()
                 }
             )
-    }
-
-    private val alwaysFocusedInteractionSource =
-        StaticMutableInteractionSource(FocusInteraction.Focus())
-
-    private val alwaysPressedInteractionSource =
-        StaticMutableInteractionSource(PressInteraction.Press(Offset.Zero))
-
-    private val alwaysFocusedAndPressedInteractionSource =
-        StaticMutableInteractionSource(
-            FocusInteraction.Focus(),
-            PressInteraction.Press(Offset.Zero),
-        )
-
-    private class StaticMutableInteractionSource(vararg interactionsToShow: Interaction) :
-        MutableInteractionSource {
-        override val interactions: Flow<Interaction> = interactionsToShow.asFlow()
-
-        override suspend fun emit(interaction: Interaction) {}
-
-        override fun tryEmit(interaction: Interaction): Boolean = true
     }
 }

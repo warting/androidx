@@ -158,7 +158,7 @@ private inline fun debugLog(generateMsg: () -> String) {
 }
 
 private val LazyLayoutMeasuredItem.mainAxisOffset
-    get() = if (placeablesCount == 0) 0 else getOffset(0).let { if (isVertical) it.y else it.x }
+    get() = getOffset(0).let { if (isVertical) it.y else it.x }
 
 /**
  * This glue logic is not meant to become public. In here we will use [StickyItemsPlacement] to
@@ -167,6 +167,8 @@ private val LazyLayoutMeasuredItem.mainAxisOffset
  * of existing items.
  */
 internal fun <T : LazyLayoutMeasuredItem> StickyItemsPlacement?.applyStickyItems(
+    firstVisibleItemIndex: Int,
+    lastVisibleItemIndex: Int,
     positionedItems: MutableList<T>,
     stickyItems: IntList,
     beforeContentPadding: Int,
@@ -178,11 +180,7 @@ internal fun <T : LazyLayoutMeasuredItem> StickyItemsPlacement?.applyStickyItems
     return if (this != null && positionedItems.isNotEmpty() && stickyItems.isNotEmpty()) {
         // gather sticking items
         val stickingItems =
-            getStickingIndices(
-                positionedItems.first().index,
-                positionedItems.last().index,
-                stickyItems,
-            )
+            getStickingIndices(firstVisibleItemIndex, lastVisibleItemIndex, stickyItems)
 
         val positionedStickingItems = mutableListOf<T>()
         val visibleStickyItems = positionedItems.fastFilter { stickyItems.contains(it.index) }

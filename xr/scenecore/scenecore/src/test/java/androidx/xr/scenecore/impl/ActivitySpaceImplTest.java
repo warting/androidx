@@ -36,12 +36,14 @@ import androidx.xr.runtime.internal.ActivitySpace;
 import androidx.xr.runtime.internal.Dimensions;
 import androidx.xr.runtime.internal.HitTestResult;
 import androidx.xr.runtime.internal.JxrPlatformAdapter;
+import androidx.xr.runtime.math.BoundingBox;
 import androidx.xr.runtime.math.Matrix4;
 import androidx.xr.runtime.math.Pose;
 import androidx.xr.runtime.math.Quaternion;
 import androidx.xr.runtime.math.Vector3;
 import androidx.xr.runtime.testing.FakeSpatialModeChangeListener;
 import androidx.xr.scenecore.impl.extensions.XrExtensionsProvider;
+import androidx.xr.scenecore.impl.impress.FakeImpressApiImpl;
 import androidx.xr.scenecore.impl.perception.PerceptionLibrary;
 import androidx.xr.scenecore.impl.perception.Session;
 import androidx.xr.scenecore.testing.FakeScheduledExecutorService;
@@ -52,6 +54,7 @@ import com.android.extensions.xr.environment.EnvironmentVisibilityState;
 import com.android.extensions.xr.environment.PassthroughVisibilityState;
 import com.android.extensions.xr.environment.ShadowEnvironmentVisibilityState;
 import com.android.extensions.xr.environment.ShadowPassthroughVisibilityState;
+import com.android.extensions.xr.node.Box3;
 import com.android.extensions.xr.node.NodeRepository;
 import com.android.extensions.xr.node.Vec3;
 import com.android.extensions.xr.space.Bounds;
@@ -61,7 +64,6 @@ import com.android.extensions.xr.space.SpatialCapabilities;
 import com.android.extensions.xr.space.SpatialState;
 
 import com.google.androidxr.splitengine.SplitEngineSubspaceManager;
-import com.google.ar.imp.apibindings.FakeImpressApiImpl;
 import com.google.ar.imp.view.splitengine.ImpSplitEngineRenderer;
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -146,7 +148,8 @@ public final class ActivitySpaceImplTest extends SystemSpaceEntityImplTest {
 
     @Override
     protected AndroidXrEntity createChildAndroidXrEntity() {
-        return (AndroidXrEntity) mTestRuntime.createEntity(new Pose(), "child", mActivitySpace);
+        return (AndroidXrEntity)
+                mTestRuntime.createGroupEntity(new Pose(), "child", mActivitySpace);
     }
 
     @Override
@@ -205,7 +208,7 @@ public final class ActivitySpaceImplTest extends SystemSpaceEntityImplTest {
     }
 
     @Test
-    public void removeBoundsChangedListener_happyPath() {
+    public void removeOnBoundsChangedListener_happyPath() {
         ActivitySpace.OnBoundsChangedListener listener =
                 Mockito.mock(ActivitySpace.OnBoundsChangedListener.class);
 
@@ -360,5 +363,20 @@ public final class ActivitySpaceImplTest extends SystemSpaceEntityImplTest {
         assertThat(activitySpaceRotation.getW()).isWithin(0.001f).of(expectedRotation.getW());
 
         assertThat(handler.getUpdateCount()).isEqualTo(0);
+    }
+
+    @Test
+    public void getRecommendedContentBoxInFullSpace_returnsCorrectlyConvertedBox() {
+        Box3 box = new Box3(-1.73f / 2, -1.61f / 2, -0.5f / 2, 1.73f / 2, 1.61f / 2, 0.5f / 2);
+        ShadowXrExtensions.extract(mXrExtensions).setRecommendedContentBoxInFullSpace(box);
+
+        BoundingBox resultBox = mActivitySpace.getRecommendedContentBoxInFullSpace();
+
+        assertThat(resultBox).isNotNull();
+        BoundingBox expectedBox =
+                new BoundingBox(
+                        new Vector3(-1.73f / 2, -1.61f / 2, -0.5f / 2),
+                        new Vector3(1.73f / 2, 1.61f / 2, 0.5f / 2));
+        assertThat(resultBox).isEqualTo(expectedBox);
     }
 }

@@ -19,6 +19,7 @@ package androidx.camera.core
 import android.content.Context
 import android.graphics.ImageFormat
 import android.graphics.Rect
+import android.hardware.camera2.CameraCharacteristics
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
@@ -36,6 +37,7 @@ import androidx.camera.core.ImageCapture.OUTPUT_FORMAT_RAW
 import androidx.camera.core.ImageCapture.OUTPUT_FORMAT_RAW_JPEG
 import androidx.camera.core.MirrorMode.MIRROR_MODE_ON_FRONT_ONLY
 import androidx.camera.core.MirrorMode.MIRROR_MODE_UNSPECIFIED
+import androidx.camera.core.featuregroup.GroupableFeature.Companion.IMAGE_ULTRA_HDR
 import androidx.camera.core.impl.AdapterCameraInfo
 import androidx.camera.core.impl.CameraConfig
 import androidx.camera.core.impl.CameraFactory
@@ -141,7 +143,7 @@ class ImageCaptureTest {
             FakeCamera("1", null, FakeCameraInfoInternal("1", CameraSelector.LENS_FACING_FRONT))
 
         val cameraFactoryProvider =
-            CameraFactory.Provider { _, _, _, _, _ ->
+            CameraFactory.Provider { _, _, _, _, _, _ ->
                 val cameraFactory = FakeCameraFactory()
                 cameraFactory.insertDefaultBackCamera(camera.cameraInfoInternal.cameraId) { camera }
                 cameraFactory.insertDefaultFrontCamera(cameraFront.cameraInfoInternal.cameraId) {
@@ -409,7 +411,12 @@ class ImageCaptureTest {
 
     @Test
     fun canGetSupportedOutputFormats_fromOriginalCameraInfo() {
-        val cameraInfo = FakeCameraInfoInternal()
+        val cameraInfo =
+            FakeCameraInfoInternal().apply {
+                setAvailableCapabilities(
+                    setOf(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW)
+                )
+            }
         cameraInfo.setSupportedResolutions(ImageFormat.JPEG, listOf())
         cameraInfo.setSupportedResolutions(ImageFormat.RAW_SENSOR, listOf())
 
@@ -423,7 +430,12 @@ class ImageCaptureTest {
 
     @Test
     fun canGetSupportedOutputFormats_fromAdapterCameraInfo_notOverwriteOutputFormats() {
-        val cameraInfo = FakeCameraInfoInternal()
+        val cameraInfo =
+            FakeCameraInfoInternal().apply {
+                setAvailableCapabilities(
+                    setOf(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW)
+                )
+            }
         cameraInfo.setSupportedResolutions(ImageFormat.JPEG, listOf())
         cameraInfo.setSupportedResolutions(ImageFormat.RAW_SENSOR, listOf())
 
@@ -440,7 +452,12 @@ class ImageCaptureTest {
 
     @Test
     fun canGetSupportedOutputFormats_fromAdapterCameraInfo_overwriteRawNotSupported() {
-        val cameraInfo = FakeCameraInfoInternal()
+        val cameraInfo =
+            FakeCameraInfoInternal().apply {
+                setAvailableCapabilities(
+                    setOf(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW)
+                )
+            }
         cameraInfo.setSupportedResolutions(ImageFormat.JPEG, listOf())
         cameraInfo.setSupportedResolutions(ImageFormat.RAW_SENSOR, listOf())
 
@@ -1057,6 +1074,47 @@ class ImageCaptureTest {
         assertThrows(CameraUseCaseAdapter.CameraException::class.java) {
             cameraUseCaseAdapter.addUseCases(listOf(imageCapture))
         }
+    }
+
+    @Test
+    fun dynamicRange_isSetToSdrByDefault_whenImageCaptureBoundWithDefaultConfig() {
+        val imageCapture = ImageCapture.Builder().build()
+
+        imageCapture.bindToCamera(
+            FakeCamera(),
+            null,
+            null,
+            imageCapture.getDefaultConfig(true, FakeUseCaseConfigFactory()),
+        )
+
+        assertThat(imageCapture.currentConfig.dynamicRange).isEqualTo(DynamicRange.SDR)
+    }
+
+    @OptIn(ExperimentalSessionConfig::class)
+    @Test
+    fun dynamicRange_isSetToUnspecified_whenUltraHdrFeatureIsSetButImageCaptureNotBoundYet() {
+        val imageCapture = ImageCapture.Builder().build()
+
+        imageCapture.featureGroup = setOf(IMAGE_ULTRA_HDR)
+
+        assertThat(imageCapture.currentConfig.dynamicRange).isEqualTo(DynamicRange.UNSPECIFIED)
+    }
+
+    @OptIn(ExperimentalSessionConfig::class)
+    @Test
+    fun dynamicRange_isSetToUnspecified_whenUltraHdrFeatureIsSetAndImageCaptureBoundWithDefaults() {
+        val imageCapture = ImageCapture.Builder().build()
+
+        imageCapture.featureGroup = setOf(IMAGE_ULTRA_HDR)
+
+        imageCapture.bindToCamera(
+            FakeCamera(),
+            null,
+            null,
+            imageCapture.getDefaultConfig(true, FakeUseCaseConfigFactory()),
+        )
+
+        assertThat(imageCapture.currentConfig.dynamicRange).isEqualTo(DynamicRange.UNSPECIFIED)
     }
 
     private fun bindImageCapture(

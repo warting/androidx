@@ -17,9 +17,11 @@
 package androidx.pdf.view
 
 import android.graphics.PointF
+import android.graphics.RectF
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
+import androidx.pdf.PdfPoint
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.ViewInteraction
@@ -127,7 +129,7 @@ private class ScrollPdfViewToPage : ViewAction {
 
     constructor(point: PdfPoint) {
         pageNum = point.pageNum
-        pointOnPage = point.pagePoint
+        pointOnPage = PointF(point.x, point.y)
     }
 
     override fun getConstraints(): Matcher<View> =
@@ -172,8 +174,8 @@ internal fun performSingleTapOnCoords(x: Float, y: Float): ViewAction {
             val screenPos = IntArray(2)
             view.getLocationOnScreen(screenPos)
 
-            val screenX = (screenPos[0] + x).toFloat()
-            val screenY = (screenPos[1] + y).toFloat()
+            val screenX = (screenPos[0] + x)
+            val screenY = (screenPos[1] + y)
 
             floatArrayOf(screenX, screenY)
         },
@@ -181,4 +183,23 @@ internal fun performSingleTapOnCoords(x: Float, y: Float): ViewAction {
         InputDevice.SOURCE_TOUCHSCREEN,
         MotionEvent.BUTTON_PRIMARY,
     )
+}
+
+/**
+ * Converts the center of the given [RectF] on a PDF page to view coordinates.
+ *
+ * @param pdfView The [PdfView] instance used to convert coordinates.
+ * @param pageNumber The page number where the link resides.
+ * @param bounds The bounds of the link in content coordinates.
+ * @return A [PointF] in view coordinates where a tap should be performed.
+ */
+internal fun getTapPointFromContentBounds(
+    pdfView: PdfView,
+    pageNumber: Int,
+    bounds: RectF,
+): android.graphics.PointF {
+    val centerX = bounds.centerX()
+    val centerY = bounds.centerY()
+    val viewPoint = pdfView.pdfToViewPoint(PdfPoint(pageNumber, centerX, centerY))
+    return requireNotNull(viewPoint) { "Failed to convert PdfPoint to view coordinates" }
 }

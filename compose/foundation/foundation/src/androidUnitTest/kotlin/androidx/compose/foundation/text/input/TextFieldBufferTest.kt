@@ -618,14 +618,30 @@ class TextFieldBufferTest {
     }
 
     @Test
-    fun addStyle_addsToOutputAnnotations_ifCreatedForOutputTransformation() {
+    fun toTextFieldBuffer_canCallAddStyle() {
+        val state = TextFieldState("Hello", TextRange(3))
+        val buffer = state.toTextFieldBuffer()
+
+        buffer.addStyle(SpanStyle(), 0, buffer.length)
+        // should not crash.
+    }
+
+    @Test
+    fun canCallAddStyle_isTrueByDefault_ifOffsetMappingCalculatorPresent() {
         val buffer =
             TextFieldBuffer(
                 TextFieldCharSequence("hello"),
                 offsetMappingCalculator = OffsetMappingCalculator(),
             )
+        assertThat(buffer.canCallAddStyle).isTrue()
+    }
+
+    @Test
+    fun addStyle_addsToOutputAnnotations_ifCreatedForOutputTransformation() {
+        val buffer = TextFieldBuffer(TextFieldCharSequence("hello"))
         // Act
         val style = SpanStyle(fontSize = 12.sp)
+        buffer.canCallAddStyle = true
         buffer.addStyle(style, 0, buffer.length)
 
         // Assert
@@ -649,13 +665,10 @@ class TextFieldBufferTest {
 
     @Test
     fun addStyle_notRangeTracked() {
-        val buffer =
-            TextFieldBuffer(
-                TextFieldCharSequence("hello"),
-                offsetMappingCalculator = OffsetMappingCalculator(),
-            )
+        val buffer = TextFieldBuffer(TextFieldCharSequence("hello"))
         val style = SpanStyle(fontSize = 12.sp)
 
+        buffer.canCallAddStyle = true
         buffer.addStyle(style, 0, buffer.length)
         buffer.insert(2, "world") // expand where style is applied
 

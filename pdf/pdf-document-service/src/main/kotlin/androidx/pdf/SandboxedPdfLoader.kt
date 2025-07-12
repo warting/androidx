@@ -20,11 +20,16 @@ import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import androidx.annotation.RestrictTo
-import androidx.pdf.exceptions.PdfPasswordException
+import androidx.pdf.service.PdfDocumentServiceImpl
+import androidx.pdf.service.connect.PdfSandboxHandleImpl
 import androidx.pdf.service.connect.PdfServiceConnection
 import androidx.pdf.service.connect.PdfServiceConnectionImpl
 import java.io.IOException
-import kotlinx.coroutines.CoroutineDispatcher
+import kotlin.coroutines.ContinuationInterceptor
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 
 /**
@@ -42,28 +47,58 @@ import kotlinx.coroutines.withContext
  * 4. Creating a [SandboxedPdfDocument] instance upon successful loading.
  *
  * @param context The [Context] required for accessing system services.
- * @param dispatcher The [CoroutineDispatcher] used for asynchronous operations.
+ * @param coroutineContext The [CoroutineContext] used for asynchronous operations. This context is
+ *   resolved internally to ensure an appropriate [ContinuationInterceptor] is present.
+ * - If the provided `coroutineContext` already contains a [ContinuationInterceptor], that
+ *   interceptor will be used.
+ * - If the provided `coroutineContext` does not contain a [ContinuationInterceptor],
+ *   [Dispatchers.IO] will be automatically added to it to handle I/O-bound tasks such as opening
+ *   file descriptors and interacting with the PDF service.
+ * - Providing a [Job] in this `coroutineContext` is an error.
+ *
  * @constructor Creates a new [SandboxedPdfLoader] instance.
  */
-@RestrictTo(RestrictTo.Scope.LIBRARY)
-public class SandboxedPdfLoader(context: Context, private val dispatcher: CoroutineDispatcher) :
-    PdfLoader {
+public class SandboxedPdfLoader(
+    context: Context,
+    private val coroutineContext: CoroutineContext = EmptyCoroutineContext,
+) : PdfLoader {
     private val context = context.applicationContext
 
     internal var testingConnection: PdfServiceConnection? = null
 
     override suspend fun openDocument(uri: Uri, password: String?): PdfDocument {
+        val connection = connect(uri)
+
+        return withContext(resolveCoroutineContext(coroutineContext)) {
+            val pfd = openFileDescriptor(uri)
+            openDocumentInternal(uri, pfd, password, connection)
+        }
+    }
+
+    override suspend fun openDocument(
+        uri: Uri,
+        fileDescriptor: ParcelFileDescriptor,
+        password: String?,
+    ): PdfDocument {
+        val connection = connect(uri)
+
+        return withContext(resolveCoroutineContext(coroutineContext)) {
+            openDocumentInternal(uri, fileDescriptor, password, connection)
+        }
+    }
+
+    private suspend fun connect(uri: Uri): PdfServiceConnection {
         val connection: PdfServiceConnection =
             testingConnection ?: PdfServiceConnectionImpl(context)
         if (!connection.isConnected) {
             connection.connect(uri)
         }
-
-        return withContext(dispatcher) { openDocumentUri(uri, password, connection) }
+        return connection
     }
 
-    private fun openDocumentUri(
+    private fun openDocumentInternal(
         uri: Uri,
+        pfd: ParcelFileDescriptor,
         password: String?,
         connection: PdfServiceConnection,
     ): PdfDocument {
@@ -72,8 +107,7 @@ public class SandboxedPdfLoader(context: Context, private val dispatcher: Corout
                 ?: throw IllegalStateException(
                     "Binder interface not available for loading the document!"
                 )
-        val pfd = openFileDescriptor(uri)
-        val status = PdfLoadingStatus.values()[binder.openPdfDocument(pfd, password)]
+        val status = PdfLoadingStatus.entries[binder.openPdfDocument(pfd, password)]
 
         if (status != PdfLoadingStatus.SUCCESS) {
             handlePdfLoadingError(pfd, status)
@@ -84,7 +118,7 @@ public class SandboxedPdfLoader(context: Context, private val dispatcher: Corout
             connection,
             password,
             pfd,
-            dispatcher,
+            coroutineContext,
             binder.numPages(),
             binder.isPdfLinearized(),
             binder.getFormType(),
@@ -111,9 +145,41 @@ public class SandboxedPdfLoader(context: Context, private val dispatcher: Corout
         return context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw IOException("Failed to open PDF file")
     }
+
+    public companion object {
+        private fun resolveCoroutineContext(coroutineContext: CoroutineContext): CoroutineContext {
+            return when {
+                coroutineContext[Job] != null -> error("coroutineContext may not contain a Job")
+                coroutineContext[ContinuationInterceptor] == null ->
+                    coroutineContext + Dispatchers.IO
+                else -> coroutineContext
+            }
+        }
+
+        /**
+         * Prepares sandboxing PDF resources ahead of any document operations, to reduce latency
+         * during the interaction with the [SandboxedPdfLoader] or [PdfDocument].
+         *
+         * The returned [PdfSandboxHandle] represents a session and must be closed by the caller
+         * when no longer needed.
+         *
+         * Calling this method is optional. Any document operation via [SandboxedPdfLoader] and
+         * [PdfDocument] will initialize the resources internally on demand, but may experience
+         * increased startup time.
+         *
+         * @param context A [Context] of component to be associated with pdf session.
+         * @return A [PdfSandboxHandle] representing an active pdf session.
+         * @see PdfSandboxHandle
+         */
+        @JvmStatic
+        public fun startInitialization(context: Context): PdfSandboxHandle {
+            return PdfSandboxHandleImpl(context).also { it.connect() }
+        }
+    }
 }
 
 /** Represents the loading status of a PDF file. */
+// TODO(b/425827955): Clean up status codes and handle runtime exceptions directly
 @RestrictTo(RestrictTo.Scope.LIBRARY)
 internal enum class PdfLoadingStatus {
     SUCCESS, // The PDF was loaded successfully.

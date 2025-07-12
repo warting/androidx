@@ -27,6 +27,7 @@ import androidx.xr.runtime.internal.ApkCheckAvailabilityErrorException
 import androidx.xr.runtime.internal.ApkCheckAvailabilityInProgressException
 import androidx.xr.runtime.internal.ApkNotInstalledException
 import androidx.xr.runtime.internal.ConfigurationNotSupportedException
+import androidx.xr.runtime.internal.FaceTrackingNotCalibratedException
 import androidx.xr.runtime.internal.JxrPlatformAdapter
 import androidx.xr.runtime.internal.JxrPlatformAdapterFactory
 import androidx.xr.runtime.internal.PermissionNotGrantedException
@@ -35,6 +36,7 @@ import androidx.xr.runtime.internal.RuntimeFactory
 import androidx.xr.runtime.internal.UnsupportedDeviceException
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -67,8 +69,7 @@ public constructor(
     public val sessionConnectors: List<SessionConnector> =
         loadProviders(SessionConnector::class.java, SESSION_CONNECTOR_PROVIDERS),
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
-    public val coroutineScope: CoroutineScope =
-        CoroutineScope(context = CoroutineContexts.Lightweight),
+    public val coroutineScope: CoroutineScope = CoroutineScope(context = EmptyCoroutineContext),
 ) {
     init {
         check(!activitySessionMap.containsKey(activity)) {
@@ -94,7 +95,8 @@ public constructor(
         /**
          * Creates a new [Session].
          *
-         * @param activity the [Activity] that owns the session.
+         * @param activity the [Activity] that provides the context for the session's resources and
+         *   controls the session's runtime state based on the [activity]'s lifecycle.
          * @param coroutineContext the [CoroutineContext] that will be used to handle the session's
          *   coroutines.
          * @return the result of the operation. Can be [SessionCreateSuccess], which contains the
@@ -103,34 +105,84 @@ public constructor(
          */
         @JvmOverloads
         @JvmStatic
+        @Suppress("deprecation")
         public fun create(
             activity: Activity,
-            coroutineContext: CoroutineContext = CoroutineContexts.Lightweight,
-        ): SessionCreateResult = create(activity, coroutineContext, false)
+            coroutineContext: CoroutineContext = EmptyCoroutineContext,
+        ): SessionCreateResult =
+            create(activity, coroutineContext, unscaledGravityAlignedActivitySpace = false)
 
         /**
          * Creates a new [Session].
          *
-         * @param activity the [Activity] that owns the session.
+         * @param activity the [Activity] that provides the context for the session's resources and
+         *   controls the session's runtime state based on the [activity]'s lifecycle.
          * @param coroutineContext the [CoroutineContext] that will be used to handle the session's
          *   coroutines.
          * @param unscaledGravityAlignedActivitySpace whether to use the unscaled gravity aligned
-         *   activity space for the session. When true, causes ActivitySpace for this Session to
+         *   activity space for the session. When true, causes ActivitySpace for this session to
          *   always be gravity aligned and to have a scale of [1 unit = 1 Meter]. Note that this
          *   might result in visual inconsistencies between HOME_SPACE and FULL_SPACE_MANAGED modes.
-         *   Defaults to False.
+         *   Defaults to True.
          * @return the result of the operation. Can be [SessionCreateSuccess], which contains the
          *   newly created session, or [SessionCreatePermissionsNotGranted] if the required
          *   permissions haven't been granted.
          */
         @JvmStatic
         @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+        @Deprecated("Will be deleted in a future release.")
         public fun create(
             activity: Activity,
-            coroutineContext: CoroutineContext = CoroutineContexts.Lightweight,
-            unscaledGravityAlignedActivitySpace: Boolean = false,
+            coroutineContext: CoroutineContext = EmptyCoroutineContext,
+            unscaledGravityAlignedActivitySpace: Boolean = true,
         ): SessionCreateResult {
+            check(activity is LifecycleOwner) { "Unsupported Activity type: ${activity.javaClass}" }
+            return create(
+                activity,
+                lifecycleOwner = activity,
+                coroutineContext,
+                unscaledGravityAlignedActivitySpace,
+            )
+        }
 
+        /**
+         * Creates a new [Session] with a provided [LifecycleOwner].
+         *
+         * Only use this version of the constructor if you desire to have finer control over the
+         * session's lifecycle. The [lifecycleOwner]'s lifecycle must still be bounded within the
+         * lifecycle of the provided [activity]. The session will be automatically destroyed if the
+         * [activity]'s lifecycle becomes destroyed.
+         *
+         * @param activity the [Activity] that provides the context for the session's resources.
+         * @param lifecycleOwner the [LifecycleOwner] whose lifecycle controls the runtime state of
+         *   the session.
+         * @param coroutineContext the [CoroutineContext] that will be used to handle the session's
+         *   coroutines.
+         * @return the result of the operation. Can be [SessionCreateSuccess], which contains the
+         *   newly created session, or [SessionCreatePermissionsNotGranted] if the required
+         *   permissions haven't been granted.
+         */
+        @JvmOverloads
+        @JvmStatic
+        @Suppress("deprecation")
+        public fun create(
+            activity: Activity,
+            lifecycleOwner: LifecycleOwner,
+            coroutineContext: CoroutineContext = EmptyCoroutineContext,
+        ): SessionCreateResult =
+            create(
+                activity,
+                lifecycleOwner,
+                coroutineContext,
+                unscaledGravityAlignedActivitySpace = false,
+            )
+
+        private fun create(
+            activity: Activity,
+            lifecycleOwner: LifecycleOwner,
+            coroutineContext: CoroutineContext = EmptyCoroutineContext,
+            unscaledGravityAlignedActivitySpace: Boolean = true,
+        ): SessionCreateResult {
             check(activity is LifecycleOwner) { "Unsupported Activity type: ${activity.javaClass}" }
 
             if (activitySessionMap.containsKey(activity)) {
@@ -191,13 +243,26 @@ public constructor(
                     sessionConnectors,
                     CoroutineScope(context = coroutineContext),
                 )
-            activity.lifecycle.addObserver(session.lifecycleObserver)
+
+            lifecycleOwner.lifecycle.addObserver(session.lifecycleObserver)
+            if (lifecycleOwner != activity) {
+                activity.lifecycle.addObserver(
+                    observer =
+                        LifecycleEventObserver { _, event ->
+                            when (event) {
+                                Lifecycle.Event.ON_DESTROY -> session.destroy()
+                                else -> {}
+                            }
+                        }
+                )
+            }
 
             return SessionCreateSuccess(session)
         }
 
         private val RUNTIME_FACTORY_PROVIDERS =
             listOf(
+                "androidx.xr.arcore.playservices.ArCoreRuntimeFactory",
                 "androidx.xr.runtime.openxr.OpenXrRuntimeFactory",
                 "androidx.xr.runtime.testing.FakeRuntimeFactory",
             )
@@ -276,6 +341,8 @@ public constructor(
             return SessionConfigurePermissionsNotGranted(e.permissions)
         } catch (e: ConfigurationNotSupportedException) {
             return SessionConfigureConfigurationNotSupported()
+        } catch (e: FaceTrackingNotCalibratedException) {
+            return SessionConfigureCalibrationRequired(RequiredCalibrationType.FACE_TRACKING)
         }
         return SessionConfigureSuccess()
     }

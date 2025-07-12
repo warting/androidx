@@ -18,8 +18,6 @@ package androidx.compose.ui.focus
 
 import androidx.compose.runtime.collection.MutableVector
 import androidx.compose.runtime.collection.mutableVectorOf
-import androidx.compose.ui.ComposeUiFlags
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusDirection.Companion.Next
 import androidx.compose.ui.focus.FocusDirection.Companion.Previous
 import androidx.compose.ui.focus.FocusStateImpl.Active
@@ -50,8 +48,8 @@ internal fun FocusTargetNode.oneDimensionalFocusSearch(
         else -> error(InvalidFocusDirection)
     }
 
-private fun FocusTargetNode.forwardFocusSearch(onFound: (FocusTargetNode) -> Boolean): Boolean =
-    when (focusState) {
+private fun FocusTargetNode.forwardFocusSearch(onFound: (FocusTargetNode) -> Boolean): Boolean {
+    return when (focusState) {
         ActiveParent -> {
             val focusedChild = activeChild ?: error(NoActiveChild)
             focusedChild.forwardFocusSearch(onFound) ||
@@ -66,6 +64,7 @@ private fun FocusTargetNode.forwardFocusSearch(onFound: (FocusTargetNode) -> Boo
                 pickChildForForwardSearch(onFound)
             }
     }
+}
 
 private fun FocusTargetNode.backwardFocusSearch(onFound: (FocusTargetNode) -> Boolean): Boolean =
     when (focusState) {
@@ -114,16 +113,10 @@ private fun FocusTargetNode.generateAndSearchChildren(
         return true
     }
 
-    val focusTransactionManager = requireTransactionManager()
-    val generationBeforeSearch = focusTransactionManager.generation
     val activeNodeBeforeSearch = requireOwner().focusOwner.activeFocusTargetNode
     // Generate more items until searchChildren() finds a result.
     return searchBeyondBounds(direction) {
-        if (
-            generationBeforeSearch != focusTransactionManager.generation ||
-                (@OptIn(ExperimentalComposeUiApi::class) ComposeUiFlags.isTrackFocusEnabled &&
-                    activeNodeBeforeSearch !== requireOwner().focusOwner.activeFocusTargetNode)
-        ) {
+        if (activeNodeBeforeSearch !== requireOwner().focusOwner.activeFocusTargetNode) {
             // A new focus change was triggered during searchBeyondBounds.
             true
         } else {

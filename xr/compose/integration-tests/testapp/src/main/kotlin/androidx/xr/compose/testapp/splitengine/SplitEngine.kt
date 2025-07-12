@@ -73,7 +73,6 @@ import androidx.xr.scenecore.MovableComponent
 import androidx.xr.scenecore.SpatialEnvironment.SpatialEnvironmentPreference
 import androidx.xr.scenecore.scene
 import java.nio.file.Paths
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
 class SplitEngine : ComponentActivity() {
@@ -90,7 +89,7 @@ class SplitEngine : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+        session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
 
         setContent {
             var title = intent.getStringExtra("TITLE")
@@ -100,20 +99,17 @@ class SplitEngine : ComponentActivity() {
     }
 
     private fun togglePassthrough(session: Session) {
-        val passthroughOpacity: Float =
-            session.scene.spatialEnvironment.getCurrentPassthroughOpacity()
+        val passthroughOpacity: Float = session.scene.spatialEnvironment.currentPassthroughOpacity
         Log.i("TogglePassthrough", "TogglePassthrough!")
         when (passthroughOpacity) {
-            0.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(1.0f)
-            1.0f -> session.scene.spatialEnvironment.setPassthroughOpacityPreference(0.0f)
+            0.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 1.0f
+            1.0f -> session.scene.spatialEnvironment.preferredPassthroughOpacity = 0.0f
         }
     }
 
     private fun setSkyboxAndGeometry(skybox: ExrImage?, geometry: GltfModel?) {
         spatialEnvironmentPreference = SpatialEnvironmentPreference(skybox, geometry)
-        session.scene.spatialEnvironment.setSpatialEnvironmentPreference(
-            spatialEnvironmentPreference
-        )
+        session.scene.spatialEnvironment.preferredSpatialEnvironment = spatialEnvironmentPreference
     }
 
     // TODO: b/324947709 - Refactor common @Composable code into a utility library for common usage
@@ -190,7 +186,7 @@ class SplitEngine : ComponentActivity() {
                     ApiButton("Switch to FSM", modifier) {
                         session.scene.requestFullSpaceMode()
                         if (movableComponentMP.value == null) {
-                            movableComponentMP.value = MovableComponent.create(session)
+                            movableComponentMP.value = MovableComponent.createSystemMovable(session)
                             session.scene.mainPanelEntity.addComponent(movableComponentMP.value!!)
                         }
                     }
@@ -221,11 +217,10 @@ class SplitEngine : ComponentActivity() {
                     ApiButton("Load Skybox Blue", modifier) {
                         coroutineScope.launch {
                             blueSkybox.value =
-                                ExrImage.createFromZipAsync(
-                                        session,
-                                        Paths.get("skyboxes", "BlueSkybox.zip"),
-                                    )
-                                    .await()
+                                ExrImage.createFromZip(
+                                    session,
+                                    Paths.get("skyboxes", "BlueSkybox.zip"),
+                                )
                         }
                     }
                     if (blueSkybox.value != null) {
@@ -266,11 +261,7 @@ class SplitEngine : ComponentActivity() {
                     ApiButton("Load Geometry Rocks", modifier) {
                         scope.launch {
                             rocksGeometry.value =
-                                GltfModel.createAsync(
-                                        session,
-                                        Paths.get("models", "GroundGeometry.glb"),
-                                    )
-                                    .await()
+                                GltfModel.create(session, Paths.get("models", "GroundGeometry.glb"))
                         }
                     }
 
@@ -314,8 +305,7 @@ class SplitEngine : ComponentActivity() {
                     ApiButton("Load\nGlimmer", modifier) {
                         scope.launch {
                             glimmerModel.value =
-                                GltfModel.createAsync(session, Paths.get("models", "l2a_pulse.glb"))
-                                    .await()
+                                GltfModel.create(session, Paths.get("models", "l2a_pulse.glb"))
                         }
                     }
 
@@ -362,11 +352,10 @@ class SplitEngine : ComponentActivity() {
                     ApiButton("Load Dragon Model", modifier) {
                         scope.launch {
                             dragonModel.value =
-                                GltfModel.createAsync(
-                                        session,
-                                        Paths.get("models", "Dragon_Evolved.gltf"),
-                                    )
-                                    .await()
+                                GltfModel.create(
+                                    session,
+                                    Paths.get("models", "Dragon_Evolved.gltf"),
+                                )
                         }
                     }
                     if (dragonModel.value != null) {
@@ -415,9 +404,7 @@ class SplitEngine : ComponentActivity() {
                             dragonEntity.value!!.startAnimation(true, "Animation")
                         }
                         ApiButton("Stop Animate Dragon Entity", modifier) {
-                            if (
-                                dragonEntity.value!!.getAnimationState() == AnimationState.PLAYING
-                            ) {
+                            if (dragonEntity.value!!.animationState == AnimationState.PLAYING) {
                                 dragonEntity.value!!.stopAnimation()
                             }
                         }
@@ -444,7 +431,7 @@ class SplitEngine : ComponentActivity() {
 
                         val interactableComponent =
                             InteractableComponent.create(session, mainExecutor) {
-                                if (it.action == InputEvent.ACTION_DOWN) {
+                                if (it.action == InputEvent.Action.ACTION_DOWN) {
                                     dragonEntity.value!!.setScale(
                                         dragonEntity.value!!.getScale() * 1.1f
                                     )

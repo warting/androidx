@@ -19,7 +19,6 @@ package androidx.xr.compose.testing
 import android.app.Activity
 import android.view.Display
 import androidx.activity.ComponentActivity
-import androidx.annotation.NonNull
 import androidx.annotation.RestrictTo
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -31,11 +30,12 @@ import androidx.xr.runtime.internal.JxrPlatformAdapter
 import androidx.xr.runtime.testing.FakeRuntimeFactory
 import androidx.xr.scenecore.impl.JxrPlatformAdapterAxr
 import androidx.xr.scenecore.impl.extensions.XrExtensionsProvider
+import androidx.xr.scenecore.impl.impress.FakeImpressApiImpl
 import androidx.xr.scenecore.impl.perception.PerceptionLibrary
 import androidx.xr.scenecore.testing.FakeScheduledExecutorService
+import com.android.extensions.xr.ShadowConfig
 import com.android.extensions.xr.XrExtensions
 import com.google.androidxr.splitengine.SplitEngineSubspaceManager
-import com.google.ar.imp.apibindings.FakeImpressApiImpl
 import com.google.ar.imp.view.splitengine.ImpSplitEngineRenderer
 import org.mockito.Mockito.mock
 import org.robolectric.shadows.ShadowDisplay
@@ -48,11 +48,14 @@ public class SubspaceTestingActivity : ComponentActivity() {
     @Suppress("MutableBareField") public var session: Session? = null
 
     /** Throws an exception by default under test; return Robolectric Display impl instead. */
-    @NonNull override fun getDisplay(): Display = ShadowDisplay.getDefaultDisplay()
+    override fun getDisplay(): Display = ShadowDisplay.getDefaultDisplay()
 
     override fun onStart() {
         SceneManager.start()
         super.onStart()
+
+        ShadowConfig.extract(XrExtensionsProvider.getXrExtensions()!!.config!!)
+            .setDefaultDpPerMeter(1151.856f)
     }
 
     override fun onDestroy() {

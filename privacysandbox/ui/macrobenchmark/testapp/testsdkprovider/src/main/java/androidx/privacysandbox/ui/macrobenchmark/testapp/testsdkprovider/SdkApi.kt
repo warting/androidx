@@ -22,7 +22,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
-import androidx.privacysandbox.sdkruntime.core.controller.SdkSandboxControllerCompat
+import androidx.privacysandbox.sdkruntime.provider.controller.SdkSandboxControllerCompat
 import androidx.privacysandbox.ui.core.DelegatingSandboxedUiAdapter
 import androidx.privacysandbox.ui.core.ExperimentalFeatures
 import androidx.privacysandbox.ui.macrobenchmark.testapp.mediateesdkprovider.IMediateeSdkApiFactory
@@ -115,6 +115,7 @@ class SdkApi(private val sdkContext: Context) : ISdkApi {
                     loadWebViewBannerAdFromLocalAssets()
                 }
                 AdType.NON_WEBVIEW_VIDEO -> loadVideoAd()
+                AdType.SCROLLABLE_AD_WITH_ANIMATION -> loadAnimationAd()
                 else -> {
                     loadNonWebViewBannerAd("Ad type not present", waitInsideOnDraw)
                 }
@@ -216,6 +217,10 @@ class SdkApi(private val sdkContext: Context) : ISdkApi {
         val adapter = testAdapters.VideoBannerAd(playerViewProvider)
         PlayerViewabilityHandler.addObserverFactoryToAdapter(adapter, playerViewProvider)
         return adapter
+    }
+
+    private fun loadAnimationAd(): AbstractSandboxedUiAdapter {
+        return testAdapters.ScrollableAdWithAnimation()
     }
 
     @OptIn(ExperimentalFeatures.DelegatingAdapterApi::class)

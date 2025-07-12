@@ -30,7 +30,6 @@ import androidx.build.gitclient.getHeadShaProvider
 import androidx.build.gradle.isRoot
 import androidx.build.kythe.configureProjectForKzipTasks
 import androidx.build.license.addLicensesToPublishedArtifacts
-import androidx.build.resources.CopyPublicResourcesDirTask
 import androidx.build.resources.configurePublicResourcesStub
 import androidx.build.sbom.configureSbomPublishing
 import androidx.build.sbom.validateAllArchiveInputsRecognized
@@ -51,6 +50,7 @@ import com.android.build.api.dsl.AarMetadata
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.CommonExtension
 import com.android.build.api.dsl.KotlinMultiplatformAndroidDeviceTestCompilation
+import com.android.build.api.dsl.KotlinMultiplatformAndroidHostTestCompilation
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.api.dsl.LibraryExtension
 import com.android.build.api.dsl.PrivacySandboxSdkExtension
@@ -70,7 +70,6 @@ import com.android.build.gradle.LibraryPlugin
 import com.android.build.gradle.TestPlugin
 import com.android.build.gradle.api.KotlinMultiplatformAndroidPlugin
 import com.android.build.gradle.api.PrivacySandboxSdkPlugin
-import com.android.utils.appendCapitalized
 import com.google.devtools.ksp.gradle.KspExtension
 import com.google.devtools.ksp.gradle.KspGradleSubplugin
 import com.google.protobuf.gradle.ProtobufExtension
@@ -94,7 +93,6 @@ import org.gradle.api.artifacts.ComponentMetadataRule
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.Usage
-import org.gradle.api.component.SoftwareComponentFactory
 import org.gradle.api.configuration.BuildFeatures
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.plugins.JavaPlugin
@@ -141,9 +139,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
  * A plugin which enables all of the Gradle customizations for AndroidX. This plugin reacts to other
  * plugins being added and adds required and optional functionality.
  */
-abstract class AndroidXImplPlugin
-@Inject
-constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Project> {
+abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
     @get:Inject abstract val registry: BuildEventsListenerRegistry
     @get:Inject abstract val buildFeatures: BuildFeatures
 
@@ -162,8 +158,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         // Perform different actions based on which plugins have been applied to the project.
         // Many of the actions overlap, ex. API tracking.
         project.plugins.configureEach { plugin ->
-            // PrivacySandboxSdkPlugin b/397703898, KotlinMultiplatformAndroidPlugin b/393137152
-            @Suppress("UnstableApiUsage")
             when (plugin) {
                 is JavaGradlePluginPlugin -> configureGradlePluginPlugin(project)
                 is JavaPlugin -> configureWithJavaPlugin(project, androidXExtension)
@@ -184,7 +178,8 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                         plugin,
                         androidXKmpExtension,
                     )
-                is PrivacySandboxSdkPlugin -> configureWithPrivacySandboxSdkPlugin(project)
+                is @Suppress("UnstableApiUsage") PrivacySandboxSdkPlugin -> // b/397703898
+                configureWithPrivacySandboxSdkPlugin(project)
                 is ProtobufPlugin -> configureProtobufPlugin(project)
             }
         }
@@ -208,11 +203,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         }
 
         project.configureTaskTimeouts()
-        project.configureMavenArtifactUpload(
-            androidXExtension,
-            androidXKmpExtension,
-            componentFactory,
-        ) {
+        project.configureMavenArtifactUpload(androidXExtension, androidXKmpExtension) {
             if (buildFeatures.isIsolatedProjectsEnabled()) return@configureMavenArtifactUpload
             project.addCreateLibraryBuildInfoFileTasks(androidXExtension, androidXKmpExtension)
         }
@@ -436,7 +427,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                 project.plugins.hasPlugin(LibraryPlugin::class.java) ||
                     project.plugins.hasPlugin(AppPlugin::class.java) ||
                     project.plugins.hasPlugin(TestPlugin::class.java) ||
-                    @Suppress("UnstableApiUsage")
                     project.plugins.hasPlugin(KotlinMultiplatformAndroidPlugin::class.java)
             }
         val defaultJavaTargetVersion =
@@ -585,6 +575,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     private fun configureWithAppPlugin(project: Project, androidXExtension: AndroidXExtension) {
         project.extensions.getByType<ApplicationExtension>().apply {
             configureAndroidBaseOptions(project, androidXExtension)
+            @Suppress("deprecation") // TODO(aurimas): migrate to new API
             defaultConfig.targetSdk = project.defaultAndroidConfig.targetSdk
             val debugSigningConfig = signingConfigs.getByName("debug")
             // Use a local debug keystore to avoid build server issues.
@@ -622,6 +613,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     private fun configureWithTestPlugin(project: Project, androidXExtension: AndroidXExtension) {
         project.extensions.getByType<TestExtension>().apply {
             configureAndroidBaseOptions(project, androidXExtension)
+            @Suppress("deprecation") // TODO(aurimas): migrate to new API
             defaultConfig.targetSdk = project.defaultAndroidConfig.targetSdk
             val debugSigningConfig = signingConfigs.getByName("debug")
             // Use a local debug keystore to avoid build server issues.
@@ -735,25 +727,25 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             finalizeDsl {
                 it.aarMetadata.configure(it.compileSdk)
                 it.lint.targetSdk = project.defaultAndroidConfig.targetSdk
-                // When b/409613130 is fixed, set it.testOptions.targetSdk =
-                // project.defaultAndroidConfig.targetSdk
                 project.setUpBlankProguardFileForKmpAarIfNeeded(
                     kotlinMultiplatformAndroidTarget.optimization.consumerKeepRules
                 )
             }
         }
 
-        project.configureProjectForApiTasks(AndroidMultiplatformApiTaskConfig, androidXExtension)
-        project.configureProjectForKzipTasks(AndroidMultiplatformApiTaskConfig, androidXExtension)
         kotlinMultiplatformAndroidComponentsExtension.onVariants { variant ->
-            project.configureMultiplatformSourcesForAndroid(
-                variant.name,
-                kotlinMultiplatformAndroidTarget,
-                androidXExtension.samplesProjects,
+            project.configureProjectForApiTasks(
+                AndroidMultiplatformApiTaskConfig(variant),
+                androidXExtension,
             )
+            project.configureProjectForKzipTasks(
+                AndroidMultiplatformApiTaskConfig(variant),
+                androidXExtension,
+            )
+            project.configurePublicResourcesStub(variant)
+            project.configureMultiplatformSourcesForAndroid(androidXExtension.samplesProjects)
         }
 
-        project.configurePublicResourcesStub(project.multiplatformExtension!!)
         project.configureVersionFileWriter(project.multiplatformExtension!!, androidXExtension)
 
         project.configureDependencyVerification(androidXExtension) { taskProvider ->
@@ -783,34 +775,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
                 it.outgoing.artifact(project.tasks.named("createFullJarAndroidMain"))
             }
         }
-        project.writeBlankPublicTxtToAar(kotlinMultiplatformAndroidComponentsExtension)
-    }
-
-    private fun Project.writeBlankPublicTxtToAar(
-        componentsExtension: KotlinMultiplatformAndroidComponentsExtension
-    ) {
-        val blankPublicResourceDir =
-            project.getSupportRootFolder().resolve("buildSrc/blank-res-api")
-        componentsExtension.onVariants { variant ->
-            val taskProvider =
-                tasks.register(
-                    "repackageAarWithResourceApi".appendCapitalized(variant.name),
-                    RepackagingTask::class.java,
-                ) { task ->
-                    task.from(blankPublicResourceDir)
-                    task.from(zipTree(task.aarFile))
-                    task.destinationDirectory.fileProvider(
-                        task.output.locationOnly.map { location -> location.asFile.parentFile }
-                    )
-                    task.archiveFileName.set(
-                        task.output.locationOnly.map { location -> location.asFile.name }
-                    )
-                }
-            variant.artifacts
-                .use(taskProvider)
-                .wiredWithFiles(RepackagingTask::aarFile, RepackagingTask::output)
-                .toTransform(SingleArtifact.AAR)
-        }
     }
 
     private fun configureProtobufPlugin(project: Project) {
@@ -838,6 +802,17 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
     private fun configureWithPrivacySandboxSdkPlugin(project: Project) {
         project.extensions.getByType<PrivacySandboxSdkExtension>().apply {
             configureLocalAsbSigning(experimentalProperties, project.getKeystore())
+        }
+        // Workaround for b/389890488
+        project.configurations.configureEach { configuration ->
+            if (configuration.isCanBeResolved) {
+                configuration.attributes { attributeContainer ->
+                    attributeContainer.attribute(
+                        BuildTypeAttr.ATTRIBUTE,
+                        project.objects.named(BuildTypeAttr::class.java, "release"),
+                    )
+                }
+            }
         }
     }
 
@@ -931,6 +906,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         libraryAndroidComponentsExtension.apply {
             finalizeDsl {
+                @Suppress("deprecation") // TODO(aurimas): migrate to new API
                 it.defaultConfig.aarMetadata.configure(it.compileSdk)
                 it.lint.targetSdk = project.defaultAndroidConfig.targetSdk
                 it.testOptions.targetSdk = project.defaultAndroidConfig.targetSdk
@@ -948,13 +924,6 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         project.configureVersionFileWriter(libraryAndroidComponentsExtension, androidXExtension)
 
         val prebuiltLibraries = listOf("libtracing_perfetto.so", "libc++_shared.so")
-        val copyPublicResourcesDirTask =
-            project.tasks.register(
-                "generatePublicResourcesStub",
-                CopyPublicResourcesDirTask::class.java,
-            ) { task ->
-                task.buildSrcResDir.set(File(project.getSupportRootFolder(), "buildSrc/res"))
-            }
         libraryAndroidComponentsExtension.onVariants { variant ->
             if (variant.buildType == DEFAULT_PUBLISH_CONFIG) {
                 // Standard docs, resource API, and Metalava configuration for AndroidX projects.
@@ -969,11 +938,11 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             }
             if (variant.name == DEFAULT_PUBLISH_CONFIG) {
                 project.configureSourceJarForAndroid(variant, androidXExtension.samplesProjects)
+                project.configurePublicResourcesStub(variant)
                 project.configureDependencyVerification(androidXExtension) { taskProvider ->
                     taskProvider.configure { task -> task.dependsOn("compileReleaseJavaWithJavac") }
                 }
             }
-            configurePublicResourcesStub(variant, copyPublicResourcesDirTask)
             val verifyELFRegionAlignmentTaskProvider =
                 project.tasks.register(
                     variant.name + "VerifyELFRegionAlignment",
@@ -1101,17 +1070,27 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         // Suppress output of android:compileSdkVersion and related attributes (b/277836549).
         androidResources.additionalParameters += "--no-compile-sdk-metadata"
 
+        @Suppress("deprecation") // TODO(aurimas): migrate to new API
         compileSdk = project.defaultAndroidConfig.compileSdk
 
         buildToolsVersion = project.defaultAndroidConfig.buildToolsVersion
 
         defaultConfig.ndk.abiFilters.addAll(SUPPORTED_BUILD_ABIS)
+        @Suppress("DEPRECATION") // TODO(aurimas): migrate to new API
         defaultConfig.minSdk = defaultMinSdk
         defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         testOptions.animationsDisabled = !project.isMacrobenchmark()
 
+        @Suppress("deprecation") // TODO(aurimas): migrate to new API
         project.afterEvaluate {
+            check(
+                !androidXExtension.shouldPublish() || !compileOptions.isCoreLibraryDesugaringEnabled
+            ) {
+                "AndroidX libraries are not permitted to use core library desugaring as it " +
+                    "forces library users to also enable core library desugaring."
+            }
+
             val minSdkVersion = defaultConfig.minSdk!!
             check(minSdkVersion >= defaultMinSdk) {
                 "minSdkVersion $minSdkVersion lower than the default of $defaultMinSdk"
@@ -1195,6 +1174,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
             defaultSourceSetName = "androidInstrumentedTest"
             sourceSetTreeName = "test"
         }
+        configureTargetSdkForTests(project.defaultAndroidConfig.targetSdk)
 
         // validate that SDK versions haven't been altered during evaluation
         project.afterEvaluate {
@@ -1210,6 +1190,20 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         project.configureTestConfigGeneration(buildFeatures.isIsolatedProjectsEnabled())
         project.configureFtlRunner(componentsExtension)
+    }
+
+    // TODO(b/425976012): Set targetSdkForTests to project.defaultAndroidConfig.targetSdk
+    private fun KotlinMultiplatformAndroidLibraryTarget.configureTargetSdkForTests(version: Int?) {
+        checkNotNull(version) {
+            "version must be set for tests. call `configureTargetSdkForTests` in the `finalizeDsl` block"
+        }
+        compilations
+            .withType(KotlinMultiplatformAndroidDeviceTestCompilation::class.java)
+            .configureEach { it.targetSdk { this.version = release(version) } }
+
+        compilations
+            .withType(KotlinMultiplatformAndroidHostTestCompilation::class.java)
+            .configureEach { it.targetSdk { this.version = release(version.coerceAtMost(35)) } }
     }
 
     /**
@@ -1534,10 +1528,9 @@ private fun Configuration.isTest(): Boolean = name.lowercase().contains("test")
 internal fun Configuration.isPublished(): Boolean =
     !isTest() && !name.lowercase().contains("metadata") && !name.endsWith("CInterop")
 
-val Project.androidExtension: AndroidComponentsExtension<*, *, *>
+internal val Project.androidExtension: AndroidComponentsExtension<*, *, *>
     get() =
-        extensions.findByType<LibraryAndroidComponentsExtension>()
-            ?: extensions.findByType<ApplicationAndroidComponentsExtension>()
+        extensions.findByType<KotlinMultiplatformAndroidComponentsExtension>()
             ?: throw IllegalArgumentException("Failed to find any registered Android extension")
 
 val Project.multiplatformExtension

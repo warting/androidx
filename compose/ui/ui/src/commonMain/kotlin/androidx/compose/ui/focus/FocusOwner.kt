@@ -36,14 +36,6 @@ internal interface FocusOwner : FocusManager {
     val modifier: Modifier
 
     /**
-     * This manager provides a way to ensure that only one focus transaction is running at a time.
-     * We use this to prevent re-entrant focus operations. Starting a new transaction automatically
-     * cancels the previous transaction and reverts any focus state changes made during that
-     * transaction.
-     */
-    val focusTransactionManager: FocusTransactionManager
-
-    /**
      * This function is called to ask the owner to request focus from the framework. eg. If a
      * composable calls requestFocus and the root view does not have focus, this function can be
      * used to request focus for the view.
@@ -114,6 +106,9 @@ internal interface FocusOwner : FocusManager {
         focusDirection: FocusDirection,
     ): Boolean
 
+    /** Reset focus to the default focused item based on the focus direction. */
+    fun resetFocus(focusDirection: FocusDirection): Boolean
+
     /**
      * Clear focus from the owner.
      *
@@ -126,6 +121,18 @@ internal interface FocusOwner : FocusManager {
 
     /** Searches for the currently focused item, and returns its coordinates as a rect. */
     fun getFocusRect(): Rect?
+
+    /**
+     * Searches the hierarchy and returns true if we have focusable content. (Includes embedded
+     * views that are focusable).
+     */
+    fun hasFocusableContent(): Boolean
+
+    /**
+     * Searches the hierarchy and returns true if we have focusable compose content (Ignores
+     * embedded views tha are focusable).
+     */
+    fun hasNonInteropFocusableContent(): Boolean
 
     /**
      * Dispatches a key event through the compose hierarchy.
@@ -162,9 +169,6 @@ internal interface FocusOwner : FocusManager {
 
     /** Schedule a FocusEvent node to be invalidated after onApplyChanges. */
     fun scheduleInvalidation(node: FocusEventModifierNode)
-
-    /** Schedule a FocusProperties node to be invalidated after onApplyChanges. */
-    fun scheduleInvalidation(node: FocusPropertiesModifierNode)
 
     /** Schedule the owner to be invalidated after onApplyChanges. */
     fun scheduleInvalidationForOwner()

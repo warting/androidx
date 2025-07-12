@@ -19,6 +19,7 @@ import androidx.compose.runtime.Anchor
 import androidx.compose.runtime.ComposerImpl.CompositionContextHolder
 import androidx.compose.runtime.CompositionContext
 import androidx.compose.runtime.GroupSourceInformation
+import androidx.compose.runtime.RememberObserverHolder
 import androidx.compose.runtime.SlotReader
 import androidx.compose.runtime.SlotTable
 import androidx.compose.runtime.SlotWriter
@@ -42,14 +43,14 @@ internal class ReaderTraceBuilder(private val reader: SlotReader) : ComposeStack
 }
 
 internal abstract class ComposeStackTraceBuilder {
-    private val trace = mutableListOf<ComposeStackTraceFrame>()
+    private val _trace = mutableListOf<ComposeStackTraceFrame>()
 
-    fun trace(): List<ComposeStackTraceFrame> = trace
+    fun trace(): List<ComposeStackTraceFrame> = _trace
 
     private fun appendTraceFrame(groupSourceInformation: GroupSourceInformation, child: Any?) {
         val frame = extractTraceFrame(groupSourceInformation, child)
         if (frame != null) {
-            trace += frame
+            _trace += frame
         }
     }
 
@@ -289,7 +290,8 @@ internal fun SlotTable.findSubcompositionContextGroup(context: CompositionContex
                         reader.groupKey(current) == referenceKey &&
                         reader.groupObjectKey(current) == reference
                 ) {
-                    val contextHolder = reader.groupGet(current, 0) as? CompositionContextHolder
+                    val observerHolder = reader.groupGet(current, 0) as? RememberObserverHolder
+                    val contextHolder = observerHolder?.wrapped as? CompositionContextHolder
                     if (contextHolder != null && contextHolder.ref == context) {
                         return current
                     }

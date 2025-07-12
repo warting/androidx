@@ -20,8 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.xr.compose.subspace.layout.SubspaceLayout
 import androidx.xr.compose.subspace.layout.SubspaceModifier
 import androidx.xr.runtime.math.Pose
-import androidx.xr.scenecore.ContentlessEntity
 import androidx.xr.scenecore.Entity
+import androidx.xr.scenecore.GroupEntity
 
 /**
  * Marks Subspace APIs that are experimental and likely to change or be removed in the future.
@@ -31,7 +31,7 @@ import androidx.xr.scenecore.Entity
  * propagating the annotation to the containing declaration.
  */
 @RequiresOptIn(
-    level = RequiresOptIn.Level.WARNING,
+    level = RequiresOptIn.Level.ERROR,
     message = "This is an experimental API. It may be changed or removed in the future.",
 )
 @Retention(AnnotationRetention.BINARY)
@@ -53,8 +53,8 @@ public fun Volume(modifier: SubspaceModifier = SubspaceModifier, onVolumeEntity:
     SubspaceLayout(
         modifier = modifier,
         coreEntity =
-            rememberCoreContentlessEntity {
-                ContentlessEntity.create(this, name = entityName("Volume"), pose = Pose.Identity)
+            rememberCoreGroupEntity {
+                GroupEntity.create(this, name = entityName("Volume"), pose = Pose.Identity)
                     .apply(onVolumeEntity)
             },
     ) { _, constraints ->

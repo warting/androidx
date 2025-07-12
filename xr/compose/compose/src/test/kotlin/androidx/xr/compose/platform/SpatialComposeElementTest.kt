@@ -19,16 +19,17 @@ package androidx.xr.compose.platform
 import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.xr.compose.subspace.layout.CoreContentlessEntity
 import androidx.xr.compose.subspace.layout.CoreEntity
+import androidx.xr.compose.subspace.layout.CoreGroupEntity
 import androidx.xr.compose.testing.SubspaceTestingActivity
 import androidx.xr.compose.testing.createFakeRuntime
 import androidx.xr.compose.testing.createFakeSession
 import androidx.xr.compose.unit.VolumeConstraints
 import androidx.xr.runtime.internal.JxrPlatformAdapter
-import androidx.xr.scenecore.ContentlessEntity
+import androidx.xr.scenecore.GroupEntity
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,6 +47,7 @@ class SpatialComposeElementTest {
         mockJxrPlatformAdapter = mock<JxrPlatformAdapter>()
     }
 
+    @Ignore // b/427806050
     @Test
     fun spatialComposeScene_constructor_initializesPropertiesWithDefaultValues() {
         lateinit var scene: SpatialComposeScene
@@ -63,6 +65,7 @@ class SpatialComposeElementTest {
             .isEqualTo(VolumeConstraints())
     }
 
+    @Ignore // b/427806050
     @Test
     fun spatialComposeElement_constructor_initializesPropertiesWithCustomValues() {
         lateinit var scene: SpatialComposeScene
@@ -74,8 +77,8 @@ class SpatialComposeElementTest {
             val fakeRuntime = createFakeRuntime(composeTestRule.activity)
             val session = createFakeSession(composeTestRule.activity, fakeRuntime)
 
-            val entity = ContentlessEntity.create(session, "test")
-            coreEntity = CoreContentlessEntity(entity)
+            val entity = GroupEntity.create(session, "test")
+            coreEntity = CoreGroupEntity(entity)
 
             composition = rememberCompositionContext()
             testConstraints = VolumeConstraints(10, 20, 30, 40, 50, 60)

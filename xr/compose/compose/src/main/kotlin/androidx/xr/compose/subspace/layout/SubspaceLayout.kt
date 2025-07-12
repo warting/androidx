@@ -20,6 +20,7 @@ import androidx.compose.runtime.Applier
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ComposeNode
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisallowComposableCalls
 import androidx.compose.runtime.currentComposer
 import androidx.xr.compose.platform.LocalOpaqueEntity
 import androidx.xr.compose.subspace.SubspaceComposable
@@ -29,8 +30,10 @@ import androidx.xr.compose.subspace.node.ComposeSubspaceNode.Companion.SetCompos
 import androidx.xr.compose.subspace.node.ComposeSubspaceNode.Companion.SetCoreEntity
 import androidx.xr.compose.subspace.node.ComposeSubspaceNode.Companion.SetMeasurePolicy
 import androidx.xr.compose.subspace.node.ComposeSubspaceNode.Companion.SetModifier
-import androidx.xr.compose.subspace.rememberCoreContentlessEntity
-import androidx.xr.scenecore.ContentlessEntity
+import androidx.xr.compose.subspace.rememberCoreGroupEntity
+import androidx.xr.runtime.Session
+import androidx.xr.scenecore.Entity
+import androidx.xr.scenecore.GroupEntity
 
 /**
  * [SubspaceLayout] is the main component for laying out leaf nodes with zero children.
@@ -57,6 +60,11 @@ public inline fun SubspaceLayout(
     modifier: SubspaceModifier = SubspaceModifier,
     measurePolicy: SubspaceMeasurePolicy,
 ) {
+    check(currentComposer.applier.current is ComposeSubspaceNode) {
+        "SubspaceComposable functions are expected to be used within the context of a " +
+            "Subspace composition. Please ensure that this component is in a Subspace or " +
+            " is a child of another SubspaceComposable."
+    }
     val compositionLocalMap = currentComposer.currentCompositionLocalMap
     ComposeNode<ComposeSubspaceNode, Applier<Any>>(
         factory = ComposeSubspaceNode.Constructor,
@@ -102,8 +110,13 @@ public inline fun SubspaceLayout(
     modifier: SubspaceModifier = SubspaceModifier,
     measurePolicy: SubspaceMeasurePolicy,
 ) {
-    val coreEntity = rememberCoreContentlessEntity {
-        ContentlessEntity.create(session = this, name = entityName("Entity"))
+    check(currentComposer.applier.current is ComposeSubspaceNode) {
+        "SubspaceComposable functions are expected to be used within the context of a " +
+            "Subspace composition. Please ensure that this component is in a Subspace or " +
+            " is a child of another SubspaceComposable."
+    }
+    val coreEntity = rememberOpaqueEntity {
+        GroupEntity.create(session = this, name = entityName("Entity"))
     }
     val compositionLocalMap = currentComposer.currentCompositionLocalMap
     ComposeNode<ComposeSubspaceNode, Applier<Any>>(
@@ -119,6 +132,13 @@ public inline fun SubspaceLayout(
         content = { CompositionLocalProvider(LocalOpaqueEntity provides coreEntity) { content() } },
     )
 }
+
+/** Creates a [CoreGroupEntity] that is automatically disposed of when it leaves the composition. */
+@Composable
+@PublishedApi
+internal fun rememberOpaqueEntity(
+    entityFactory: @DisallowComposableCalls Session.() -> Entity
+): OpaqueEntity = rememberCoreGroupEntity(entityFactory)
 
 /**
  * [SubspaceLayout] is the main core component for layout for "leaf" nodes. It can be used to
@@ -142,6 +162,11 @@ internal inline fun SubspaceLayout(
     coreEntity: CoreEntity? = null,
     measurePolicy: SubspaceMeasurePolicy,
 ) {
+    check(currentComposer.applier.current is ComposeSubspaceNode) {
+        "SubspaceComposable functions are expected to be used within the context of a " +
+            "Subspace composition. Please ensure that this component is in a Subspace or " +
+            " is a child of another SubspaceComposable."
+    }
     val compositionLocalMap = currentComposer.currentCompositionLocalMap
     ComposeNode<ComposeSubspaceNode, Applier<Any>>(
         factory = ComposeSubspaceNode.Constructor,
@@ -177,11 +202,17 @@ internal inline fun SubspaceLayout(
 internal inline fun SubspaceLayout(
     crossinline content: @Composable @SubspaceComposable () -> Unit,
     modifier: SubspaceModifier = SubspaceModifier,
-    coreEntity: CoreEntity = rememberCoreContentlessEntity {
-        ContentlessEntity.create(session = this, name = entityName("Entity"))
+    coreEntity: CoreEntity = rememberCoreGroupEntity {
+        GroupEntity.create(session = this, name = entityName("Entity"))
     },
     measurePolicy: SubspaceMeasurePolicy,
 ) {
+    check(currentComposer.applier.current is ComposeSubspaceNode) {
+        "SubspaceComposable functions are expected to be used within the context of a " +
+            "Subspace composition. Please ensure that this component is in a Subspace or " +
+            " is a child of another SubspaceComposable."
+    }
+
     val compositionLocalMap = currentComposer.currentCompositionLocalMap
     ComposeNode<ComposeSubspaceNode, Applier<Any>>(
         factory = ComposeSubspaceNode.Constructor,

@@ -19,8 +19,11 @@ package androidx.compose.foundation.text.selection
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.ComposeFoundationFlags
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.contextmenu.ContextMenuScope
+import androidx.compose.foundation.contextmenu.ContextMenuState
 import androidx.compose.foundation.internal.checkPreconditionNotNull
 import androidx.compose.foundation.internal.hasText
+import androidx.compose.foundation.internal.isAutofillAvailable
 import androidx.compose.foundation.internal.readAnnotatedString
 import androidx.compose.foundation.internal.toClipEntry
 import androidx.compose.foundation.text.DefaultCursorThickness
@@ -30,7 +33,15 @@ import androidx.compose.foundation.text.HandleState.Cursor
 import androidx.compose.foundation.text.HandleState.None
 import androidx.compose.foundation.text.HandleState.Selection
 import androidx.compose.foundation.text.LegacyTextFieldState
+import androidx.compose.foundation.text.MenuItemsAvailability
+import androidx.compose.foundation.text.TextContextMenuItems
+import androidx.compose.foundation.text.TextContextMenuItems.Autofill
+import androidx.compose.foundation.text.TextContextMenuItems.Copy
+import androidx.compose.foundation.text.TextContextMenuItems.Cut
+import androidx.compose.foundation.text.TextContextMenuItems.Paste
+import androidx.compose.foundation.text.TextContextMenuItems.SelectAll
 import androidx.compose.foundation.text.TextDragObserver
+import androidx.compose.foundation.text.TextItem
 import androidx.compose.foundation.text.UndoManager
 import androidx.compose.foundation.text.ValidatingEmptyOffsetMappingIdentity
 import androidx.compose.foundation.text.contextmenu.modifier.ToolbarRequester
@@ -42,6 +53,7 @@ import androidx.compose.foundation.text.detectDownAndDragGesturesWithObserver
 import androidx.compose.foundation.text.getLineHeight
 import androidx.compose.foundation.text.isPositionInsideSelection
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,7 +107,14 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
      * The current [TextFieldValue]. This contains the original text, not the transformed text.
      * Transformed text can be found with [transformedText].
      */
-    internal var value: TextFieldValue by mutableStateOf(TextFieldValue())
+    private val valueState = mutableStateOf(TextFieldValue())
+
+    internal var value: TextFieldValue
+        get() = valueState.value
+        set(value) {
+            valueState.value = value
+            latestSelection = value.selection
+        }
 
     /**
      * The current transformed text from the [LegacyTextFieldState]. The original text can be found
@@ -184,6 +203,17 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
     /** The previous [SelectionLayout] where [SelectionLayout.shouldRecomputeSelection] was true. */
     private var previousSelectionLayout: SelectionLayout? = null
 
+    /**
+     * The latest selection range that was passed to [onValueChange]. The [value] state is updated
+     * only after CoreTextField is recomposed. Even after [onValueChange] is called with a new
+     * value, we won't know the final value until the next frame.
+     *
+     * **USE WITH CAUTION**: Be aware that developer can change selection in [onValueChange]. This
+     * selection is our best guess, but is not guaranteed to be the same as the new [value]. This is
+     * introduced for smart selection feature.
+     */
+    internal var latestSelection: TextRange? = null
+
     // TODO(grantapher) android ClipboardManager has a way to notify primary clip changes.
     //  That could possibly be used so that this doesn't have to be updated manually.
     /** The current clip entry. Updated via [updateClipboardEntry]. */
@@ -195,11 +225,17 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         get() =
             if (!enabled) Modifier
             else
-                Modifier.textContextMenuGestures(onPreShowContextMenu = { updateClipboardEntry() })
+                Modifier.textContextMenuGestures(
+                        onPreShowContextMenu = {
+                            updateClipboardEntry()
+                            notifyPlatformSelectionBehaviorsOnShowContextMenu()
+                        }
+                    )
                     .textContextMenuToolbarHandler(
                         requester = toolbarRequester,
                         onShow = {
                             updateClipboardEntry()
+                            notifyPlatformSelectionBehaviorsOnShowContextMenu()
                             textToolbarShownViaProvider = true
                         },
                         onHide = { textToolbarShownViaProvider = false },
@@ -219,6 +255,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
     internal val touchSelectionObserver =
         object : TextDragObserver {
             private var isLongPressSelectionOnly = true
+            private var runningSelection: TextRange? = null
 
             override fun onDown(point: Offset) {
                 // Not supported for long-press-drag.
@@ -255,6 +292,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                         enterSelectionMode(showFloatingToolbar = false)
                         hapticFeedBack?.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onValueChange(newValue)
+                        latestSelection = newValue.selection
                     }
                     isLongPressSelectionOnly = false
                 } else {
@@ -276,6 +314,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                     // When char based selection is used, we want to ensure we snap the
                     // beginning offset to the start word boundary of the first selected word.
                     dragBeginSelection = adjustedStartSelection
+                    runningSelection = adjustedStartSelection
                 }
 
                 // don't set selection handle state until drag ends
@@ -356,6 +395,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                             )
                         }
 
+                    runningSelection = newSelection
                     if (newSelection != dragBeginSelection) {
                         isLongPressSelectionOnly = false
                     }
@@ -372,7 +412,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                 currentDragPosition = null
                 updateFloatingToolbar(show = true)
 
-                val collapsed = value.selection.collapsed
+                val collapsed = runningSelection?.collapsed ?: value.selection.collapsed
                 setHandleState(if (collapsed) Cursor else Selection)
                 state?.showSelectionHandleStart =
                     !collapsed && isSelectionHandleInVisibleBound(isStartHandle = true)
@@ -529,6 +569,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                             selection = newSelection,
                         )
                     )
+                    latestSelection = newSelection
                 }
             }
         }
@@ -651,6 +692,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                             selection = newSelection,
                         )
                     )
+                    latestSelection = newSelection
                 }
             }
 
@@ -701,6 +743,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                 }
             val newValue = value.copy(selection = TextRange(newCursorOffset))
             onValueChange(newValue)
+            latestSelection = newValue.selection
         }
 
         // If a new cursor position is given and the text is not empty, enter the Cursor state.
@@ -749,6 +792,20 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         clipEntry = clipboard?.getClipEntry()
     }
 
+    private suspend fun notifyPlatformSelectionBehaviorsOnShowContextMenu() {
+        transformedText?.text?.let { text ->
+            latestSelection?.let { selection ->
+                platformSelectionBehaviors?.onShowContextMenu(
+                    text,
+                    TextRange(
+                        offsetMapping.originalToTransformed(selection.start),
+                        offsetMapping.originalToTransformed(selection.end),
+                    ),
+                )
+            }
+        }
+    }
+
     /** Only fully accurate if [updateClipboardEntry] has been called. */
     internal fun canPaste(): Boolean = editable && clipEntry?.hasText() == true
 
@@ -782,6 +839,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                     selection = TextRange(newCursorOffset, newCursorOffset),
                 )
             onValueChange(newValue)
+            latestSelection = newValue.selection
             setHandleState(None)
         }
 
@@ -809,6 +867,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                     selection = TextRange(newCursorOffset, newCursorOffset),
                 )
             onValueChange(newValue)
+            latestSelection = newValue.selection
             setHandleState(None)
             undoManager?.forceNextSnapshot()
         }
@@ -838,6 +897,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                     selection = TextRange(newCursorOffset, newCursorOffset),
                 )
             onValueChange(newValue)
+            latestSelection = newValue.selection
             setHandleState(None)
             undoManager?.forceNextSnapshot()
         }
@@ -850,6 +910,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
                 selection = TextRange(0, value.text.length),
             )
         onValueChange(newValue)
+        latestSelection = newValue.selection
         oldValue = oldValue.copy(selection = newValue.selection)
         enterSelectionMode(showFloatingToolbar = true)
     }
@@ -1163,6 +1224,7 @@ internal class TextFieldSelectionManager(val undoManager: UndoManager? = null) {
         val newValue =
             createTextFieldValue(annotatedString = value.annotatedString, selection = newSelection)
         onValueChange(newValue)
+        latestSelection = newSelection
 
         if (!isTouchBasedSelection) {
             updateFloatingToolbar(show = !newSelection.collapsed)
@@ -1298,3 +1360,21 @@ internal expect fun Modifier.addBasicTextFieldTextContextMenuComponents(
     manager: TextFieldSelectionManager,
     coroutineScope: CoroutineScope,
 ): Modifier
+
+internal fun TextFieldSelectionManager.contextMenuBuilder(
+    contextMenuState: ContextMenuState,
+    itemsAvailability: State<MenuItemsAvailability>,
+): ContextMenuScope.() -> Unit = {
+    fun textFieldItem(label: TextContextMenuItems, enabled: Boolean, operation: () -> Unit) {
+        TextItem(contextMenuState, label, enabled, operation)
+    }
+
+    val availability: MenuItemsAvailability = itemsAvailability.value
+    textFieldItem(Cut, enabled = availability.canCut) { cut() }
+    textFieldItem(Copy, enabled = availability.canCopy) { copy(cancelSelection = false) }
+    textFieldItem(Paste, enabled = availability.canPaste) { paste() }
+    textFieldItem(SelectAll, enabled = availability.canSelectAll) { selectAll() }
+    if (isAutofillAvailable()) {
+        textFieldItem(Autofill, enabled = availability.canAutofill) { autofill() }
+    }
+}

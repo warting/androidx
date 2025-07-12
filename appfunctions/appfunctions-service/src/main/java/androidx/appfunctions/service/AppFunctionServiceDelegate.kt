@@ -21,6 +21,7 @@ import android.os.Build
 import android.os.OutcomeReceiver
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.annotation.RestrictTo
 import androidx.appfunctions.AppFunctionAppUnknownException
 import androidx.appfunctions.AppFunctionCancelledException
 import androidx.appfunctions.AppFunctionContext
@@ -45,7 +46,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-internal class AppFunctionServiceDelegate(
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+public class AppFunctionServiceDelegate(
     context: Context,
     workerCoroutineContext: CoroutineContext,
     private val mainCoroutineContext: CoroutineContext,
@@ -58,8 +60,9 @@ internal class AppFunctionServiceDelegate(
     private val workerCoroutineScope = CoroutineScope(workerCoroutineContext + job)
     private val appContext = context.applicationContext
 
-    internal fun onExecuteFunction(
+    public fun onExecuteFunction(
         executeAppFunctionRequest: ExecuteAppFunctionRequest,
+        callingPackageName: String,
         callback: OutcomeReceiver<ExecuteAppFunctionResponse, AppFunctionException>,
     ): Job =
         workerCoroutineScope.launch {
@@ -87,6 +90,7 @@ internal class AppFunctionServiceDelegate(
                 callback.onResult(
                     unsafeInvokeFunction(
                         executeAppFunctionRequest,
+                        callingPackageName,
                         appFunctionMetadata,
                         parameters,
                         translator,
@@ -149,6 +153,7 @@ internal class AppFunctionServiceDelegate(
 
     private suspend fun unsafeInvokeFunction(
         request: ExecuteAppFunctionRequest,
+        callingPackageName: String,
         appFunctionMetadata: CompileTimeAppFunctionMetadata,
         parameters: Map<String, Any?>,
         translator: Translator?,
@@ -162,6 +167,16 @@ internal class AppFunctionServiceDelegate(
                 )
             }
         val returnValue = appFunctionMetadata.response.unsafeBuildReturnValue(result)
+
+        returnValue.visitAppFunctionUriGrants { uriGrant ->
+            appContext.grantUriPermission(
+                callingPackageName,
+                uriGrant.uri,
+                @Suppress("WrongConstant") // modeFlags is a subset of Intent flags
+                uriGrant.modeFlags,
+            )
+        }
+
         // Downgrade the return value from the agents, if they are using the old format.
         val translatedReturnValue = translator?.downgradeResponse(returnValue) ?: returnValue
         return ExecuteAppFunctionResponse.Success(translatedReturnValue)

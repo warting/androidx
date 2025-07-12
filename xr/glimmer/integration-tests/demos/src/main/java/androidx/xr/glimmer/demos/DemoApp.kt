@@ -18,16 +18,11 @@ package androidx.xr.glimmer.demos
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,8 +33,9 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.xr.glimmer.GlimmerTheme
+import androidx.xr.glimmer.ListItem
 import androidx.xr.glimmer.Text
-import androidx.xr.glimmer.surface
+import androidx.xr.glimmer.list.VerticalList
 
 @Composable
 fun DemoApp(currentDemo: Demo, onNavigateToDemo: (Demo) -> Unit) {
@@ -64,30 +60,15 @@ private fun DisplayDemo(demo: Demo, onNavigate: (Demo) -> Unit) {
 
 @Composable
 private fun DisplayDemoCategory(category: DemoCategory, onNavigate: (Demo) -> Unit) {
-    LazyColumn(
+    VerticalList(
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        items(category.demos) { demo ->
+        items(category.demos.size) { index ->
+            val demo = category.demos[index]
             ListItem(onClick = { onNavigate(demo) }) { Text(demo.title) }
         }
-    }
-}
-
-@Composable
-internal fun ListItem(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {},
-    content: @Composable (() -> Unit),
-) {
-    Box(
-        modifier
-            .fillMaxWidth()
-            .surface(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 20.dp)
-    ) {
-        content()
     }
 }
 

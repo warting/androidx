@@ -263,7 +263,8 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
                 @Nullable ViewGroup prevInflateParent,
                 boolean isReattaching,
                 InflaterStatsLogger inflaterStatsLogger) {
-            return immediateFuture(RenderingArtifact.create(inflaterStatsLogger));
+            return immediateFuture(
+                    RenderingArtifact.create(inflaterStatsLogger, prevInflateParent));
         }
     }
 
@@ -317,7 +318,8 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
             attachParent.addView(
                     inflateResult.inflateParent, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
             inflateResult.updateDynamicDataPipeline(isReattaching);
-            return immediateFuture(RenderingArtifact.create(inflaterStatsLogger));
+            return immediateFuture(
+                    RenderingArtifact.create(inflaterStatsLogger, prevInflateParent));
         }
     }
 
@@ -1110,6 +1112,15 @@ public class ProtoLayoutViewInstance implements AutoCloseable {
             }
         }
         return result;
+    }
+
+    /**
+     * Notifies that the current layout is invalid and needs to be reinflated.
+     * This will clear any cached layout information and trigger a cache invalidation for resources.
+     */
+    public void invalidateLayout() {
+        mPrevLayout = null;
+        invalidateCache();
     }
 
     /**

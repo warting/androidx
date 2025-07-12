@@ -45,8 +45,7 @@ class SurfaceConfigTest {
         // Assert
         assertThat(surfaceConfig.configType).isEqualTo(type)
         assertThat(surfaceConfig.configSize).isEqualTo(size)
-        assertThat(surfaceConfig.streamUseCase)
-            .isEqualTo(SurfaceConfig.DEFAULT_STREAM_USE_CASE_VALUE)
+        assertThat(surfaceConfig.streamUseCase).isEqualTo(SurfaceConfig.DEFAULT_STREAM_USE_CASE)
     }
 
     @Test
@@ -54,7 +53,7 @@ class SurfaceConfigTest {
         // Arrange
         val type = ConfigType.JPEG
         val size = ConfigSize.MAXIMUM
-        val streamUseCase: Long = 1234
+        val streamUseCase = StreamUseCase.PREVIEW_VIDEO_STILL
 
         // Act
         val surfaceConfig = SurfaceConfig.create(type, size, streamUseCase)
@@ -195,16 +194,14 @@ class SurfaceConfigTest {
         // Arrange
         val cameraMode = CONCURRENT_CAMERA
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                s240p_4_3,
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = s240p_4_3,
+                surfaceSizeDefinition = surfaceSizeDefinition,
+                cameraMode = cameraMode,
             )
 
         // Assert
@@ -217,16 +214,14 @@ class SurfaceConfigTest {
         // Arrange
         val cameraMode = CONCURRENT_CAMERA
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                s720p_16_9,
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = s720p_16_9,
+                surfaceSizeDefinition = surfaceSizeDefinition,
+                cameraMode = cameraMode,
             )
 
         // Assert
@@ -239,16 +234,14 @@ class SurfaceConfigTest {
         // Arrange
         val cameraMode = CONCURRENT_CAMERA
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                Size(1980, 1080),
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = Size(1980, 1080),
+                surfaceSizeDefinition = surfaceSizeDefinition,
+                cameraMode = cameraMode,
             )
 
         // Assert
@@ -259,18 +252,16 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_usingFeatureComboTable_exactFixedSizeMatch_returnsFixedSize() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
         val configSource = SurfaceConfig.ConfigSource.FEATURE_COMBINATION_TABLE
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                s720p_16_9,
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = s720p_16_9,
+                surfaceSizeDefinition = surfaceSizeDefinition,
+                configSource = configSource,
             )
 
         // Assert
@@ -281,19 +272,17 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_usingFeatureComboTable_noFixedSizeButMatchesMax_returnsMaximum() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
         val configSource = SurfaceConfig.ConfigSource.FEATURE_COMBINATION_TABLE
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
+                imageFormat = imageFormat,
                 // creating new size instance to ensure different size instance than max supported
-                Size(maxSize.width, maxSize.height),
-                surfaceSizeDefinition,
-                configSource,
+                size = Size(maxSize.width, maxSize.height),
+                surfaceSizeDefinition = surfaceSizeDefinition,
+                configSource = configSource,
             )
 
         // Assert
@@ -304,18 +293,16 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_withFeatureComboTable_noSizeMatch_returnsUnsupported() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
         val configSource = SurfaceConfig.ConfigSource.FEATURE_COMBINATION_TABLE
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                s240p_4_3,
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = s240p_4_3,
+                surfaceSizeDefinition = surfaceSizeDefinition,
+                configSource = configSource,
             )
 
         // Assert
@@ -326,18 +313,14 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_withCaptureSessionTables_smallerThanAnalysisSize_returnsVGA() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                s240p_4_3,
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = s240p_4_3,
+                surfaceSizeDefinition = surfaceSizeDefinition,
             )
 
         // Assert
@@ -348,18 +331,14 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_withCaptureSessionTables_smallerThanPreviewSize_returnsPreview() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                s720p_16_9,
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = s720p_16_9,
+                surfaceSizeDefinition = surfaceSizeDefinition,
             )
 
         // Assert
@@ -370,18 +349,14 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_withCaptureSessionTables_smallerThanRecordSize_returnsRecord() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                s1440p_4_3,
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = s1440p_4_3,
+                surfaceSizeDefinition = surfaceSizeDefinition,
             )
 
         // Assert
@@ -392,18 +367,14 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_withCaptureSessionTables_smallerThanMaxSize_returnsMaximum() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                Size(3900, 2800),
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = Size(3900, 2800),
+                surfaceSizeDefinition = surfaceSizeDefinition,
             )
 
         // Assert
@@ -414,18 +385,14 @@ class SurfaceConfigTest {
     @Test
     fun transformSurfaceConfig_largerThanMaxButNotUltraHighCamera_returnsUnsupported() {
         // Arrange
-        val cameraMode = CameraMode.DEFAULT
         val imageFormat = ImageFormat.YUV_420_888
-        val configSource = SurfaceConfig.ConfigSource.CAPTURE_SESSION_TABLES
 
         // Act
         val surfaceConfig =
             SurfaceConfig.transformSurfaceConfig(
-                cameraMode,
-                imageFormat,
-                Size(6000, 3000),
-                surfaceSizeDefinition,
-                configSource,
+                imageFormat = imageFormat,
+                size = Size(6000, 3000),
+                surfaceSizeDefinition = surfaceSizeDefinition,
             )
 
         // Assert

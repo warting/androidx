@@ -15,26 +15,40 @@
 */
 
 /**
-        * This file was created using the `create_project.py` script located in the
-        * `<AndroidX root>/development/project-creator` directory.
-*
-* Please use that script when creating a new project, rather than copying an existing project and
-        * modifying its settings.
-*/
+ * This file was created using the `create_project.py` script located in the
+ * `<AndroidX root>/development/project-creator` directory.
+ *
+ * Please use that script when creating a new project, rather than copying an existing project and
+ * modifying its settings.
+ */
 
 import androidx.build.SoftwareType
 
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 dependencies {
+    api(libs.kotlinStdlib)
+    api(project(":xr:arcore:arcore"))
+    implementation(libs.kotlinCoroutinesRx3)
 
+    testImplementation(libs.kotlinCoroutinesTest)
+    testImplementation(project(":xr:runtime:runtime-testing"))
+    testImplementation(libs.junit)
+    testImplementation(libs.testExtJunit)
+    testImplementation(libs.testExtTruth)
+    testImplementation("androidx.appcompat:appcompat:1.2.0")
 }
 
 android {
-    compileSdk 35
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 23
+    }
 
     namespace = "androidx.xr.arcore.rxjava3"
 }
@@ -45,7 +59,5 @@ androidx {
     inceptionYear = "2025"
     description = "XR ARCore compatibility APIs for Java/RxJava3 developers."
 
-    // TODO: b/326456246
-    optOutJSpecify = true
     enableRobolectric()
 }

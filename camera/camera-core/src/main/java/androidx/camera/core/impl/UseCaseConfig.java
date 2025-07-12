@@ -131,6 +131,12 @@ public interface UseCaseConfig<T extends UseCase> extends TargetConfig<T>, Image
             Option.create("camerax.core.useCase.takePictureManagerProvider",
                     TakePictureManager.Provider.class);
 
+    /**
+     * Option: camerax.core.useCase.streamUseCase
+     */
+    Option<StreamUseCase> OPTION_STREAM_USE_CASE =
+            Option.create("camerax.core.useCase.streamUseCase", StreamUseCase.class);
+
     // *********************************************************************************************
 
     /**
@@ -298,6 +304,13 @@ public interface UseCaseConfig<T extends UseCase> extends TargetConfig<T>, Image
     }
 
     /**
+     * Returns whether a target frame rate was set on this config
+     */
+    default boolean hasTargetFrameRate() {
+        return containsOption(OPTION_TARGET_FRAME_RATE);
+    }
+
+    /**
      * Retrieves target frame rate
      *
      * @param valueIfMissing The value to return if this configuration option has not been set.
@@ -308,10 +321,6 @@ public interface UseCaseConfig<T extends UseCase> extends TargetConfig<T>, Image
         return retrieveOption(OPTION_TARGET_FRAME_RATE, valueIfMissing);
     }
 
-    default boolean isStrictFrameRateRequired() {
-        return requireNonNull(retrieveOption(OPTION_IS_STRICT_FRAME_RATE_REQUIRED, false));
-    }
-
     /**
      * Retrieves the target frame rate
      *
@@ -320,6 +329,20 @@ public interface UseCaseConfig<T extends UseCase> extends TargetConfig<T>, Image
      */
     default @NonNull Range<Integer> getTargetFrameRate() {
         return retrieveOption(OPTION_TARGET_FRAME_RATE);
+    }
+
+    /**
+     * Retrieves whether a strict {@link #getTargetFrameRate() target frame rate} is required.
+     *
+     * <p>If this option is {@code true}, the system must attempt to precisely match the
+     * {@link #getTargetFrameRate() target frame rate} when determining the final frame rate.
+     * If {@code false}, the system will find a suitable frame rate, which may differ from the
+     * target.
+     *
+     * @return {@code true} if the target frame rate must be strictly met; {@code false} otherwise.
+     */
+    default boolean isStrictFrameRateRequired() {
+        return requireNonNull(retrieveOption(OPTION_IS_STRICT_FRAME_RATE_REQUIRED, false));
     }
 
     /**
@@ -380,6 +403,14 @@ public interface UseCaseConfig<T extends UseCase> extends TargetConfig<T>, Image
                         return new TakePictureManagerImpl(imageCaptureControl);
                     }
                 }));
+    }
+
+    /**
+     * @return The stream use case of this UseCaseConfig.
+     */
+    @NonNull
+    default StreamUseCase getStreamUseCase() {
+        return requireNonNull(retrieveOption(OPTION_STREAM_USE_CASE, StreamUseCase.DEFAULT));
     }
 
     /**
@@ -478,6 +509,13 @@ public interface UseCaseConfig<T extends UseCase> extends TargetConfig<T>, Image
          * @param captureType The capture type for this use case.
          */
         @NonNull B setCaptureType(UseCaseConfigFactory.@NonNull CaptureType captureType);
+
+        /**
+         * Sets the stream use case for this configuration.
+         *
+         * @param streamUseCase The stream use case for this use case.
+         */
+        @NonNull B setStreamUseCase(@NonNull StreamUseCase streamUseCase);
 
         /**
          * Retrieves the configuration used by this builder.

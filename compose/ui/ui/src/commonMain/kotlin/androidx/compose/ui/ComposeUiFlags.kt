@@ -77,6 +77,26 @@ object ComposeUiFlags {
     @Suppress("MutableBareField") @JvmField var isViewFocusFixEnabled: Boolean = false
 
     /**
+     * This flag enables an alternate approach to fixing the issues addressed by the
+     * [isViewFocusFixEnabled] flag.
+     */
+    @Suppress("MutableBareField")
+    @JvmField
+    var isBypassUnfocusableComposeViewEnabled: Boolean = true
+
+    /**
+     * This flag enables a fix for b/378570682. For API >=26. We attempt to manually find the next
+     * focusable item for 1-D focus search cases when Compose does not have any focusable content.
+     */
+    @Suppress("MutableBareField") @JvmField var isPre26FocusFinderFixEnabled: Boolean = false
+
+    /**
+     * This flag enables a fix for b/388590015. The view system ignores an invalid prevFocusRect
+     * when requestFocus is called, so we support this behavior in Compose too.
+     */
+    @Suppress("MutableBareField") @JvmField var isIgnoreInvalidPrevFocusRectEnabled: Boolean = true
+
+    /**
      * When an embedded view that is focused is removed from the hierarchy, it triggers a
      * requestFocus() which tries to re-assign focus before the previous composition is complete.
      * This flag enables a fix for this issue.
@@ -85,14 +105,6 @@ object ComposeUiFlags {
     @Suppress("MutableBareField", "unused")
     @JvmField
     var isRemoveFocusedViewFixEnabled: Boolean = false
-
-    /**
-     * With this flag on, the new focus state management implementation is enabled. The new
-     * implementation removes the focus state previously stored in each FocusTargetNode and instead
-     * keeps track of the current active focus node centrally in FocusOwnerImpl. This change reduces
-     * the cost of initializing the focus system.
-     */
-    @Suppress("MutableBareField") @JvmField var isTrackFocusEnabled: Boolean = true
 
     /**
      * Enable WindowInsets rulers:
@@ -115,13 +127,19 @@ object ComposeUiFlags {
      * With this flag on, when an AccessibilityService performs ACTION_FOCUS on a Composable node,
      * if it is in touch mode, it will exit touch mode first, then try to request focus on the node.
      */
-    @Suppress("MutableBareField") @JvmField var isFocusActionExitsTouchModeEnabled: Boolean = true
+    @Deprecated("This flag is no longer needed.")
+    @Suppress("MutableBareField", "unused")
+    @JvmField
+    var isFocusActionExitsTouchModeEnabled: Boolean = false
 
     /**
      * With this flag on, Modifier.focusRestorer() will not pin the item that needs to be restored.
      * Users are responsible for providing a key for the item that needs to be restored b/330696779.
      */
-    @Suppress("MutableBareField") @JvmField var isNoPinningInFocusRestorationEnabled: Boolean = true
+    @Deprecated("This flag is no longer needed.")
+    @Suppress("MutableBareField", "unused")
+    @JvmField
+    var isNoPinningInFocusRestorationEnabled: Boolean = false
 
     /**
      * With this flag on, SubcomposeLayout will deactivate not used content slots outside of the
@@ -131,7 +149,10 @@ object ComposeUiFlags {
     @Suppress("MutableBareField") @JvmField var isOutOfFrameDeactivationEnabled: Boolean = true
 
     /** Enable clearing focus when a focused item is removed from a lazyList. */
-    @Suppress("MutableBareField") @JvmField var isClearFocusOnResetEnabled: Boolean = true
+    @Deprecated("This flag is no longer needed.")
+    @Suppress("MutableBareField", "unused")
+    @JvmField
+    var isClearFocusOnResetEnabled: Boolean = false
 
     /**
      * With this flag on, the adaptive refresh rate (ARR) feature will be enabled. A preferred frame
@@ -159,4 +180,7 @@ object ComposeUiFlags {
     @Suppress("MutableBareField")
     @JvmField
     var isNestedScrollDispatcherNodeFixEnabled: Boolean = true
+
+    /** This flag enables setting the shape semantics property in the graphicsLayer modifiers. */
+    @Suppress("MutableBareField") @JvmField var isGraphicsLayerShapeSemanticsEnabled: Boolean = true
 }

@@ -21,15 +21,18 @@ import android.content.Context
 import android.os.Build
 import androidx.annotation.IntDef
 import androidx.annotation.RequiresPermission
+import androidx.annotation.RestrictTo
 import androidx.appfunctions.internal.AppFunctionManagerApi
 import androidx.appfunctions.internal.AppFunctionReader
 import androidx.appfunctions.internal.AppSearchAppFunctionReader
 import androidx.appfunctions.internal.Dependencies
 import androidx.appfunctions.internal.ExtensionAppFunctionManagerApi
+import androidx.appfunctions.internal.NullTranslatorSelector
 import androidx.appfunctions.internal.PlatformAppFunctionManagerApi
+import androidx.appfunctions.internal.Translator
 import androidx.appfunctions.internal.TranslatorSelector
 import androidx.appfunctions.metadata.AppFunctionMetadata
-import androidx.appfunctions.metadata.AppFunctionSchemaMetadata
+import androidx.appfunctions.metadata.AppFunctionPackageMetadata
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -37,11 +40,12 @@ import kotlinx.coroutines.flow.Flow
  * platform class [android.app.appfunctions.AppFunctionManager].
  */
 public class AppFunctionManagerCompat
-internal constructor(
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+public constructor(
     private val context: Context,
-    private val translatorSelector: TranslatorSelector,
     private val appFunctionReader: AppFunctionReader,
     private val appFunctionManagerApi: AppFunctionManagerApi,
+    private val translatorSelector: TranslatorSelector = NullTranslatorSelector(),
 ) {
 
     /**
@@ -106,10 +110,9 @@ internal constructor(
     public suspend fun executeAppFunction(
         request: ExecuteAppFunctionRequest
     ): ExecuteAppFunctionResponse {
-
-        val schemaMetadata: AppFunctionSchemaMetadata? =
+        val functionMetadata: AppFunctionMetadata? =
             try {
-                appFunctionReader.getAppFunctionSchemaMetadata(
+                appFunctionReader.getAppFunctionMetadata(
                     functionId = request.functionIdentifier,
                     packageName = request.targetPackageName,
                 )
@@ -125,8 +128,8 @@ internal constructor(
 
         // Translate the request when necessary by looking into the target schema version.
         val translator =
-            if (schemaMetadata?.version == LEGACY_SDK_GLOBAL_SCHEMA_VERSION) {
-                translatorSelector.getTranslator(schemaMetadata)
+            if (functionMetadata?.schema?.version == LEGACY_SDK_GLOBAL_SCHEMA_VERSION) {
+                translatorSelector.getTranslator(functionMetadata.schema)
             } else {
                 null
             }
@@ -141,14 +144,31 @@ internal constructor(
 
         val executeAppFunctionResponse = appFunctionManagerApi.executeAppFunction(translatedRequest)
 
-        // Translate the response back to what the agent app expects.
-        val successResponse =
-            executeAppFunctionResponse as? ExecuteAppFunctionResponse.Success
-                ?: return executeAppFunctionResponse
-        return if (translator != null) {
-            successResponse.copy(translator.upgradeResponse(successResponse.returnValue))
+        return processResponse(translator, functionMetadata, executeAppFunctionResponse)
+    }
+
+    @Suppress("NewApi") // AppFunctionManagerCompat is only available when SDK >= 33
+    private fun processResponse(
+        translator: Translator?,
+        functionMetadata: AppFunctionMetadata?,
+        response: ExecuteAppFunctionResponse,
+    ): ExecuteAppFunctionResponse {
+        if (response !is ExecuteAppFunctionResponse.Success) {
+            return response
+        }
+
+        val currentVersionReturnValue =
+            translator?.upgradeResponse(response.returnValue) ?: response.returnValue
+
+        return if (functionMetadata == null) {
+            ExecuteAppFunctionResponse.Success(currentVersionReturnValue)
         } else {
-            successResponse
+            ExecuteAppFunctionResponse.Success(
+                currentVersionReturnValue.replaceSpecWith(
+                    functionMetadata.response,
+                    functionMetadata.components,
+                )
+            )
         }
     }
 
@@ -161,20 +181,20 @@ internal constructor(
      * [android.content.pm.PackageManager.canPackageQuery]. If a package is not queryable by the
      * calling app, its functions' metadata will not be visible.
      *
-     * Updates to [AppFunctionMetadata] can occur when the app defining the function is updated or
-     * when a function's enabled state changes.
+     * Updates to [AppFunctionPackageMetadata] can occur when the app defining the function is
+     * updated or when a function's enabled state changes.
      *
      * If multiple updates happen within a short duration, only the latest update might be emitted.
      *
      * @param searchSpec an [AppFunctionSearchSpec] instance specifying the filters for searching
      *   the app function metadata.
-     * @return a flow that emits a list of [AppFunctionMetadata] matching the search criteria and
-     *   updated versions of this list when underlying data changes.
+     * @return a flow that emits a list of [AppFunctionPackageMetadata] matching the search criteria
+     *   and updated versions of this list when underlying data changes.
      */
     @RequiresPermission(value = "android.permission.EXECUTE_APP_FUNCTIONS", conditional = true)
     public fun observeAppFunctions(
         searchSpec: AppFunctionSearchSpec
-    ): Flow<List<AppFunctionMetadata>> {
+    ): Flow<List<AppFunctionPackageMetadata>> {
         return appFunctionReader.searchAppFunctions(searchSpec)
     }
 
@@ -183,7 +203,8 @@ internal constructor(
             [APP_FUNCTION_STATE_DEFAULT, APP_FUNCTION_STATE_ENABLED, APP_FUNCTION_STATE_DISABLED]
     )
     @Retention(AnnotationRetention.SOURCE)
-    internal annotation class EnabledState
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public annotation class EnabledState
 
     public companion object {
         /**
@@ -214,21 +235,20 @@ internal constructor(
          * @return `true` if the AppFunctions extension library is available on this device, `false`
          *   otherwise.
          */
-        private fun isExtensionLibraryAvailable(): Boolean {
-            return try {
+        private fun isExtensionLibraryAvailable(): Boolean =
+            try {
                 Class.forName("com.android.extensions.appfunctions.AppFunctionManager")
                 true
             } catch (_: ClassNotFoundException) {
                 false
             }
-        }
 
         /**
          * Gets an instance of [AppFunctionManagerCompat] if the AppFunction feature is supported.
          *
          * The AppFunction feature is supported,
          * * If SDK version is greater or equal to 36
-         * * If SDK version is greater or equal to 33 and the device implements App Function
+         * * If SDK version is greater or equal to 34 and the device implements App Function
          *   extension library.
          *
          * @return an instance of [AppFunctionManagerCompat] if the AppFunction feature is supported
@@ -240,24 +260,24 @@ internal constructor(
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA -> {
                     AppFunctionManagerCompat(
                         context,
-                        Dependencies.translatorSelector,
                         AppSearchAppFunctionReader(
                             context,
                             Dependencies.schemaAppFunctionInventory,
                         ),
                         PlatformAppFunctionManagerApi(context),
+                        Dependencies.translatorSelector,
                     )
                 }
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
                     isExtensionLibraryAvailable() -> {
                     AppFunctionManagerCompat(
                         context,
-                        Dependencies.translatorSelector,
                         AppSearchAppFunctionReader(
                             context,
                             Dependencies.schemaAppFunctionInventory,
                         ),
                         ExtensionAppFunctionManagerApi(context),
+                        Dependencies.translatorSelector,
                     )
                 }
                 else -> {

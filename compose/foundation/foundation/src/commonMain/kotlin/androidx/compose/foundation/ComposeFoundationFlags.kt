@@ -150,4 +150,25 @@ object ComposeFoundationFlags {
      * implementation as an optimization.
      */
     @Suppress("MutableBareField") @JvmField var isNonSuspendingPointerInputInClickableEnabled = true
+
+    /**
+     * With this flag on, the new BasicTextField and the other new TextFields that accept
+     * [androidx.compose.foundation.text.input.TextFieldState] changes their behavior of how they
+     * process arrow/Dpad keys received from input devices such as hardware keyboards, gamepads, or
+     * TV remotes. The new behavior is to always move the cursor first until it reaches the start or
+     * the end of the text. Then the TextField allows to move the focus to the next focusable
+     * element on the screen.
+     */
+    @Suppress("MutableBareField") @JvmField var isTextFieldDpadNavigationEnabled = true
+
+    /**
+     * Controls the behavior of any scrollable container in terms of how it operates to keep the
+     * focused child in view when the container's viewport shrinks. When this flag is enabled, the
+     * scrollable polls the focused area among its descendants to find the most up-to-date area
+     * which should be kept in view. Otherwise, each focused child notifies the scrollable of its
+     * focus area through [onFocusedBoundsChanged].
+     */
+    @Suppress("MutableBareField")
+    @JvmField
+    var isKeepInViewFocusObservationChangeEnabled: Boolean = true
 }

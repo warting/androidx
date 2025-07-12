@@ -17,48 +17,52 @@
 package androidx.navigationevent
 
 import androidx.annotation.MainThread
+import androidx.navigationevent.NavigationEventPriority.Companion.Default
+import androidx.navigationevent.NavigationEventPriority.Companion.Overlay
 
 /**
- * Dispatcher that can be used to register [NavigationEventCallback] instances for handling the
- * in-app callbacks via composition.
+ * Creates a [NavigationEventDispatcher] instance.
+ *
+ * This dispatcher acts as a localized entry point for registering [NavigationEventCallback]
+ * instances and triggering navigation events within a specific part of your application (e.g., a
+ * composable or a fragment). It delegates the actual event processing and callback management to a
+ * [NavigationEventProcessor] that is shared across all parent-child dispatchers.
+ *
+ * @param fallbackOnBackPressed An optional lambda to be invoked if a navigation event completes and
+ *   no registered [NavigationEventCallback] handles it. This provides a default "back" action.
+ * @param onHasEnabledCallbacksChanged An optional lambda that will be called whenever the global
+ *   state of whether there are any enabled callback changes.
  */
 public class NavigationEventDispatcher(
     private val fallbackOnBackPressed: (() -> Unit)? = null,
     private val onHasEnabledCallbacksChanged: ((Boolean) -> Unit)? = null,
 ) {
-    private val inProgressCallbacks: MutableList<NavigationEventCallback> = mutableListOf()
-    /** Callbacks that should be processed with higher priority, before [normalCallbacks]. */
-    private val overlayCallbacks = ArrayDeque<NavigationEventCallback>()
-
-    /** Standard or default callbacks for navigation events. */
-    private val normalCallbacks = ArrayDeque<NavigationEventCallback>()
-
-    private var hasEnabledCallbacks: Boolean = false
-
-    private var updateInputHandler: () -> Unit = {}
 
     /**
-     * Recomputes and updates the current [hasEnabledCallbacks] state based on the enabled status of
-     * all registered callbacks.
-     *
-     * If the enabled state changes, this method invokes [onHasEnabledCallbacksChanged] (when set)
-     * and triggers [updateInputHandler] to update the active callbacks that should participate in
-     * navigation handling.
+     * The internal, shared processor responsible for managing all registered
+     * [NavigationEventCallback]s and orchestrating the actual event dispatching across all
+     * [NavigationEventDispatcher] instances. This ensures consistent ordering and state for all
+     * navigation events.
      */
-    internal fun updateEnabledCallbacks() {
-        val hasEnabledCallbacks = (overlayCallbacks + normalCallbacks).any { it.isEnabled }
-        if (hasEnabledCallbacks != this.hasEnabledCallbacks) {
-            // Update `hasEnabledCallbacks` before notifying, since callbacks may access it directly
-            // and would otherwise see a stale value.
-            this.hasEnabledCallbacks = hasEnabledCallbacks
+    internal val sharedProcessor: NavigationEventProcessor = NavigationEventProcessor()
 
-            onHasEnabledCallbacksChanged?.invoke(hasEnabledCallbacks)
-            updateInputHandler.invoke()
+    init {
+        // If a lambda for changes in enabled callbacks is provided, register it with the
+        // shared processor. This allows this specific dispatcher instance (or its consumers)
+        // to be notified of global changes in the callback enablement state.
+        if (onHasEnabledCallbacksChanged != null) {
+            sharedProcessor.addOnHasEnabledCallbacksChangedCallback(onHasEnabledCallbacksChanged)
         }
     }
 
-    internal fun updateInput(update: () -> Unit) {
-        updateInputHandler = update
+    /**
+     * Adds a callback that will be notified when the overall enabled state of registered callbacks
+     * changes.
+     *
+     * @param callback The callback to invoke when the enabled state changes.
+     */
+    internal fun addOnHasEnabledCallbacksChangedCallback(callback: (Boolean) -> Unit) {
+        sharedProcessor.addOnHasEnabledCallbacksChangedCallback(callback)
     }
 
     /**
@@ -67,143 +71,83 @@ public class NavigationEventDispatcher(
      *
      * @return True if there is at least one enabled callback.
      */
-    public fun hasEnabledCallbacks(): Boolean = hasEnabledCallbacks
+    public fun hasEnabledCallbacks(): Boolean = sharedProcessor.hasEnabledCallbacks()
 
     /**
-     * Add a new [NavigationEventCallback]. Callbacks are invoked in the reverse order in which they
-     * are added, so this newly added [NavigationEventCallback] will be the first callback to be
-     * called.
+     * Recomputes and updates the current [hasEnabledCallbacks] state based on the enabled status of
+     * all registered callbacks. This method should be called whenever a callback's enabled state or
+     * its registration status (added/removed) changes.
+     */
+    internal fun updateEnabledCallbacks() {
+        sharedProcessor.updateEnabledCallbacks()
+    }
+
+    /**
+     * Adds a new [NavigationEventCallback] to receive navigation events.
      *
-     * To remove a callback, use [NavigationEventCallback.remove].
+     * **Callbacks are invoked based on [priority], and then by recency.** All [Overlay] callbacks
+     * are called before any [Default] callbacks. Within each priority group, callbacks are invoked
+     * in a Last-In, First-Out (LIFO) order—the most recently added callback is called first.
      *
-     * The callbacks provided will be invoked on the main thread.
+     * All callbacks are invoked on the main thread. To stop receiving events, a callback must be
+     * removed via [NavigationEventCallback.remove].
+     *
+     * @param callback The callback instance to be added.
+     * @param priority The priority of the callback, determining its invocation order relative to
+     *   others. See [NavigationEventPriority].
+     * @throws IllegalArgumentException if the given callback is already registered with a different
+     *   dispatcher.
      */
     @Suppress("PairedRegistration") // Callback is removed via `NavigationEventCallback.remove()`
     @MainThread
     public fun addCallback(
         callback: NavigationEventCallback,
-        priority: NavigationEventPriority = NavigationEventPriority.Default,
+        priority: NavigationEventPriority = Default,
     ) {
-        check(callback.dispatcher == null) {
-            "Callback '$callback' is already registered with a dispatcher"
-        }
-        when (priority) {
-            NavigationEventPriority.Overlay -> overlayCallbacks.addFirst(callback)
-            NavigationEventPriority.Default -> normalCallbacks.addFirst(callback)
-        }
-
-        callback.dispatcher = this
-
-        updateEnabledCallbacks()
+        sharedProcessor.addCallback(dispatcher = this, callback, priority)
     }
 
     internal fun removeCallback(callback: NavigationEventCallback) {
-        // If the callback is currently being processed (i.e., it's in `inProgressCallbacks`),
-        // it needs to be notified of cancellation and then removed from the in-progress tracking.
-        if (callback in inProgressCallbacks) {
-            callback.onEventCancelled()
-            inProgressCallbacks -= callback
-        }
-
-        // Attempt to remove the callback from both overlay and normal callback lists.
-        // It's okay if the callback is not present.
-        overlayCallbacks.remove(callback)
-        normalCallbacks.remove(callback)
-
-        callback.dispatcher = null
-
-        updateEnabledCallbacks()
+        sharedProcessor.removeCallback(callback)
     }
 
     /**
-     * Dispatch an [NavigationEventCallback.onEventStarted] event with the given event to the proper
-     * callbacks
+     * Dispatch an [NavigationEventCallback.onEventStarted] event with the given event. This call is
+     * delegated to the shared [NavigationEventProcessor].
      *
      * @param event [NavigationEvent] to dispatch to the callbacks.
      */
     @MainThread
     public fun dispatchOnStarted(event: NavigationEvent) {
-        if (inProgressCallbacks.isNotEmpty()) {
-            // It's important to ensure that any ongoing operations from previous events are
-            // properly cancelled before starting new ones to maintain a consistent state.
-            dispatchOnCancelled()
-        }
-
-        for (callback in getEnabledCallbacks()) {
-            // Add callback to `inProgressCallbacks` *before* execution. This ensures `onCancelled`
-            // can be called even if the callback removes itself during `onEventStarted`.
-            inProgressCallbacks += callback
-            callback.onEventStarted(event)
-
-            // If callback does not allow the event to pass through to other callbacks, stop.
-            if (!callback.isPassThrough) break
-        }
+        sharedProcessor.dispatchOnStarted(event)
     }
 
     /**
-     * Dispatch an [NavigationEventCallback.onEventProgressed] event with the given event to the
-     * proper callbacks
+     * Dispatch an [NavigationEventCallback.onEventProgressed] event with the given event. This call
+     * is delegated to the shared [NavigationEventProcessor].
      *
      * @param event [NavigationEvent] to dispatch to the callbacks.
      */
     @MainThread
     public fun dispatchOnProgressed(event: NavigationEvent) {
-        // If there is callbacks in progress, only those are notified.
-        // Otherwise, all enabled callbacks are notified.
-        val callbacks = inProgressCallbacks.toList().ifEmpty { getEnabledCallbacks() }
-        // Do not clear in-progress, as `progressed` is not a terminal event.
-
-        for (callback in callbacks) {
-            callback.onEventProgressed(event)
-
-            // If callback does not allow the event to pass through to other callbacks, stop.
-            if (!callback.isPassThrough) break
-        }
+        sharedProcessor.dispatchOnProgressed(event)
     }
 
     /**
-     * Dispatch an [NavigationEventCallback.onEventCompleted] event with the given event to the
-     * proper callbacks
+     * Dispatch an [NavigationEventCallback.onEventCompleted] event. This call is delegated to the
+     * shared [NavigationEventProcessor], passing the fallback action.
      */
     @MainThread
     public fun dispatchOnCompleted() {
-        // If there is callbacks in progress, only those are notified.
-        // Otherwise, all enabled callbacks are notified.
-        val callbacks = inProgressCallbacks.toList().ifEmpty { getEnabledCallbacks() }
-        inProgressCallbacks.clear() // Clear in-progress, as 'completed' is a terminal event.
-
-        if (callbacks.isEmpty()) {
-            fallbackOnBackPressed?.invoke()
-        } else {
-            for (callback in callbacks) {
-                callback.onEventCompleted()
-
-                // If callback does not allow the event to pass through to other callbacks, stop.
-                if (!callback.isPassThrough) break
-            }
-        }
+        sharedProcessor.dispatchOnCompleted(fallbackOnBackPressed)
     }
 
     /**
-     * Dispatch an [NavigationEventCallback.onEventCancelled] event with the given event to the
-     * proper callbacks
+     * Dispatch an [NavigationEventCallback.onEventCancelled] event. This call is delegated to the
+     * shared [NavigationEventProcessor].
      */
     @MainThread
     public fun dispatchOnCancelled() {
-        // If there is callbacks in progress, only those are notified.
-        // Otherwise, all enabled callbacks are notified.
-        val callbacks = inProgressCallbacks.toList().ifEmpty { getEnabledCallbacks() }
-        inProgressCallbacks.clear() // Clear in-progress, as 'cancelled' is a terminal event.
-
-        for (callback in callbacks) {
-            callback.onEventCancelled()
-
-            // If callback does not allow the event to pass through to other callbacks, stop.
-            if (!callback.isPassThrough) break
-        }
-    }
-
-    private fun getEnabledCallbacks(): List<NavigationEventCallback> {
-        return (overlayCallbacks + normalCallbacks).filter { callback -> callback.isEnabled }
+        sharedProcessor.dispatchOnCancelled()
     }
 }

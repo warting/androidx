@@ -37,7 +37,7 @@ android {
     defaultConfig {
         // TODO: This should be lower, possibly 21.
         //       Address API calls that require higher versions.
-        minSdkVersion 34
+        minSdk = 34
     }
     namespace = "androidx.xr.scenecore.samples.visibilitytest"
 
@@ -55,8 +55,6 @@ androidx {
     type = SoftwareType.TEST_APPLICATION
     inceptionYear = "2024"
     description = "Test app that exercises the SceneCore Visibility API."
-    // TODO: b/326456246
-    optOutJSpecify = true
 }
 
 dependencies {

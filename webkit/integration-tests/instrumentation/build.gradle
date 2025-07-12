@@ -15,6 +15,7 @@ plugins {
 
 android {
     namespace = "androidx.webkit.instrumentation"
+    compileSdk = 35
 
     flavorDimensions = ["targetSdk"]
 
@@ -42,6 +43,7 @@ dependencies {
     androidTestImplementation(project(":webkit:integration-tests:common"))
 
     androidTestImplementation(libs.okhttpMockwebserver)
+    androidTestImplementation(libs.okhttpTls)
     androidTestImplementation(libs.testExtJunit)
     androidTestImplementation(libs.testCore)
     androidTestImplementation(libs.testRunner)

@@ -25,6 +25,7 @@ import androidx.core.util.isEmpty
 import androidx.core.util.keyIterator
 import androidx.core.util.valueIterator
 import androidx.pdf.PdfDocument
+import androidx.pdf.PdfPoint
 import androidx.pdf.models.FormWidgetInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -200,9 +201,20 @@ internal class PageManager(
         pages.put(pageNum, page)
     }
 
+    fun maybeLoadFormWidgetMetadata(formWidgetMetadataLoader: FormWidgetMetadataLoader) {
+        pages.valueIterator().forEach {
+            if (it.formWidgetInfos == null) {
+                it.maybeUpdateFormWidgetInfos(formWidgetMetadataLoader)
+            }
+        }
+    }
+
     /** Updates the form widget information in the given [pageNum] when a edit is applied. */
-    fun maybeUpdateFormWidgetMetadata(pageNum: Int) {
-        pages[pageNum]?.maybeUpdateFormWidgetInfos()
+    fun maybeUpdateFormWidgetMetadata(
+        pageNum: Int,
+        formWidgetMetadataLoader: FormWidgetMetadataLoader,
+    ) {
+        pages[pageNum]?.maybeUpdateFormWidgetInfos(formWidgetMetadataLoader)
     }
 
     /** Adds [newHighlights]s to this manager to be drawn along with the pages they belong to */

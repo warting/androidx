@@ -16,6 +16,7 @@
 
 package androidx.webkit.internal;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
@@ -31,7 +32,6 @@ import android.webkit.WebView;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.VisibleForTesting;
 import androidx.webkit.Navigation;
-import androidx.webkit.OutcomeReceiverCompat;
 import androidx.webkit.Page;
 import androidx.webkit.PrerenderOperationCallback;
 import androidx.webkit.Profile;
@@ -74,6 +74,7 @@ import java.util.regex.Pattern;
  * Enum representing a WebView feature, this provides functionality for determining whether a
  * feature is supported by the current framework and/or WebView APK.
  */
+@SuppressLint("UnsafeOptInUsageError") // Prevent lint errors from experimental feature names.
 public class WebViewFeatureInternal {
     /**
      * This feature covers
@@ -765,8 +766,8 @@ public class WebViewFeatureInternal {
      * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
      * This feature covers
      * {@link WebResourceResponseCompat#setCookies(List)},
-     * {@link WebSettingsCompat#setIncludeCookiesOnShouldInterceptRequestEnabled(WebSettings, boolean)},
-     * {@link WebSettingsCompat#isIncludeCookiesOnShouldInterceptRequestEnabled(WebSettings)},
+     * {@link WebSettingsCompat#setCookiesIncludedInShouldInterceptRequest(WebSettings, boolean)},
+     * {@link WebSettingsCompat#areCookiesIncludedInShouldInterceptRequest(WebSettings)},
      * {@link ServiceWorkerWebSettingsCompat#setIncludeCookiesOnShouldInterceptRequestEnabled(boolean)}, and
      * {@link ServiceWorkerWebSettingsCompat#isIncludeCookiesOnShouldInterceptRequestEnabled()}.
      */
@@ -781,6 +782,15 @@ public class WebViewFeatureInternal {
     public static final ApiFeature.NoFramework WARM_UP_RENDERER_PROCESS =
             new ApiFeature.NoFramework(WebViewFeature.WARM_UP_RENDERER_PROCESS,
                     Features.WARM_UP_RENDERER_PROCESS);
+
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers {@link Profile#setOriginMatchedHeader(String, String, Set)},
+     * {@link Profile#clearOriginMatchedHeader(String)}, and {@link Profile#clearAllOriginMatchedHeaders()}.
+     */
+    public static final ApiFeature.NoFramework ORIGIN_MATCHED_HEADERS =
+            new ApiFeature.NoFramework(WebViewFeature.ORIGIN_MATCHED_HEADERS,
+                    Features.EXTRA_HEADER_FOR_ORIGINS);
 
     // --- Add new feature constants above this line ---
 

@@ -17,9 +17,13 @@
 package androidx.xr.runtime.openxr
 
 import androidx.annotation.RestrictTo
+import androidx.xr.runtime.Config
+import androidx.xr.runtime.VpsAvailabilityResult
 import androidx.xr.runtime.internal.Anchor
 import androidx.xr.runtime.internal.AnchorInvalidUuidException
 import androidx.xr.runtime.internal.AnchorResourcesExhaustedException
+import androidx.xr.runtime.internal.DepthMap
+import androidx.xr.runtime.internal.Face
 import androidx.xr.runtime.internal.Hand
 import androidx.xr.runtime.internal.HitResult
 import androidx.xr.runtime.internal.PerceptionManager
@@ -29,6 +33,7 @@ import androidx.xr.runtime.internal.ViewCamera
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Ray
 import androidx.xr.runtime.math.Vector3
+import java.nio.ByteBuffer
 import java.util.Arrays
 import java.util.UUID
 
@@ -108,7 +113,14 @@ internal constructor(private val timeSource: OpenXrTimeSource) : PerceptionManag
     override val viewCameras: List<ViewCamera>
         get() = xrResources.viewCameras
 
+    override val userFace: Face?
+        get() = xrResources.userFace
+
     override val earth: OpenXrEarth = xrResources.earth
+
+    override val depthMaps: List<DepthMap> =
+        listOf(xrResources.leftDepthMap, xrResources.rightDepthMap)
+    internal var depthEstimationMode = Config.DepthEstimationMode.DISABLED
 
     private var lastUpdateXrTime: Long = 0L
 
@@ -126,7 +138,32 @@ internal constructor(private val timeSource: OpenXrTimeSource) : PerceptionManag
         // TODO(b/421191332): Add the View Camera config and apply it for poseInUnboundedSpace.
         updateViewCameras(xrTime, false)
 
+        if (depthEstimationMode != Config.DepthEstimationMode.DISABLED) {
+            val depthMapBuffers = nativeGetDepthImagesDataBuffers(xrTime)
+            xrResources.leftDepthMap.update(depthMapBuffers)
+            xrResources.rightDepthMap.update(depthMapBuffers)
+        }
+
         lastUpdateXrTime = xrTime
+    }
+
+    override suspend fun checkVpsAvailability(
+        latitude: Double,
+        longitude: Double,
+    ): VpsAvailabilityResult {
+        throw NotImplementedError("Not implemented on OpenXR runtime.")
+    }
+
+    internal fun updateAugmentedObjects(xrTime: Long) {
+        val objects = nativeGetAugmentedObjects(xrTime)
+        // Add new objects to the list of trackables.
+        for (obj in objects) {
+            if (xrResources.trackablesMap.containsKey(obj)) continue
+
+            val trackable = OpenXrAugmentedObject(obj, timeSource, xrResources)
+            xrResources.addTrackable(obj, trackable)
+            xrResources.addUpdatable(trackable as Updatable)
+        }
     }
 
     internal fun updatePlanes(xrTime: Long) {
@@ -179,6 +216,8 @@ internal constructor(private val timeSource: OpenXrTimeSource) : PerceptionManag
 
     private external fun nativeCreateAnchor(pose: Pose, timestampNs: Long): Long
 
+    private external fun nativeGetAugmentedObjects(timestampNs: Long): LongArray
+
     private external fun nativeGetPlanes(): LongArray
 
     private external fun nativeGetPlaneType(planeId: Long, timestampNs: Long): Int
@@ -204,4 +243,6 @@ internal constructor(private val timeSource: OpenXrTimeSource) : PerceptionManag
         isHeadTrackingEnabled: Boolean,
         timestampNs: Long,
     ): Array<ViewCameraState>?
+
+    private external fun nativeGetDepthImagesDataBuffers(timestampNs: Long): Array<ByteBuffer>
 }

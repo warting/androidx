@@ -21,18 +21,24 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.internal.ReceiveContentConfiguration
 import androidx.compose.foundation.content.readPlainText
+import androidx.compose.foundation.contextmenu.ContextMenuScope
+import androidx.compose.foundation.contextmenu.ContextMenuState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapAndPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.internal.checkPreconditionNotNull
-import androidx.compose.foundation.internal.hasText
+import androidx.compose.foundation.internal.isAutofillAvailable
 import androidx.compose.foundation.internal.readText
 import androidx.compose.foundation.internal.toClipEntry
 import androidx.compose.foundation.text.DefaultCursorThickness
 import androidx.compose.foundation.text.Handle
+import androidx.compose.foundation.text.MenuItemsAvailability
+import androidx.compose.foundation.text.TextContextMenuItems
+import androidx.compose.foundation.text.TextContextMenuItems.*
 import androidx.compose.foundation.text.TextDragObserver
+import androidx.compose.foundation.text.TextItem
 import androidx.compose.foundation.text.contextmenu.modifier.ToolbarRequester
 import androidx.compose.foundation.text.getLineHeight
 import androidx.compose.foundation.text.input.TextFieldCharSequence
@@ -58,13 +64,14 @@ import androidx.compose.foundation.text.selection.MouseSelectionObserver
 import androidx.compose.foundation.text.selection.PlatformSelectionBehaviors
 import androidx.compose.foundation.text.selection.SelectionAdjustment
 import androidx.compose.foundation.text.selection.SelectionLayout
+import androidx.compose.foundation.text.selection.awaitSelectionGestures
 import androidx.compose.foundation.text.selection.containsInclusive
 import androidx.compose.foundation.text.selection.getAdjustedCoordinates
 import androidx.compose.foundation.text.selection.getSelectionHandleCoordinates
 import androidx.compose.foundation.text.selection.getTextFieldSelectionLayout
 import androidx.compose.foundation.text.selection.isPrecisePointer
-import androidx.compose.foundation.text.selection.selectionGesturePointerInputBtf2
 import androidx.compose.foundation.text.selection.visibleBounds
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,7 +89,6 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.text.AnnotatedString
@@ -116,6 +122,7 @@ import kotlinx.coroutines.launch
  * @param toolbarRequester The [ToolbarRequester] used to show and hide text floating toolbar.
  * @param coroutineScope The [coroutineScope] bounds to the composition.
  * @param platformSelectionBehaviors The platform specific selection behaviors.
+ * @param clipboard The [Clipboard] used to copy/cut/paste text.
  */
 @OptIn(ExperimentalFoundationApi::class)
 internal class TextFieldSelectionState(
@@ -128,16 +135,14 @@ internal class TextFieldSelectionState(
     private var isPassword: Boolean,
     private val toolbarRequester: ToolbarRequester,
     private val coroutineScope: CoroutineScope,
-    private val platformSelectionBehaviors: PlatformSelectionBehaviors?,
+    internal val platformSelectionBehaviors: PlatformSelectionBehaviors?,
+    private var clipboard: Clipboard,
 ) {
     /** [HapticFeedback] handle to perform haptic feedback. */
     private var hapticFeedBack: HapticFeedback? = null
 
     /** A handler to trigger the [TextToolbar] to be shown or hidden */
     private var textToolbarHandler: TextToolbarHandler? = null
-
-    /** [Clipboard] to perform clipboard features. */
-    private var clipboard: Clipboard? = null
 
     /** Whether user is interacting with the UI in touch mode. */
     var isInTouchMode: Boolean by mutableStateOf(true)
@@ -377,6 +382,8 @@ internal class TextFieldSelectionState(
         if (!enabled) {
             hideTextToolbar()
         }
+        val previousClipboard = clipboard
+
         this.hapticFeedBack = hapticFeedBack
         this.clipboard = clipboard
         this.textToolbarHandler = showTextToolbar
@@ -384,6 +391,10 @@ internal class TextFieldSelectionState(
         this.enabled = enabled
         this.readOnly = readOnly
         this.isPassword = isPassword
+
+        if (previousClipboard !== clipboard) {
+            clipboardPasteState = ClipboardPasteState(clipboard)
+        }
     }
 
     /** Implements the complete set of gestures supported by the cursor handle. */
@@ -450,7 +461,6 @@ internal class TextFieldSelectionState(
 
     fun dispose() {
         hideTextToolbar()
-        clipboard = null
         hapticFeedBack = null
     }
 
@@ -667,7 +677,7 @@ internal class TextFieldSelectionState(
      *   exception is the first mouse down does immediately place the cursor at the position.
      */
     suspend fun PointerInputScope.textFieldSelectionGestures(requestFocus: () -> Unit) {
-        selectionGesturePointerInputBtf2(
+        awaitSelectionGestures(
             mouseSelectionObserver = TextFieldMouseSelectionObserver(requestFocus),
             textDragObserver = TextFieldTextDragObserver(requestFocus),
         )
@@ -1370,7 +1380,7 @@ internal class TextFieldSelectionState(
         if (text.selection.collapsed) return
 
         val textToCut = AnnotatedString(text.getSelectedText().toString())
-        clipboard?.setClipEntry(textToCut.toClipEntry())
+        clipboard.setClipEntry(textToCut.toClipEntry())
 
         textFieldState.deleteSelectedText()
     }
@@ -1394,7 +1404,7 @@ internal class TextFieldSelectionState(
         if (text.selection.collapsed) return
 
         val textToCopy = AnnotatedString(text.getSelectedText().toString())
-        clipboard?.setClipEntry(textToCopy.toClipEntry())
+        clipboard.setClipEntry(textToCopy.toClipEntry())
 
         if (!cancelSelection) return
 
@@ -1403,11 +1413,9 @@ internal class TextFieldSelectionState(
 
     // TODO(grantapher) android ClipboardManager has a way to notify primary clip changes.
     //  That could possibly be used so that this doesn't have to be updated manually.
-    private var clipEntry: ClipEntry? by mutableStateOf(null)
+    private var clipboardPasteState = ClipboardPasteState(clipboard)
 
-    suspend fun updateClipboardEntry() {
-        clipEntry = clipboard?.getClipEntry()
-    }
+    suspend fun updateClipboardEntry() = clipboardPasteState.update()
 
     /**
      * Whether a paste operation can execute now and have a meaningful effect. The paste operation
@@ -1419,16 +1427,16 @@ internal class TextFieldSelectionState(
     fun canPaste(): Boolean {
         if (!editable) return false
         // if receive content is not configured, we expect at least a text item to be present
-        if (clipEntry?.hasText() == true) return true
+        if (clipboardPasteState.hasText) return true
         // if receive content is configured, hasClip should be enough to show the paste option
-        return receiveContentConfiguration?.invoke() != null && clipEntry != null
+        return receiveContentConfiguration?.invoke() != null && clipboardPasteState.hasClip
     }
 
     suspend fun paste() {
         val receiveContentConfiguration =
             receiveContentConfiguration?.invoke() ?: return pasteAsPlainText()
 
-        val clipEntry = clipboard?.getClipEntry() ?: return pasteAsPlainText()
+        val clipEntry = clipboard.getClipEntry() ?: return pasteAsPlainText()
         val clipMetadata = clipEntry.clipMetadata
 
         val remaining =
@@ -1459,7 +1467,7 @@ internal class TextFieldSelectionState(
      * end of the newly added text.
      */
     private suspend fun pasteAsPlainText() {
-        val clipboardText = clipboard?.getClipEntry()?.readText() ?: return
+        val clipboardText = clipboard.getClipEntry()?.readText() ?: return
 
         textFieldState.replaceSelectedText(
             clipboardText,
@@ -1689,7 +1697,43 @@ internal interface TextToolbarHandler {
     fun hideTextToolbar()
 }
 
+internal fun TextFieldSelectionState.contextMenuBuilder(
+    state: ContextMenuState,
+    itemsAvailability: State<MenuItemsAvailability>,
+    onMenuItemClicked: TextFieldSelectionState.(TextContextMenuItems) -> Unit,
+): ContextMenuScope.() -> Unit = {
+    fun textFieldItem(label: TextContextMenuItems, enabled: Boolean) {
+        TextItem(state, label, enabled) { onMenuItemClicked(label) }
+    }
+
+    val availability: MenuItemsAvailability = itemsAvailability.value
+
+    textFieldItem(Cut, enabled = availability.canCut)
+    textFieldItem(Copy, enabled = availability.canCopy)
+    textFieldItem(Paste, enabled = availability.canPaste)
+    textFieldItem(SelectAll, enabled = availability.canSelectAll)
+    if (isAutofillAvailable()) {
+        textFieldItem(Autofill, enabled = availability.canAutofill)
+    }
+}
+
 internal expect fun Modifier.addBasicTextFieldTextContextMenuComponents(
     state: TextFieldSelectionState,
     coroutineScope: CoroutineScope,
 ): Modifier
+
+/**
+ * The way we calculate whether something can be pasted from Clipboard can be different on each
+ * platform due to Clipboard permissions and access warnings. Furthermore, [update] may want to
+ * cache information to be able to evaluate [hasText] and [hasClip] more efficiently.
+ *
+ * Therefore, this class provides the necessary abstraction between platforms to help access
+ * [Clipboard] more effectively.
+ */
+internal expect class ClipboardPasteState(clipboard: Clipboard) {
+    val hasText: Boolean
+
+    val hasClip: Boolean
+
+    suspend fun update()
+}

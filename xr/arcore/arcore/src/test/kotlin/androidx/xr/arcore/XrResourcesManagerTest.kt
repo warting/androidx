@@ -26,9 +26,13 @@ import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.testing.FakePerceptionManager
 import androidx.xr.runtime.testing.FakeRuntimeAnchor
 import androidx.xr.runtime.testing.FakeRuntimeArDevice
+import androidx.xr.runtime.testing.FakeRuntimeAugmentedObject
+import androidx.xr.runtime.testing.FakeRuntimeDepthMap
 import androidx.xr.runtime.testing.FakeRuntimeEarth
+import androidx.xr.runtime.testing.FakeRuntimeFace
 import androidx.xr.runtime.testing.FakeRuntimeHand
 import androidx.xr.runtime.testing.FakeRuntimePlane
+import androidx.xr.runtime.testing.FakeRuntimeViewCamera
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
@@ -51,7 +55,7 @@ class XrResourcesManagerTest {
     @Before
     fun setUp() {
         underTest = XrResourcesManager()
-        FakeRuntimeAnchor.anchorsCreated = 0
+        FakeRuntimeAnchor.anchorsCreatedCount = 0
     }
 
     @After
@@ -79,12 +83,24 @@ class XrResourcesManagerTest {
     }
 
     @Test
-    fun initiateArDevice_setsArDevice() {
+    fun initiateArDevice_setsArDeviceAndViewCameras() {
         val runtimeArDevice = FakeRuntimeArDevice()
-
-        underTest.initiateArDevice(runtimeArDevice)
+        val runtimeViewCameras = listOf(FakeRuntimeViewCamera(), FakeRuntimeViewCamera())
+        underTest.initiateArDeviceAndViewCameras(runtimeArDevice, runtimeViewCameras)
 
         assertThat(underTest.arDevice.runtimeArDevice).isEqualTo(runtimeArDevice)
+        assertThat(underTest.viewCameras.size).isEqualTo(2)
+        assertThat(underTest.viewCameras[0].state.value.pose).isEqualTo(runtimeViewCameras[0].pose)
+        assertThat(underTest.viewCameras[1].state.value.pose).isEqualTo(runtimeViewCameras[1].pose)
+    }
+
+    @Test
+    fun initiateFace_setsAvailableFace() {
+        val runtimeFace = FakeRuntimeFace()
+
+        underTest.initiateFace(runtimeFace)
+
+        assertThat(underTest.userFace!!.runtimeFace).isEqualTo(runtimeFace)
     }
 
     @Test
@@ -145,6 +161,19 @@ class XrResourcesManagerTest {
     }
 
     @Test
+    fun syncTrackables_handlesAugmentedObjects() {
+        val runtimeTrackable1 = FakeRuntimeAugmentedObject()
+        val runtimeTrackable2 = FakeRuntimeAugmentedObject()
+        val runtimeTrackable3 = FakeRuntimeAugmentedObject()
+
+        underTest.syncTrackables(listOf(runtimeTrackable1, runtimeTrackable2))
+
+        assertThat(underTest.trackablesMap[runtimeTrackable1]).isNotNull()
+        assertThat(underTest.trackablesMap[runtimeTrackable2]).isNotNull()
+        assertThat(underTest.trackablesMap[runtimeTrackable3]).isNull()
+    }
+
+    @Test
     fun clear_clearsAllTrackables() {
         underTest.syncTrackables(listOf(FakeRuntimePlane()))
         check(underTest.trackablesMap.isNotEmpty())
@@ -179,6 +208,21 @@ class XrResourcesManagerTest {
         underTest.update()
 
         assertThat(underTest.earth.state.value).isEqualTo(Earth.State.RUNNING)
+    }
+
+    @Test
+    fun update_updatesDepthMaps() = doBlocking {
+        val runtimeDepthMap = FakeRuntimeDepthMap()
+        underTest.initiateDepthMaps(listOf(runtimeDepthMap))
+        underTest.update()
+        check(underTest.depthMaps.size == 1)
+        check(underTest.depthMaps[0].state.value.width == 0)
+        val expectedWidth: Int = 100
+        runtimeDepthMap.width = expectedWidth
+
+        underTest.update()
+
+        assertThat(underTest.depthMaps[0].state.value.width).isEqualTo(expectedWidth)
     }
 
     private fun createTestSessionAndRunTest(testBody: () -> Unit) {

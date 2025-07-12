@@ -17,8 +17,11 @@
 package androidx.xr.runtime
 
 import android.Manifest
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.xr.runtime.internal.ApkCheckAvailabilityErrorException
 import androidx.xr.runtime.internal.ApkCheckAvailabilityInProgressException
@@ -47,8 +50,10 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
+import org.robolectric.annotation.LooperMode
 
 @RunWith(AndroidJUnit4::class)
+@LooperMode(LooperMode.Mode.PAUSED)
 class SessionTest {
     private lateinit var underTest: Session
     private lateinit var activityController: ActivityController<ComponentActivity>
@@ -191,8 +196,9 @@ class SessionTest {
             underTest.config ==
                 Config(
                     planeTracking = Config.PlaneTrackingMode.HORIZONTAL_AND_VERTICAL,
+                    augmentedObjectCategories = AugmentedObjectCategory.all(),
                     handTracking = Config.HandTrackingMode.BOTH,
-                    headTracking = Config.HeadTrackingMode.LAST_KNOWN,
+                    deviceTracking = Config.DeviceTrackingMode.LAST_KNOWN,
                     depthEstimation = Config.DepthEstimationMode.SMOOTH_AND_RAW,
                     anchorPersistence = Config.AnchorPersistenceMode.LOCAL,
                 )
@@ -200,8 +206,9 @@ class SessionTest {
         val newConfig =
             Config(
                 planeTracking = Config.PlaneTrackingMode.DISABLED,
+                augmentedObjectCategories = listOf<AugmentedObjectCategory>(),
                 handTracking = Config.HandTrackingMode.DISABLED,
-                headTracking = Config.HeadTrackingMode.DISABLED,
+                deviceTracking = Config.DeviceTrackingMode.DISABLED,
                 depthEstimation = Config.DepthEstimationMode.DISABLED,
                 anchorPersistence = Config.AnchorPersistenceMode.DISABLED,
             )
@@ -223,7 +230,10 @@ class SessionTest {
 
         val result =
             underTest.configure(
-                underTest.config.copy(depthEstimation = Config.DepthEstimationMode.DISABLED)
+                underTest.config.copy(
+                    depthEstimation = Config.DepthEstimationMode.DISABLED,
+                    faceTracking = Config.FaceTrackingMode.DISABLED,
+                )
             )
 
         assertThat(result).isInstanceOf(SessionConfigurePermissionsNotGranted::class.java)
@@ -283,15 +293,18 @@ class SessionTest {
 
             // First resume and update
             activityController.resume()
+            shadowOf(Looper.getMainLooper()).idle()
             advanceUntilIdle()
             val beforeTimeMark = underTest.state.value.timeMark
             check(beforeTimeMark != initialTimeMark)
             activityController.pause()
+            shadowOf(Looper.getMainLooper()).idle()
             advanceUntilIdle()
             timeSource += expectedDuration
 
             lifecycleManager.allowOneMoreCallToUpdate()
             activityController.resume()
+            shadowOf(Looper.getMainLooper()).idle()
             advanceUntilIdle()
 
             val afterTimeMark = underTest.state.value.timeMark
@@ -347,7 +360,7 @@ class SessionTest {
     }
 
     @Test
-    fun destroy_resumed_setsLifecycleToStopped() {
+    fun destroy_resumed_setsLifecycleToDestroyed() {
         activityController.create().start().resume()
         underTest = createSession()
 
@@ -358,7 +371,7 @@ class SessionTest {
     }
 
     @Test
-    fun destroy_setsPlatformAdapterToStopped() {
+    fun destroy_setsPlatformAdapterToDestroyed() {
         activityController.create().start().resume()
         underTest = createSession()
 
@@ -419,6 +432,22 @@ class SessionTest {
 
             assertThat(job.isCancelled).isTrue()
         }
+
+    @Test
+    fun destroy_activityDestroyedWithCustomLifecycleOwner_setsLifecycleToDestroyed() {
+        activityController.create().start().resume()
+        val lifecycleOwner =
+            object : LifecycleOwner {
+                override val lifecycle: Lifecycle
+                    get() = LifecycleRegistry(this)
+            }
+        underTest = (Session.create(activity, lifecycleOwner) as SessionCreateSuccess).session
+
+        activityController.destroy()
+
+        val lifecycleManager = underTest.runtime.lifecycleManager as FakeLifecycleManager
+        assertThat(lifecycleManager.state).isEqualTo(FakeLifecycleManager.State.DESTROYED)
+    }
 
     private fun createSession(coroutineDispatcher: CoroutineDispatcher = testDispatcher): Session {
         val result = Session.create(activity, coroutineDispatcher)
