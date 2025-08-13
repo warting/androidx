@@ -48,7 +48,6 @@ import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.attributes.BuildTypeAttr
 import com.android.build.api.dsl.AarMetadata
 import com.android.build.api.dsl.ApplicationExtension
-import com.android.build.api.dsl.CommonExtension
 import com.android.build.api.dsl.KotlinMultiplatformAndroidDeviceTestCompilation
 import com.android.build.api.dsl.KotlinMultiplatformAndroidHostTestCompilation
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
@@ -590,7 +589,6 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
             isTestApp = true,
         )
         project.buildOnServerDependsOnAssembleRelease()
-        project.buildOnServerDependsOnLint()
     }
 
     private fun configureWithTestPlugin(project: Project, androidXExtension: AndroidXExtension) {
@@ -829,12 +827,6 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
         project.addToBuildOnServer("assembleRelease")
     }
 
-    private fun Project.buildOnServerDependsOnLint() {
-        if (!project.usingMaxDepVersions().get()) {
-            project.addToBuildOnServer("lint")
-        }
-    }
-
     private fun HasDeviceTests.configureTests() {
         deviceTests.forEach { (_, deviceTest) ->
             deviceTest.packaging.resources.apply {
@@ -944,7 +936,6 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
             project.addToBuildOnServer(verifyELFRegionAlignmentTaskProvider)
         }
         project.buildOnServerDependsOnAssembleRelease()
-        project.buildOnServerDependsOnLint()
     }
 
     private fun configureGradlePluginPlugin(project: Project) {
@@ -1038,10 +1029,16 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
         afterEvaluate { androidXExtension.validateMavenVersion() }
     }
 
-    private fun CommonExtension<*, *, *, *, *, *>.configureAndroidBaseOptions(
+    private fun Any.configureAndroidBaseOptions(
         project: Project,
         androidXExtension: AndroidXExtension,
     ) {
+        // Workaround to avoid specifying the parametrized types of CommonExtension explicitly
+        // So we can clean up the parameters in AGP
+        // The compiler can infer that this is CommonExtension from these checks
+        if (this !is ApplicationExtension && this !is LibraryExtension && this !is TestExtension) {
+            throw IllegalArgumentException("Unexpected extension: $this")
+        }
         compileOptions.apply {
             sourceCompatibility = VERSION_1_8
             targetCompatibility = VERSION_1_8

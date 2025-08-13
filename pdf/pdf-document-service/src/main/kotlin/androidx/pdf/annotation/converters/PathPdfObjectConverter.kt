@@ -26,8 +26,7 @@ import androidx.pdf.utils.getPathFromPathInputs
 /** Converts a [PathPdfObject] to a AOSP [PdfPagePathObject]. */
 @RequiresExtension(extension = Build.VERSION_CODES.S, version = 18)
 internal class PathPdfObjectConverter : Converter<PathPdfObject, PdfPagePathObject> {
-    override fun convert(from: PathPdfObject): PdfPagePathObject {
-        // TODO: Clean up toAospPdfPageObject from annotationUtils
+    override fun convert(from: PathPdfObject, vararg args: Any): PdfPagePathObject {
         val path = from.inputs.getPathFromPathInputs()
         return PdfPagePathObject(path).apply {
             strokeWidth = from.brushWidth

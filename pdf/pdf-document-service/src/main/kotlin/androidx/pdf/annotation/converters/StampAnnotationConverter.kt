@@ -26,8 +26,7 @@ import androidx.pdf.annotation.models.StampAnnotation
 /** Converts a [StampAnnotation] to a [AospStampAnnotation]. */
 @RequiresExtension(extension = Build.VERSION_CODES.S, version = 18)
 internal class StampAnnotationConverter : Converter<StampAnnotation, AospStampAnnotation> {
-    override fun convert(from: StampAnnotation): AospStampAnnotation {
-        // TODO: Clean up toAospStampAnnotation from annotationUtils
+    override fun convert(from: StampAnnotation, vararg args: Any): AospStampAnnotation {
         val aospStampAnnotation = AospStampAnnotation(from.bounds)
         for (pdfObject in from.pdfObjects) {
             val converter = PdfObjectConvertersFactory.create<PdfObject>(pdfObject)
